@@ -314,8 +314,8 @@
                 let nv = row[4];
                 let ma_kh = row[5];
                 let ten_kh = row[6];
-                let lng = parseFloat(row[22]); // Cột W
-                let lat = parseFloat(row[23]); // Cột X
+                let lat = parseFloat(row[22]); // Cột W (chứa giá trị 10.x)
+                let lng = parseFloat(row[23]); // Cột X (chứa giá trị 106.x)
 
                 // Lọc tọa độ hợp lệ
                 let isValidCoord = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
