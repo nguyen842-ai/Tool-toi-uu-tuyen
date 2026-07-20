@@ -444,7 +444,6 @@
 
     // ================= XỬ LÝ SỰ KIỆN FILTER =================
     function resetViewStates() {
-        // Ẩn bảng, làm sạch mảng lưu và ẩn toggle toolbar khi chuyển đổi filter
         dashboard.style.display = 'none';
         currentRouteOriginal = [];
         currentRouteOptimized = [];
@@ -506,7 +505,6 @@
         const area = selArea.value; const npp = selNPP.value; const nv = selNV.value; 
         if (!nv) { clearDayChips(); return; }
         
-        // Đổi hình Avatar (Giả lập)
         document.getElementById('avatar-img').src = `New folder/images/${nv}.PNG`;
         
         let thus = [...new Set(rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv).map(r => r[COL.THU]))].filter(Boolean);
@@ -533,7 +531,6 @@
     };
 
     function updateDaySelection() {
-        // Cập nhật style CSS cho Chips
         document.querySelectorAll('.chip-day').forEach(el => {
             if(selectedDays.includes(el.getAttribute('data-day'))) el.classList.add('active');
             else el.classList.remove('active');
@@ -545,10 +542,10 @@
             else chipAll.classList.remove('active');
         }
 
-        // Bật/Tắt các nút bấm
         btnDlMapWeek.disabled = (selectedDays.length === 0);
-        // Chức năng AI chỉ mở khi chọn đúng 1 ngày
-        btnOptimize.disabled = (selectedDays.length !== 1);
+        
+        // MỞ KHÓA CHO NHIỀU NGÀY: Giờ đây chỉ cần chọn ít nhất 1 ngày là được phép dùng AI
+        btnOptimize.disabled = (selectedDays.length === 0);
 
         resetViewStates();
         if (selectedDays.length > 0) processDataAndRender();
@@ -559,11 +556,9 @@
         const area = selArea.value; const npp = selNPP.value; const nv = selNV.value;
         if (!area || !npp || !nv || selectedDays.length === 0) return;
 
-        // Nếu mảng gốc đang rỗng (mới đổi ngày filter), tạo lại mảng gốc
         if (currentRouteOriginal.length === 0) {
             currentRouteOriginal = rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv && selectedDays.includes(r[COL.THU]));
             
-            // Sắp xếp mặc định theo Thứ -> Thời gian Check-in
             const order = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
             currentRouteOriginal.sort((a, b) => {
                 let dayDiff = (order[a[COL.THU]]||99) - (order[b[COL.THU]]||99);
@@ -572,7 +567,6 @@
             });
         }
 
-        // Dữ liệu dùng để render phụ thuộc vào cờ isOptimizedView
         let activeData = isOptimizedView ? currentRouteOptimized : currentRouteOriginal;
 
         drawMap(activeData);
@@ -590,8 +584,8 @@
             let dayData = data.filter(r => r[COL.THU] === day);
             if(dayData.length === 0) return;
 
-            // Màu của tuyến tối ưu sẽ đổi sang cam/đỏ để dễ phân biệt
-            let color = isOptimizedView ? '#f59e0b' : (colorMap[day] || '#3b82f6');
+            // Sử dụng màu theo ngày để dễ phân biệt khi xáo khách hàng giữa các ngày
+            let color = colorMap[day] || '#3b82f6';
             let dayLatLngs = [];
             
             dayData.forEach((row, index) => {
@@ -650,7 +644,6 @@
                 displayCheckin = dayCheckIn; displayCheckout = dayCheckOut;
             }
 
-            // Tính quãng đường dồn theo mảng truyền vào (đã xếp thứ tự)
             for(let i = 0; i < dayData.length - 1; i++) {
                 totalDist += getHaversine14(dayData[i][COL.LAT], dayData[i][COL.LNG], dayData[i+1][COL.LAT], dayData[i+1][COL.LNG]);
             }
@@ -721,7 +714,6 @@
             let routeLabel = isTrongTuyen ? `<span style="color:#16a34a; font-weight:bold;">${lang.valIn}</span>` : `<span style="color:#f59e0b; font-weight:bold;">${lang.valOut}</span>`;
 
             let tr = document.createElement('tr');
-            // Nếu là dòng của tuyến Tối ưu, bôi nền nhẹ để phân biệt
             if (isOptimizedView) tr.style.backgroundColor = '#fffbeb'; 
 
             tr.innerHTML = `
@@ -756,46 +748,68 @@
             return;
         }
 
-        btnOptimize.innerText = "⌛ AI Đang Tính...";
+        btnOptimize.innerText = "⌛ AI Đang Tính Toán (VRP)...";
         btnOptimize.disabled = true;
 
         try {
-            // 1. Đóng gói payload tọa độ gửi đi
+            // 1. Đóng gói payload gửi đi
             const payload = currentRouteOriginal.map((row) => ({
                 id: row[COL.MA_KH],
                 lat: parseFloat(row[COL.LAT]),
                 lng: parseFloat(row[COL.LNG])
             }));
 
-            // 2. GỌI API THẬT QUA ENDPOINT CỦA VERCEL
-            const response = await fetch('/api/optimizeRoute', {
+            // 2. GỌI API THẬT QUA ENDPOINT CỦA VERCEL (ĐÃ ĐƯỢC FIX CORS)
+const vercelURL = 'https://tool-toi-uu-tuyen-git-main-nguyen842.vercel.app/api/optimizeRoute'; 
+            
+            const response = await fetch(vercelURL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ locations: payload })
+                body: JSON.stringify({ 
+                    locations: payload,
+                    availableDays: selectedDays // Truyền cả danh sách ngày đang chọn cho AI biết
+                })
             });
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || "Lỗi xử lý tuyến từ API");
+                throw new Error(errData.error || "Lỗi xử lý tuyến từ AI");
             }
 
             const data = await response.json();
-            const optimizedOrderIDs = data.optimized_ids;
+            const aiResults = data.optimized_data; // Mảng object: [{id, day, order}]
 
-            // 3. Khớp và sắp xếp lại mảng hiển thị dựa trên kết quả AI
-            currentRouteOptimized = [...currentRouteOriginal].sort((a, b) => {
-                let idxA = optimizedOrderIDs.indexOf(a[COL.MA_KH]);
-                let idxB = optimizedOrderIDs.indexOf(b[COL.MA_KH]);
-                return idxA - idxB;
+            // 3. Mapping lại mảng tuyến đường: Cập nhật Ngày mới và Thứ tự mới
+            currentRouteOptimized = currentRouteOriginal.map(row => {
+                let newRow = [...row]; // Clone row để không ghi đè dữ liệu gốc
+                let khID = newRow[COL.MA_KH];
+                
+                // Tìm phán quyết của AI cho khách hàng này
+                let aiDecision = aiResults.find(item => item.id === khID);
+                if (aiDecision) {
+                    newRow[COL.THU] = aiDecision.day; // Gán lại ngày AI phán quyết
+                    newRow._ai_order = aiDecision.order; // Gán tạm trường order để lát sort
+                } else {
+                    newRow._ai_order = 999;
+                }
+                return newRow;
             });
 
-            // 4. Hiển thị Toolbar chọn tuyến và cập nhật giao diện
+            // 4. Sắp xếp lại danh sách theo Ngày -> Thứ tự AI
+            const orderRules = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
+            currentRouteOptimized.sort((a, b) => {
+                let dayDiff = (orderRules[a[COL.THU]] || 99) - (orderRules[b[COL.THU]] || 99);
+                if (dayDiff !== 0) return dayDiff;
+                return (a._ai_order || 0) - (b._ai_order || 0);
+            });
+
+            // 5. Hiển thị Toolbar chọn tuyến và cập nhật giao diện
             toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             isOptimizedView = true;
 
             processDataAndRender();
-            alert("✨ AI đã tối ưu xong lộ trình! Vui lòng xem bản đồ và so sánh khoảng cách.");
+            alert("✨ AI đã gom cụm và tối ưu xong lịch trình!");
 
         } catch (error) {
             console.error(error);
@@ -806,7 +820,6 @@
         }
     }
 
-    // Lắng nghe sự kiện click trên Toggle
     function handleRouteToggle() {
         const routeType = document.querySelector('input[name="routeType"]:checked').value;
         isOptimizedView = (routeType === 'optimized');
@@ -856,7 +869,7 @@
         const R = 6371; 
         const dLat = (lat2 - lat1) * (Math.PI / 180); const dLon = (lon2 - lon1) * (Math.PI / 180);
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; // Hệ số nhân 1.4 đường thực tế
+        return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; 
     }
     
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
