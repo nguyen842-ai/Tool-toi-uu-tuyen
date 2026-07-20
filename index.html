@@ -759,8 +759,8 @@
                 lng: parseFloat(row[COL.LNG])
             }));
 
-            // 2. GỌI API THẬT QUA ENDPOINT CỦA VERCEL (ĐÃ ĐƯỢC FIX CORS)
-const vercelURL = 'https://tool-toi-uu-tuyen-git-main-nguyen842.vercel.app/api/optimizeRoute'; 
+            // Đổi từ link dài thòong thành link gốc ngắn gọn này, nhớ là KHÔNG CÓ dấu gạch chéo ở cuối cùng nhé:
+const vercelURL = 'https://tool-toi-uu-tuyen.vercel.app/api/optimizeRoute';
             
             const response = await fetch(vercelURL, {
                 method: 'POST',
