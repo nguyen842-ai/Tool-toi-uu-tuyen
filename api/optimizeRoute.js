@@ -1,67 +1,93 @@
 export default async function handler(req, res) {
-    // 1. Cấu hình CORS Header (Cho phép Frontend từ domain khác gọi vào)
+    // 1. GẮN GIẤY THÔNG HÀNH CORS (Bắt buộc phải để trên cùng)
     res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Trong thực tế, bạn có thể thay '*' bằng 'https://nguyen842-ai.github.io'
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-    // Phản hồi ngay lập tức cho các request Preflight (OPTIONS) của trình duyệt
+    // 2. Trả lời trình duyệt khi nó "hỏi dò" (Preflight request)
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    // Chỉ chấp nhận POST
+    // 3. Chặn các request không phải POST
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return res.status(405).json({ error: 'Chỉ chấp nhận phương thức POST' });
     }
 
     try {
-        const { locations } = req.body;
+        const { locations, availableDays } = req.body;
+        
         if (!locations || locations.length === 0) {
-            return res.status(400).json({ error: 'Missing locations data' });
+            return res.status(400).json({ error: 'Thiếu dữ liệu vị trí' });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ error: 'Gemini API Key is not configured on Vercel' });
+        // Tạo Prompt cho bài toán Phân tuyến theo Tuần
+        const prompt = `Bạn là hệ thống AI điều phối kho vận (Logistics).
+Dưới đây là danh sách khách hàng cần viếng thăm:
+${JSON.stringify(locations)}
+
+Danh sách các ca làm việc (Ngày) hiện có: ${availableDays.join(', ')}
+
+NHIỆM VỤ CỦA BẠN:
+1. Gom cụm: Gom các khách hàng có tọa độ (lat, lng) gần nhau vào cùng 1 ngày để tối ưu thời gian di chuyển.
+2. Phân bổ đều: Cố gắng chia đều số lượng khách hàng cho các ngày trong danh sách ca làm việc.
+3. Sắp xếp: Trong mỗi ngày, sắp xếp thứ tự viếng thăm sao cho quãng đường đi ngắn nhất.
+4. Ràng buộc Output: TRẢ VỀ DUY NHẤT 1 mảng JSON thuần túy (không bọc trong markdown \`\`\`json, không giải thích). 
+
+Cấu trúc JSON bắt buộc:
+[
+  { "id": "Mã khách hàng", "day": "Tên ngày mới được phân bổ", "order": thứ tự viếng thăm trong ngày }
+]`;
+
+        // Lấy danh sách chìa khóa
+        const keysString = process.env.GEMINI_API_KEY; // NHỚ ĐỔI TÊN BIẾN TRÊN VERCEL LÀ GEMINI_API_KEYS
+        if (!keysString) {
+            return res.status(500).json({ error: 'Chưa cài đặt Keys trên Server' });
         }
 
-        const prompt = `Bạn là chuyên gia Logistics tối ưu hóa tuyến đường di chuyển. 
-Dưới đây là mảng JSON chứa danh sách điểm đến bao gồm id, lat (vĩ độ), lng (kinh độ).
-Nhiệm vụ: Sắp xếp lại thứ tự các id sao cho tổng quãng đường di chuyển ngắn nhất và logic nhất.
-RÀNG BUỘC BẮT BUỘC: Điểm đầu tiên trong mảng dữ liệu đầu vào PHẢI LUÔN LÀ điểm xuất phát (giữ nguyên vị trí đầu tiên).
-CHỈ TRẢ VỀ một mảng JSON thuần túy chứa danh sách các id đã sắp xếp theo thứ tự mới. Không giải thích, không dùng markdown.
+        const apiKeys = keysString.split(',').map(key => key.trim()).filter(key => key.length > 0);
+        let lastErrorData = null;
+        let lastStatus = 500;
 
-Dữ liệu đầu vào:
-${JSON.stringify(locations)}`;
+        // Xoay vòng chìa khóa
+        for (let i = 0; i < apiKeys.length; i++) {
+            const currentKey = apiKeys[i];
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
 
-        // 2. Gọi Model gemini-1.5-flash
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
-        });
-
-        if (!geminiResponse.ok) {
-            const err = await geminiResponse.json();
-            console.error("Gemini API Error:", err);
-            return res.status(500).json({ error: 'Failed to fetch from Gemini' });
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Làm sạch JSON rác từ AI trước khi parse
+                let textResponse = data.candidates[0].content.parts[0].text.trim();
+                textResponse = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+                
+                const optimizedData = JSON.parse(textResponse);
+                return res.status(200).json({ optimized_data: optimizedData });
+            } 
+            
+            lastErrorData = data;
+            lastStatus = response.status;
+            
+            const isQuotaError = response.status === 429 || (data.error && data.error.status === "RESOURCE_EXHAUSTED");
+            if (isQuotaError) {
+                console.log(`Key ${i+1} hết hạn mức, thử key tiếp theo...`);
+                continue; 
+            } else {
+                return res.status(response.status).json(data);
+            }
         }
 
-        const result = await geminiResponse.json();
-        let textResponse = result.candidates[0].content.parts[0].text.trim();
-        
-        // 3. Làm sạch Markdown rác (nếu có) trước khi Parse
-        textResponse = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
-        
-        const optimizedIds = JSON.parse(textResponse);
-
-        return res.status(200).json({ optimized_ids: optimizedIds });
+        return res.status(lastStatus).json(lastErrorData || { error: 'Tất cả các key đều đã cạn kiệt.' });
 
     } catch (error) {
-        console.error("Server Error:", error);
-        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
+        console.error("Lỗi Server:", error);
+        return res.status(500).json({ error: 'Lỗi hệ thống nội bộ Server' });
     }
 }
