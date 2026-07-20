@@ -565,7 +565,6 @@
         renderComparisonTable();
         renderDetailTable(activeData);
         
-        // Hiển thị khung chat nếu đã có kết quả AI tối ưu
         if (hasOptimizedData) {
             document.getElementById('ai-chat-section').style.display = 'block';
         } else {
@@ -788,14 +787,14 @@
                 })
             });
 
-            // BẪY LỖI 503 TIMEOUT TỪ VERCEL HOBBY PLAN
+            // BẪY LỖI 503 VÀ THÔNG BÁO THEO Ý MUỐN CỦA BẠN
             if (response.status === 503) {
-                throw new Error("Server AI xử lý quá lâu (vượt quá 10 giây). Bạn hãy thử bỏ bớt ngày chọn (1-2 ngày) để tối ưu mượt mà nhé!");
+                throw new Error("AI đang quá tải, vui lòng thử lại sau!");
             }
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || `Lỗi từ Server AI (Mã lỗi: ${response.status})`);
+                throw new Error(errData.error || `Lỗi xử lý tuyến từ AI (Mã lỗi: ${response.status})`);
             }
 
             const data = await response.json();
@@ -876,8 +875,9 @@
                 })
             });
 
+            // BẪY LỖI 503 VÀ THÔNG BÁO THEO Ý MUỐN CỦA BẠN TRONG PHẦN CHAT CHỈNH TUYẾN
             if (response.status === 503) {
-                throw new Error("Server AI xử lý tinh chỉnh quá hạn (10s). Vui lòng thử lại lệnh ngắn gọn hơn!");
+                throw new Error("AI đang quá tải, vui lòng thử lại sau!");
             }
 
             if (!response.ok) {
@@ -956,12 +956,13 @@
     }
 
     function minutesToStr(mins) {
-        if (isNaN(mins) || mins <= 0) return `0 ${langData[curLang].unitMinute}`;
+        if (isNaN(mins) || mins <= 0) return `0 Phút`;
         let totalMins = Math.round(mins);
-        if (totalMins < 60) return `${totalMins} ${langData[curLang].unitMinute}`;
-        return `${Math.floor(totalMins/60)} ${langData[curLang].unitHour} ${totalMins%60} ${langData[curLang].unitMinute}`;
+        if (totalMins < 60) return `${totalMins} Phút`;
+        return `${Math.floor(totalMins/60)} Giờ ${totalMins%60} Phút`;
     }
 
+    // Công thức tính Haversine nhân hệ số thực tế 1.4
     function getHaversine14(lat1, lon1, lat2, lon2) {
         lat1 = parseFloat(lat1); lon1 = parseFloat(lon1); lat2 = parseFloat(lat2); lon2 = parseFloat(lon2);
         if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
