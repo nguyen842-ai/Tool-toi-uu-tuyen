@@ -41,7 +41,7 @@ Cấu trúc JSON bắt buộc:
 ]`;
 
         // Lấy danh sách chìa khóa
-        const keysString = process.env.GEMINI_API_KEYS; 
+        const keysString = process.env.GEMINI_API_KEY; 
         if (!keysString) {
             return res.status(500).json({ error: 'Chưa cài đặt Keys trên Server' });
         }
