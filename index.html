@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">CÔNG CỤ HỖ TRỢ TỐI ƯU TUYẾN BÁN HÀNG</title>
+    <title id="page-title">CÔNG CỤ ĐIỀU CHỈNH TUYẾN BÁN HÀNG</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -127,7 +127,7 @@
     <div id="left-panel">
         <div id="upload-section">
             <div class="upload-warning">
-                <div data-i18n="warningTitle">CÔNG CỤ HỖ TRỢ TỐI ƯU TUYẾN BÁN HÀNG</div>
+                <div data-i18n="warningTitle">CÔNG CỤ ĐIỀU CHỈNH TUYẾN BÁN HÀNG</div>
                 <div id="report-time" style="font-size: 13px; font-weight: normal; text-transform: none; margin-top: 5px; color: #1e293b;"></div>
             </div>
             
@@ -268,7 +268,7 @@
     // ================= TỪ ĐIỂN SONG NGỮ (I18N) =================
     const langData = {
         vi: {
-            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "CÔNG CỤ HỖ TRỢ TỐI ƯU TUYẾN BÁN HÀNG",
+            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "CÔNG CỤ ĐIỀU CHỈNH TUYẾN BÁN HÀNG",
             btnLoad: "📥 Tải Dữ Liệu", btnOptimize: "✨ AI Tối Ưu Tuyến", btnMapWeek: "🗺️ Tải Ảnh Bản Đồ", btnExportDetail: "📥 Tải Bảng Excel",
             lblRoute: "1. Dữ liệu ghé thăm:",
             statusEmpty: "(Chưa tải)", statusLoading: "⌛ Đang xử lý...", statusDone: "✅ Đã tải xong", statusError: "❌ Lỗi tải file",
@@ -300,7 +300,7 @@
     let selectedDays = []; 
     let loadStatus = { route: 'idle' };
 
-    // ======= STATE QUẢN LÝ LỘ TRÌNH MỚI (LƯU TRỮ VĨNH VIỄN TRONG PHIÊN) =======
+    // ======= BỘ NHỚ LỘ TRÌNH (PHIÊN LÀM VIỆC) =======
     let rawRouteData = []; 
     let currentNVDataOriginal = [];  
     let currentNVDataOptimized = []; 
@@ -551,17 +551,32 @@
         }
     }
 
-    // ================= XỬ LÝ DỮ LIỆU & RENDER =================
-    function processDataAndRender() {
+    // ================= ĐIỀU PHỐI ĐỒ HỌA & TÍNH TOÁN ASYNC =================
+    async function processDataAndRender() {
         if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) {
             dashboard.style.display = 'none';
             return;
         }
 
+        // Ẩn bảng số liệu tạm thời khi đang vẽ bản đồ để user tập trung nhìn map
+        dashboard.style.display = 'none';
+
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r[COL.THU]));
 
-        drawMap(activeData);
+        // Vô hiệu hóa nút tạm thời khi đang chạy hiệu ứng để tránh xung đột dữ liệu
+        btnOptimize.disabled = true;
+        const btnSendChat = document.getElementById('btn-send-ai-chat');
+        if (btnSendChat) btnSendChat.disabled = true;
+
+        // BƯỚC 1: TRẢ ĐIỂM TUẦN TỰ LÊN BẢN ĐỒ TRƯỚC
+        await drawMapSequentially(activeData);
+
+        // Mở lại các nút bấm
+        btnOptimize.disabled = (selectedDays.length === 0);
+        if (btnSendChat) btnSendChat.disabled = false;
+
+        // BƯỚC 2: SAU ĐÓ MỚI TÍNH TOÁN KHOẢNG CÁCH VÀ VẼ BẢNG
         renderComparisonTable();
         renderDetailTable(activeData);
         
@@ -571,44 +586,76 @@
             document.getElementById('ai-chat-section').style.display = 'none';
         }
         
+        // Hiện toàn bộ bảng phân tích hiệu quả lên màn hình
         dashboard.style.display = 'block';
     }
 
-    function drawMap(data) {
+    // HÀM VẼ GHIM TUẦN TỰ KÈM ĐƯỜNG NỐI ĐUÔI REAL-TIME
+    async function drawMapSequentially(data) {
         routeLayer.clearLayers(); 
         let allLatLngs = []; 
         
-        selectedDays.forEach(day => {
-            let dayData = data.filter(r => r[COL.THU] === day);
-            if(dayData.length === 0) return;
-
-            let color = colorMap[day] || '#3b82f6';
-            let dayLatLngs = [];
-            
-            dayData.forEach((row, index) => {
-                let lat = parseFloat(row[COL.LAT]); let lng = parseFloat(row[COL.LNG]); 
-                let stt = index + 1; 
-                
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    dayLatLngs.push([lat, lng]);
-                    allLatLngs.push([lat, lng]);
-                    let icon = L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div class="route-marker" style="background-color: ${color};">${stt}</div>`,
-                        iconSize: [26, 26], iconAnchor: [13, 13]
-                    });
-                    let marker = L.marker([lat, lng], {icon: icon});
-                    marker.bindPopup(`<b>${row[COL.THU]}</b><br><b>${row[COL.TEN_KH] || 'N/A'}</b><br>Mã KH: ${row[COL.MA_KH]}<br>STT: ${stt}<br>Time IN: ${row[COL.TIME_IN] || '--'}`);
-                    routeLayer.addLayer(marker);
-                }
-            });
-            if (dayLatLngs.length > 1) {
-                L.polyline(dayLatLngs, {color: color, weight: 3, opacity: 0.8, dashArray: isOptimizedView ? '' : '5, 5'}).addTo(routeLayer);
+        // Trích xuất toàn bộ tọa độ để "Bắt Khung Nhìn" (Fit Bounds) trước lập tức
+        data.forEach(row => {
+            let lat = parseFloat(row[COL.LAT]); 
+            let lng = parseFloat(row[COL.LNG]); 
+            if (!isNaN(lat) && !isNaN(lng)) {
+                allLatLngs.push([lat, lng]);
             }
         });
 
         if (allLatLngs.length > 0) {
             map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]});
+        }
+
+        // Bộ nhớ lưu trữ mảng tọa độ và Object Polyline thực tế của từng ngày
+        let dayCoordinates = {};
+        let dayPolylineObjects = {};
+
+        // Vòng lặp rải điểm tuần tự từng hàng dữ liệu một
+        for (let i = 0; i < data.length; i++) {
+            let row = data[i];
+            let day = row[COL.THU];
+            
+            let lat = parseFloat(row[COL.LAT]); 
+            let lng = parseFloat(row[COL.LNG]); 
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                if (!dayCoordinates[day]) {
+                    dayCoordinates[day] = [];
+                }
+                
+                dayCoordinates[day].push([lat, lng]);
+                let stt = dayCoordinates[day].length; // Số thứ tự tăng dần trong ngày
+                
+                let color = colorMap[day] || '#3b82f6';
+                let icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="route-marker" style="background-color: ${color};">${stt}</div>`,
+                    iconSize: [26, 26], iconAnchor: [13, 13]
+                });
+
+                let marker = L.marker([lat, lng], {icon: icon});
+                marker.bindPopup(`<b>${row[COL.THU]}</b><br><b>${row[COL.TEN_KH] || 'N/A'}</b><br>Mã KH: ${row[COL.MA_KH]}<br>STT: ${stt}<br>Time IN: ${row[COL.TIME_IN] || '--'}`);
+                routeLayer.addLayer(marker);
+
+                // Nếu có từ 2 điểm trở lên, cập nhật đường vẽ tuyến nối đuôi real-time
+                if (dayCoordinates[day].length > 1) {
+                    if (dayPolylineObjects[day]) {
+                        dayPolylineObjects[day].setLatLngs(dayCoordinates[day]);
+                    } else {
+                        dayPolylineObjects[day] = L.polyline(dayCoordinates[day], {
+                            color: color, 
+                            weight: 3, 
+                            opacity: 0.8, 
+                            dashArray: isOptimizedView ? '' : '5, 5'
+                        }).addTo(routeLayer);
+                    }
+                }
+
+                // Độ trễ 100 mili-giây tạo hiệu ứng rớt điểm liên tục cực mượt
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
     }
 
@@ -787,7 +834,6 @@
                 })
             });
 
-            // BẪY LỖI 503 VÀ THÔNG BÁO THEO Ý MUỐN CỦA BẠN
             if (response.status === 503) {
                 throw new Error("AI đang quá tải, vui lòng thử lại sau!");
             }
@@ -833,7 +879,7 @@
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             isOptimizedView = true;
 
-            processDataAndRender();
+            await processDataAndRender();
             alert("✨ AI đã gom cụm và tối ưu xong lịch trình!");
 
         } catch (error) {
@@ -875,7 +921,6 @@
                 })
             });
 
-            // BẪY LỖI 503 VÀ THÔNG BÁO THEO Ý MUỐN CỦA BẠN TRONG PHẦN CHAT CHỈNH TUYẾN
             if (response.status === 503) {
                 throw new Error("AI đang quá tải, vui lòng thử lại sau!");
             }
@@ -905,7 +950,7 @@
                 return (a._ai_order || 0) - (b._ai_order || 0);
             });
 
-            processDataAndRender();
+            await processDataAndRender();
             inputEl.value = ""; 
             alert("✨ Trợ lý AI đã điều chỉnh tuyến thành công theo yêu cầu của bạn!");
 
@@ -962,7 +1007,6 @@
         return `${Math.floor(totalMins/60)} Giờ ${totalMins%60} Phút`;
     }
 
-    // Công thức tính Haversine nhân hệ số thực tế 1.4
     function getHaversine14(lat1, lon1, lat2, lon2) {
         lat1 = parseFloat(lat1); lon1 = parseFloat(lon1); lat2 = parseFloat(lat2); lon2 = parseFloat(lon2);
         if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
