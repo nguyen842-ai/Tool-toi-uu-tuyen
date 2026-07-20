@@ -41,7 +41,7 @@ Cấu trúc JSON bắt buộc:
 ]`;
 
         // Lấy danh sách chìa khóa
-        const keysString = process.env.GEMINI_API_KEY; // NHỚ ĐỔI TÊN BIẾN TRÊN VERCEL LÀ GEMINI_API_KEYS
+        const keysString = process.env.GEMINI_API_KEYS; 
         if (!keysString) {
             return res.status(500).json({ error: 'Chưa cài đặt Keys trên Server' });
         }
@@ -53,7 +53,9 @@ Cấu trúc JSON bắt buộc:
         // Xoay vòng chìa khóa
         for (let i = 0; i < apiKeys.length; i++) {
             const currentKey = apiKeys[i];
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+            
+            // ĐÃ CẬP NHẬT MODEL LÊN PHIÊN BẢN 3.5 THEO YÊU CẦU
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${currentKey}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
