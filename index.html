@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title"></title>
+    <title id="page-title">Báo cáo chi tiết ghé thăm khách hàng</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -127,7 +127,7 @@
     <div id="left-panel">
         <div id="upload-section">
             <div class="upload-warning">
-                <div data-i18n="warningTitle">CÔNG CỤ TỐI ƯU TUYẾN BÁN HÀNG</div>
+                <div data-i18n="warningTitle">Báo cáo chi tiết ghé thăm khách hàng</div>
                 <div id="report-time" style="font-size: 13px; font-weight: normal; text-transform: none; margin-top: 5px; color: #1e293b;"></div>
             </div>
             
@@ -225,6 +225,26 @@
                 </table>
             </div>
 
+            <!-- KHU VỰC TRỢ LÝ AI TINH CHỈNH LUỒNG -->
+            <div id="ai-chat-section" style="display: none; margin-top: 25px; margin-bottom: 25px;">
+                <div class="header-title-row">
+                    <h3>✨ Trợ Lý AI Tinh Chỉnh Lộ Trình</h3>
+                </div>
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; font-style: italic;">
+                        *Ví dụ: "Dời khách hàng mã KH01 sang Thứ 3 và xếp lên đầu tuyến"*
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="ai-chat-input" placeholder="Nhập yêu cầu điều chỉnh tuyến tại đây..." 
+                               style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                        <button id="btn-send-ai-chat" class="btn-primary btn-warning" onclick="sendCustomRequestToAI()" 
+                                style="margin: 0; padding: 10px 15px; width: auto; font-size: 13px;">
+                            🚀 Gửi yêu cầu
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- BẢNG CHI TIẾT LỘ TRÌNH DI CHUYỂN -->
             <div class="header-title-row" style="margin-top: 30px;">
                 <h2 data-i18n="tableTitle">📋 Chi Tiết Lộ Trình Di Chuyển</h2>
@@ -248,7 +268,7 @@
     // ================= TỪ ĐIỂN SONG NGỮ (I18N) =================
     const langData = {
         vi: {
-            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "CÔNG CỤ TỐI ƯU TUYẾN BÁN HÀNG",
+            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "Báo cáo chi tiết ghé thăm khách hàng",
             btnLoad: "📥 Tải Dữ Liệu", btnOptimize: "✨ AI Tối Ưu Tuyến", btnMapWeek: "🗺️ Tải Ảnh Bản Đồ", btnExportDetail: "📥 Tải Bảng Excel",
             lblRoute: "1. Dữ liệu ghé thăm:",
             statusEmpty: "(Chưa tải)", statusLoading: "⌛ Đang xử lý...", statusDone: "✅ Đã tải xong", statusError: "❌ Lỗi tải file",
@@ -261,7 +281,7 @@
             optRouteOriginal: "📍 Tuyến Cũ (Thực tế)", optRouteOptimized: "✨ Tuyến Mới (AI Tối ưu)"
         },
         en: {
-            pageTitle: "Employee Route Tracking", warningTitle: "SALES ROUTE OPTIMIZATION TOOLS",
+            pageTitle: "Employee Route Tracking", warningTitle: "Customer Visit Detail Report",
             btnLoad: "📥 Load Data", btnOptimize: "✨ Optimize Route", btnMapWeek: "🗺️ Download Map", btnExportDetail: "📥 Export Excel",
             lblRoute: "1. Visit Data:",
             statusEmpty: "(Not loaded)", statusLoading: "⌛ Loading...", statusDone: "✅ Done", statusError: "❌ Fetch Error",
@@ -282,9 +302,9 @@
 
     // ======= STATE QUẢN LÝ LỘ TRÌNH MỚI (LƯU TRỮ VĨNH VIỄN TRONG PHIÊN) =======
     let rawRouteData = []; 
-    let currentNVDataOriginal = [];  // Lưu TOÀN BỘ data các ngày của NV đang chọn
-    let currentNVDataOptimized = []; // Lưu TOÀN BỘ data sau khi AI tối ưu
-    let hasOptimizedData = false;    // Cờ đánh dấu đã có kết quả AI hay chưa
+    let currentNVDataOriginal = [];  
+    let currentNVDataOptimized = []; 
+    let hasOptimizedData = false;    
     let isOptimizedView = false;    
 
     // ======= SUPABASE =======
@@ -412,7 +432,6 @@
     }
 
     // ================= XỬ LÝ SỰ KIỆN FILTER =================
-    // Hàm này CHỈ DÙNG để xóa trắng bộ nhớ khi đổi Area, NPP hoặc NV
     function clearNVData() {
         dashboard.style.display = 'none';
         currentNVDataOriginal = [];
@@ -443,7 +462,7 @@
     }
 
     selArea.addEventListener('change', () => {
-        clearNVData(); // Đổi vùng -> xóa bộ nhớ
+        clearNVData(); 
         const area = selArea.value;
         if (!area) { selNPP.disabled = true; selNV.disabled = true; clearDayChips(); return; }
         
@@ -458,7 +477,7 @@
     });
 
     selNPP.addEventListener('change', () => {
-        clearNVData(); // Đổi NPP -> xóa bộ nhớ
+        clearNVData(); 
         const area = selArea.value;
         const npp = selNPP.value;
         if (!npp) { selNV.disabled = true; clearDayChips(); return; }
@@ -473,13 +492,12 @@
     });
 
     selNV.addEventListener('change', () => {
-        clearNVData(); // Đổi NV -> xóa bộ nhớ
+        clearNVData(); 
         const area = selArea.value; const npp = selNPP.value; const nv = selNV.value; 
         if (!nv) { clearDayChips(); return; }
         
         document.getElementById('avatar-img').src = `New folder/images/${nv}.PNG`;
         
-        // TẢI TOÀN BỘ DATA CỦA NHÂN VIÊN NÀY VÀO BỘ NHỚ
         currentNVDataOriginal = rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv);
         
         const order = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
@@ -489,7 +507,6 @@
             return timeStrToMinutes(a[COL.TIME_IN]) - timeStrToMinutes(b[COL.TIME_IN]);
         });
 
-        // Lấy danh sách các Thứ nhân viên này đi làm
         let thus = [...new Set(currentNVDataOriginal.map(r => r[COL.THU]))].filter(Boolean);
         
         let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">${langData[curLang].lblAll}</div>`;
@@ -512,7 +529,6 @@
     };
 
     function updateDaySelection() {
-        // Hàm này KHÔNG còn xóa data nữa
         document.querySelectorAll('.chip-day').forEach(el => {
             if(selectedDays.includes(el.getAttribute('data-day'))) el.classList.add('active');
             else el.classList.remove('active');
@@ -542,15 +558,19 @@
             return;
         }
 
-        // Chọn bộ nhớ Cũ hay Mới để mang ra lọc
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
-        
-        // Chỉ lấy những dòng thuộc các "Thứ" đang được chọn hiển thị
         let activeData = baseData.filter(r => selectedDays.includes(r[COL.THU]));
 
         drawMap(activeData);
         renderComparisonTable();
         renderDetailTable(activeData);
+        
+        // Hiển thị khung chat nếu đã có kết quả AI tối ưu
+        if (hasOptimizedData) {
+            document.getElementById('ai-chat-section').style.display = 'block';
+        } else {
+            document.getElementById('ai-chat-section').style.display = 'none';
+        }
         
         dashboard.style.display = 'block';
     }
@@ -601,7 +621,7 @@
         for(let i = 0; i < dayData.length - 1; i++) {
             dist += getHaversine14(dayData[i][COL.LAT], dayData[i][COL.LNG], dayData[i+1][COL.LAT], dayData[i+1][COL.LNG]);
         }
-        let moveTime = (dist / 20) * 60; // minutes
+        let moveTime = (dist / 20) * 60; 
         return { count, dist, moveTime };
     }
 
@@ -693,13 +713,12 @@
         
         data.forEach((row, index) => {
             let distToNext = 0;
-            // Tính khoảng cách đến khách tiếp theo (cùng 1 ngày)
             if(index < data.length - 1 && row[COL.THU] === data[index+1][COL.THU]) {
                 distToNext = getHaversine14(row[COL.LAT], row[COL.LNG], data[index+1][COL.LAT], data[index+1][COL.LNG]);
             }
             totalDist += distToNext;
 
-            let moveTime = (distToNext / 20) * 60; // Tính theo phút
+            let moveTime = (distToNext / 20) * 60; 
             totalMoveTime += moveTime;
 
             let loTrinhText = (row[COL.LO_TRINH] || '').toString().toLowerCase();
@@ -741,7 +760,6 @@
 
     // ================= CHỨC NĂNG AI TỐI ƯU TUYẾN =================
     async function optimizeRouteWithAI() {
-        // Chỉ lấy những data của những ngày ĐANG ĐƯỢC CHỌN để gửi cho AI xử lý
         let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r[COL.THU]));
 
         if (dataToOptimize.length < 3) {
@@ -770,19 +788,21 @@
                 })
             });
 
+            // BẪY LỖI 503 TIMEOUT TỪ VERCEL HOBBY PLAN
+            if (response.status === 503) {
+                throw new Error("Server AI xử lý quá lâu (vượt quá 10 giây). Bạn hãy thử bỏ bớt ngày chọn (1-2 ngày) để tối ưu mượt mà nhé!");
+            }
+
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || "Lỗi xử lý tuyến từ AI");
+                throw new Error(errData.error || `Lỗi từ Server AI (Mã lỗi: ${response.status})`);
             }
 
             const data = await response.json();
             const aiResults = data.optimized_data;
 
-            // Áp dụng kết quả AI đè lên bộ nhớ gốc, lưu vào bộ nhớ Optimized
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
                 let newRow = [...row];
-                
-                // Chỉ áp dụng AI cho những KH nằm trong các ngày đã gửi đi tối ưu
                 if (selectedDays.includes(row[COL.THU])) {
                     let khID = newRow[COL.MA_KH];
                     let aiDecision = aiResults.find(item => item.id === khID);
@@ -793,12 +813,11 @@
                         newRow._ai_order = 999;
                     }
                 } else {
-                    newRow._ai_order = 0; // Khách hàng của những ngày không gửi đi AI thì giữ nguyên
+                    newRow._ai_order = 0; 
                 }
                 return newRow;
             });
 
-            // Sắp xếp lại bộ nhớ AI
             const orderRules = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
             currentNVDataOptimized.sort((a, b) => {
                 let dayDiff = (orderRules[a[COL.THU]] || 99) - (orderRules[b[COL.THU]] || 99);
@@ -810,7 +829,6 @@
                 return timeStrToMinutes(a[COL.TIME_IN]) - timeStrToMinutes(b[COL.TIME_IN]);
             });
 
-            // Bật cờ đánh dấu đã có kết quả AI và chuyển sang View Mới
             hasOptimizedData = true;
             toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
@@ -821,10 +839,82 @@
 
         } catch (error) {
             console.error(error);
-            alert("Lỗi: " + error.message);
+            alert("⚠️ " + error.message);
         } finally {
             btnOptimize.innerText = langData[curLang].btnOptimize;
             btnOptimize.disabled = false;
+        }
+    }
+
+    // ================= TRỢ LÝ AI CHATBOT TINH CHỈNH TUYẾN =================
+    async function sendCustomRequestToAI() {
+        const inputEl = document.getElementById('ai-chat-input');
+        const userCommand = inputEl.value.trim();
+        const btn = document.getElementById('btn-send-ai-chat');
+
+        if (!userCommand) {
+            alert("Vui lòng nhập yêu cầu điều chỉnh tuyến!");
+            return;
+        }
+
+        btn.innerText = "⌛ AI Đang xử lý...";
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('https://tool-toi-uu-tuyen.vercel.app/api/modifyRoute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    currentData: currentNVDataOptimized.map(row => ({
+                        id: row[COL.MA_KH],
+                        day: row[COL.THU],
+                        lat: parseFloat(row[COL.LAT]),
+                        lng: parseFloat(row[COL.LNG])
+                    })),
+                    command: userCommand,
+                    availableDays: selectedDays
+                })
+            });
+
+            if (response.status === 503) {
+                throw new Error("Server AI xử lý tinh chỉnh quá hạn (10s). Vui lòng thử lại lệnh ngắn gọn hơn!");
+            }
+
+            if (!response.ok) {
+                throw new Error("Không thể xử lý yêu cầu chỉnh sửa tuyến từ AI!");
+            }
+
+            const data = await response.json();
+            const aiResults = data.modified_data;
+
+            currentNVDataOptimized = currentNVDataOptimized.map(row => {
+                let newRow = [...row];
+                let khID = newRow[COL.MA_KH];
+                let match = aiResults.find(item => item.id === khID);
+                if (match) {
+                    newRow[COL.THU] = match.day;
+                    newRow._ai_order = match.order;
+                }
+                return newRow;
+            });
+
+            const orderRules = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
+            currentNVDataOptimized.sort((a, b) => {
+                let dayDiff = (orderRules[a[COL.THU]] || 99) - (orderRules[b[COL.THU]] || 99);
+                if (dayDiff !== 0) return dayDiff;
+                return (a._ai_order || 0) - (b._ai_order || 0);
+            });
+
+            processDataAndRender();
+            inputEl.value = ""; 
+            alert("✨ Trợ lý AI đã điều chỉnh tuyến thành công theo yêu cầu của bạn!");
+
+        } catch (error) {
+            console.error(error);
+            alert("⚠️ " + error.message);
+        } finally {
+            btn.innerText = "🚀 Gửi yêu cầu";
+            btn.disabled = false;
         }
     }
 
