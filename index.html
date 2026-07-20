@@ -706,6 +706,14 @@
     }
 
     async function optimizeRouteWithAI() {
+        // --- THÊM PASSCODE BẢO VỆ Ở ĐÂY ---
+        const passcode = prompt("Vui lòng nhập mật khẩu để sử dụng tính năng AI:");
+        if (passcode !== "admin!2345@") {
+            alert("Mật khẩu không đúng! Không thể chạy AI.");
+            return;
+        }
+        // ---------------------------------
+        
         let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
         if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần AI tối ưu.");
         btnOptimize.innerText = "⌛ AI Đang Tính Toán..."; btnOptimize.disabled = true;
