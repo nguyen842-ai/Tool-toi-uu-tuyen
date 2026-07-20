@@ -308,21 +308,29 @@
             allWarningData = [];
 
             jsonRoute.forEach((row, rowIndex) => {
-                if (rowIndex === 0 || !row[0]) return; // Skip if no STT
+                if (rowIndex === 0 || !row[0]) return; // Bỏ qua dòng tiêu đề
 
                 let npp = row[2];
                 let nv = row[4];
                 let ma_kh = row[5];
                 let ten_kh = row[6];
-                let lat = parseFloat(row[22]); // Cột W (chứa giá trị 10.x)
-                let lng = parseFloat(row[23]); // Cột X (chứa giá trị 106.x)
+                let lat = parseFloat(row[22]); // Cột W (Vĩ độ - đã sửa chuẩn)
+                let lng = parseFloat(row[23]); // Cột X (Kinh độ - đã sửa chuẩn)
 
-                // Lọc tọa độ hợp lệ
                 let isValidCoord = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
                 let addedToWarning = false;
 
-                // Tính Tần suất (Đếm số chữ 'x' ở cột W1, W2, W3, W4 tương ứng cột S, T, U, V - index 18, 19, 20, 21)
-                let freqCount = [18, 19, 20, 21].filter(c => (row[c] || '').toString().toLowerCase().trim() === 'x').length;
+                // --- LOGIC MỚI: NHẬN DIỆN CHÍNH XÁC F2-1, F2-2, F4 ---
+                let w1 = (row[18] || '').toString().toLowerCase().trim() === 'x';
+                let w2 = (row[19] || '').toString().toLowerCase().trim() === 'x';
+                let w3 = (row[20] || '').toString().toLowerCase().trim() === 'x';
+                let w4 = (row[21] || '').toString().toLowerCase().trim() === 'x';
+                
+                let freqType = "Lỗi Tần Suất";
+                if (w1 && w2 && w3 && w4) freqType = "F4";
+                else if (w1 && !w2 && w3 && !w4) freqType = "F2-1";
+                else if (!w1 && w2 && !w3 && w4) freqType = "F2-2";
+                // -----------------------------------------------------
 
                 DAY_COLS.forEach((colIdx, i) => {
                     let cellVal = (row[colIdx] || '').toString().toLowerCase().trim();
@@ -330,12 +338,12 @@
                         let dayName = DAYS_TEXT[i];
                         let warnings = [];
                         
-                        // Kiểm tra 3 điều kiện lỗi
+                        // Kiểm tra lỗi
                         if (!isValidCoord) warnings.push("Trống / Sai Tọa độ");
                         if (dayName === 'Chủ nhật') warnings.push("Tuyến rơi vào Chủ nhật");
-                        if (freqCount !== 2 && freqCount !== 4) warnings.push(`Sai tần suất (F${freqCount})`);
+                        if (freqType === "Lỗi Tần Suất") warnings.push("Sai chuẩn tần suất (Không phải F4, F2-1, F2-2)");
 
-                        // Đưa vào bảng Cảnh Báo nếu có bất kỳ lỗi nào
+                        // Đưa vào bảng Cảnh Báo
                         if (warnings.length > 0 && !addedToWarning) {
                             allWarningData.push({
                                 npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, 
@@ -344,11 +352,11 @@
                             addedToWarning = true;
                         }
 
-                        // Vẫn Đưa vào Map nếu Tọa Độ hợp lệ (bất chấp lỗi Chủ nhật hay Tần suất)
+                        // Đưa vào dữ liệu Map (Thêm thuộc tính freq để hiển thị)
                         if (isValidCoord) {
                             allValidData.push({
                                 npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, 
-                                thu: dayName, lat: lat, lng: lng, _ai_order: 999
+                                thu: dayName, lat: lat, lng: lng, freq: freqType, _ai_order: 999
                             });
                         }
                     }
@@ -563,20 +571,42 @@
     }
 
     function renderDetailTable(data) {
-        const thead = document.getElementById('table-head'); const tbody = document.getElementById('table-body');
-        thead.innerHTML = `<tr><th class="route-th">Thứ</th><th class="route-th">STT Tuyến</th><th class="route-th">Mã KH</th><th class="route-th">Tên KH</th><th class="route-th num-right">Khoảng cách tới (km)</th></tr>`;
+        const thead = document.getElementById('table-head'); 
+        const tbody = document.getElementById('table-body');
+        // Thêm cột Tần Suất vào giao diện
+        thead.innerHTML = `<tr>
+            <th class="route-th">Thứ</th>
+            <th class="route-th">STT</th>
+            <th class="route-th">Mã KH</th>
+            <th class="route-th">Tên KH</th>
+            <th class="route-th">Tần Suất</th>
+            <th class="route-th num-right">Khoảng cách tới (km)</th>
+        </tr>`;
         tbody.innerHTML = '';
         
+        let currentDay = '';
+        let sttInDay = 0; // Biến đếm STT nội bộ cho từng ngày
+
         data.forEach((row, index) => {
+            // Logic tách bạch: Đặt lại STT về 1 khi chuyển Thứ
+            if (row.thu !== currentDay) {
+                currentDay = row.thu;
+                sttInDay = 1;
+            } else {
+                sttInDay++;
+            }
+
             let distToNext = 0;
-            if(index < data.length - 1 && row.thu === data[index+1].thu) {
+            if (index < data.length - 1 && row.thu === data[index+1].thu) {
                 distToNext = getHaversine14(row.lat, row.lng, data[index+1].lat, data[index+1].lng);
             }
+            
             tbody.innerHTML += `<tr ${isOptimizedView ? 'style="background-color: #fffbeb;"' : ''}>
                 <td style="font-weight:bold; color: ${colorMap[row.thu]};">${row.thu}</td>
-                <td style="text-align:center; font-weight:bold;">${index + 1}</td>
+                <td style="text-align:center; font-weight:bold; font-size:14px;">${sttInDay}</td>
                 <td>${row.ma_kh}</td>
                 <td style="white-space: normal;">${row.ten_kh}</td>
+                <td style="text-align:center;"><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:bold; color:#334155;">${row.freq || 'N/A'}</span></td>
                 <td class="num-right" style="font-weight:bold; color:#1e40af;">${formatNum(distToNext)}</td>
             </tr>`;
         });
