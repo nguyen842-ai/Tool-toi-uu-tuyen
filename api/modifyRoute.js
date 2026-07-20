@@ -43,7 +43,7 @@ Cấu trúc JSON đầu ra bắt buộc:
 ]`;
 
         // 3. XOAY VÒNG API KEYS TỰ ĐỘNG DỰ PHÒNG LỖI QUÁ TẢI
-        const keysString = process.env.GEMINI_API_KEYS;
+        const keysString = process.env.GEMINI_API_KEY;
         if (!keysString) {
             return res.status(500).json({ error: 'Chưa cấu hình GEMINI_API_KEYS trên hệ thống Vercel.' });
         }
