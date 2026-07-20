@@ -760,56 +760,46 @@
         btnOptimize.disabled = true;
 
         try {
-            // 1. Đóng gói payload gửi đi
-            // Payload bao gồm Tọa độ khách hàng. Điểm đầu tiên (index = 0) thường được giữ nguyên là điểm xuất phát.
-            const payload = currentRouteOriginal.map((row, index) => ({
+            // 1. Đóng gói payload tọa độ gửi đi
+            const payload = currentRouteOriginal.map((row) => ({
                 id: row[COL.MA_KH],
                 lat: parseFloat(row[COL.LAT]),
                 lng: parseFloat(row[COL.LNG])
             }));
 
-            // 2. GỌI API (THAY BẰNG API THẬT TRÊN VERCEL CỦA BẠN)
-            // LƯU Ý: Dưới đây là mô phỏng (Mock API) để bạn có thể test ngay giao diện.
-            // Để nối backend, bạn bỏ comment đoạn fetch và truyền API Vercel của bạn vào.
-            /* 
+            // 2. GỌI API THẬT QUA ENDPOINT CỦA VERCEL
             const response = await fetch('/api/optimizeRoute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ locations: payload })
             });
-            if (!response.ok) throw new Error("Lỗi API Vercel");
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || "Lỗi xử lý tuyến từ API");
+            }
+
             const data = await response.json();
-            const optimizedOrderIDs = data.optimized_ids; // Mảng các ID đã sắp xếp. VD: ['KH001', 'KH005', 'KH003'...]
-            */
+            const optimizedOrderIDs = data.optimized_ids;
 
-            // --- ĐOẠN MOCK DATA (Giả lập AI xáo trộn thứ tự cho tối ưu hơn) ---
-            await new Promise(r => setTimeout(r, 1500)); // Delay giả lập mạng
-            let mockIDs = currentRouteOriginal.map(r => r[COL.MA_KH]);
-            // Giữ nguyên phần tử đầu, đảo ngược hoặc shuffle nhẹ phần tử còn lại để tạo cảm giác đổi
-            let firstID = mockIDs.shift();
-            mockIDs.sort(() => Math.random() - 0.5); 
-            const optimizedOrderIDs = [firstID, ...mockIDs];
-            // -----------------------------------------------------------------
-
-            // 3. Clone mảng gốc và sắp xếp theo mảng ID trả về
+            // 3. Khớp và sắp xếp lại mảng hiển thị dựa trên kết quả AI
             currentRouteOptimized = [...currentRouteOriginal].sort((a, b) => {
                 let idxA = optimizedOrderIDs.indexOf(a[COL.MA_KH]);
                 let idxB = optimizedOrderIDs.indexOf(b[COL.MA_KH]);
                 return idxA - idxB;
             });
 
-            // 4. Bật Toggle Toolbar và chuyển mode sang View Optimzed
+            // 4. Hiển thị Toolbar chọn tuyến và cập nhật giao diện
             toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             isOptimizedView = true;
 
-            // 5. Render lại toàn bộ dữ liệu
             processDataAndRender();
             alert("✨ AI đã tối ưu xong lộ trình! Vui lòng xem bản đồ và so sánh khoảng cách.");
 
         } catch (error) {
             console.error(error);
-            alert("Lỗi khi kết nối với hệ thống AI Optimizer.");
+            alert("Lỗi: " + error.message);
         } finally {
             btnOptimize.innerText = langData[curLang].btnOptimize;
             btnOptimize.disabled = false;
