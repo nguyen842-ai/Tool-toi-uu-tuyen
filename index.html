@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Báo cáo chi tiết ghé thăm khách hàng</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f1f5f9;
+            font-size: 13px; 
+        }
+        
+        #app-container { display: flex; height: 100vh; width: 100%; position: relative;}
+        
+        /* ---------- BÊN TRÁI 40% ---------- */
+        #left-panel {
+            width: 40%; height: 100%;
+            display: flex; flex-direction: column;
+            border-right: 2px solid #cbd5e1;
+            background: #fff;
+        }
+        #upload-section {
+            padding: 15px; background: #e2e8f0; border-bottom: 2px solid #cbd5e1;
+        }
+        .upload-warning {
+            color: #1e40af; font-weight: bold; font-size: 15px; text-transform: uppercase;
+            background: #dbeafe; border: 1px solid #bfdbfe; text-align: center;
+            padding: 12px; border-radius: 6px; margin-bottom: 12px;
+        }
+        
+        .btn-primary {
+            width: 100%; padding: 12px; background-color: #3b82f6; color: white;
+            border: none; border-radius: 6px; font-weight: bold; font-size: 14px;
+            cursor: pointer; transition: background 0.3s; margin-bottom: 15px;
+        }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-primary:disabled { background-color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
+        
+        .btn-warning { background-color: #f59e0b; margin: 0; padding: 8px 10px; flex: 1; }
+        .btn-warning:hover { background-color: #d97706; }
+
+        .btn-purple { background-color: #8b5cf6; margin: 0; padding: 8px 10px; flex: 1; }
+        .btn-purple:hover { background-color: #7c3aed; }
+
+        .file-status-box { margin-bottom: 10px; display: flex; justify-content: space-between; font-weight: bold;}
+        .status-badge { font-weight: normal; font-size: 12px; }
+        
+        #map-container { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; }
+        #map { flex-grow: 1; width: 100%; background: #e2e8f0; z-index: 1; }
+        
+        /* Toolbar Toggle trên Bản đồ */
+        #route-toggle-toolbar {
+            position: absolute;
+            top: 15px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: white; padding: 8px 16px;
+            border-radius: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none; align-items: center; gap: 15px;
+            border: 2px solid #3b82f6;
+        }
+        .toggle-option { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 13px; font-weight: bold; color: #1e293b;}
+        .toggle-option input { cursor: pointer; }
+
+        /* ---------- BÊN PHẢI 60% ---------- */
+        #right-panel {
+            width: 60%; height: 100%;
+            padding: 20px; box-sizing: border-box;
+            overflow-y: auto; background-color: #ffffff;
+            position: relative;
+        }
+
+        .lang-switcher { position: absolute; top: 15px; right: 20px; display: flex; gap: 5px; }
+        .lang-btn { background: white; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .lang-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+
+        .filter-header-section { display: flex; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 30px; }
+        #avatar-container { width: 150px; height: 180px; margin-right: 20px; border: 2px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: center; background-color: #fff; overflow: hidden; flex-shrink: 0; }
+        #avatar-container img { width: 100%; height: 100%; object-fit: cover; }
+        .filters-wrapper { flex-grow: 1; }
+        .filter-row { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 15px; }
+        .filter-row h3 { margin: 0; min-width: 100px; color: #1e293b; padding-top: 5px; }
+        .filter-item { display: flex; flex-direction: column; flex: 1; }
+        .filter-item label { font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #475569; }
+        .filter-item select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; width: 100%; }
+
+        .day-chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 35px; align-items: center; }
+        .day-chip { padding: 6px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .day-chip:hover { background: #e2e8f0; }
+        .day-chip.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .day-chip.active:hover { background: #2563eb; }
+        .action-buttons-container { display: flex; gap: 10px; flex: 1; }
+
+        .summary-card { margin-bottom: 20px; }
+        .header-title-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; }
+        .header-title-row h2 { margin: 0; color: #0f172a; }
+        
+        .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .kpi-box { background: #f8fafc; padding: 12px; border-radius: 6px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .kpi-title { font-size: 13px; color: #64748b; font-weight: bold; margin-bottom: 5px;}
+        .kpi-value { font-size: 18px; color: #0f172a; font-weight: bold; }
+        .kpi-sub { font-size: 11px; color: #64748b; margin-top: 5px; border-top: 1px dashed #cbd5e1; padding-top: 5px; }
+
+        .data-table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 13px; }
+        th, td { padding: 8px 10px; text-align: left; border: 1px solid #e2e8f0; }
+        th.route-th { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; white-space: normal !important; word-wrap: break-word; max-width: 120px; }
+        th { position: sticky; top: 0; }
+        td { white-space: nowrap; }
+        tfoot { background-color: #e2e8f0; font-weight: bold; }
+        .num-right { text-align: right; }
+        .route-marker { border-radius: 50%; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="left-panel">
+        <div id="upload-section">
+            <div class="upload-warning">
+                <div data-i18n="warningTitle">Báo cáo chi tiết ghé thăm khách hàng</div>
+                <div id="report-time" style="font-size: 13px; font-weight: normal; text-transform: none; margin-top: 5px; color: #1e293b;"></div>
+            </div>
+            
+            <button id="btnLoadData" class="btn-primary" onclick="loadDataFromSupabase()" data-i18n="btnLoad">
+                📥 Tải Dữ Liệu
+            </button>
+
+            <div class="file-status-box">
+                <span data-i18n="lblRoute">1. Dữ liệu ghé thăm:</span>
+                <span id="statusRoute" class="status-badge" style="color:#64748b;" data-i18n="statusEmpty">(Chưa tải)</span>
+            </div>
+        </div>
+        <div id="map-container">
+            <!-- Toolbar chọn tuyến -->
+            <div id="route-toggle-toolbar">
+                <label class="toggle-option">
+                    <input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()">
+                    <span data-i18n="optRouteOriginal">📍 Tuyến Cũ (Thực tế)</span>
+                </label>
+                <label class="toggle-option">
+                    <input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()">
+                    <span data-i18n="optRouteOptimized" style="color:#f59e0b;">✨ Tuyến Mới (AI Tối ưu)</span>
+                </label>
+            </div>
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div class="lang-switcher">
+            <button id="btn-lang-vi" class="lang-btn active" onclick="setLang('vi')">VI</button>
+            <button id="btn-lang-en" class="lang-btn" onclick="setLang('en')">EN</button>
+        </div>
+
+        <div class="filter-header-section">
+            <div id="avatar-container">
+                <img id="avatar-img" src="" alt="Avatar" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23cbd5e1\' stroke-width=\'2\'><circle cx=\'12\' cy=\'8\' r=\'4\'/><path d=\'M18 21v-2a4 4 0 0 0-4-4H10a4 4 0 0 0-4 4v2\'/></svg>';">
+            </div>
+            <div class="filters-wrapper">
+                <div class="filter-row">
+                    <h3 data-i18n="filterTitle">Bộ Lọc</h3>
+                    <div class="filter-item">
+                        <label data-i18n="lblArea">Khu vực</label>
+                        <select id="sel-area" disabled><option value="" data-i18n="optArea">-- Chọn Khu vực --</option></select>
+                    </div>
+                    <div class="filter-item">
+                        <label data-i18n="lblNPP">Đơn vị PP</label>
+                        <select id="sel-npp" disabled><option value="" data-i18n="optNPP">-- Chọn NPP --</option></select>
+                    </div>
+                </div>
+                
+                <div class="filter-row">
+                    <h3 style="min-width: 100px; margin: 0;"></h3>
+                    <div class="filter-item">
+                        <label data-i18n="lblNV">Nhân viên</label>
+                        <select id="sel-nv" disabled><option value="" data-i18n="optNV">-- Chọn Nhân viên --</option></select>
+                    </div>
+                </div>
+
+                <div class="filter-row">
+                    <h3 style="min-width: 100px; margin: 0;"></h3>
+                    <div class="filter-item" style="flex: 2;">
+                        <label data-i18n="lblDay">Thứ (Day) - Chọn nhiều ngày</label>
+                        <div id="day-chips-container" class="day-chips">
+                            <span style="color:#94a3b8; font-size: 13px;" data-i18n="optDay">-- Chọn Thứ --</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="filter-row" style="margin-top: 15px;">
+                    <h3 style="min-width: 100px; margin: 0;"></h3>
+                    <div class="action-buttons-container">
+                        <button id="btn-ai-optimize" class="btn-primary btn-warning" onclick="optimizeRouteWithAI()" disabled data-i18n="btnOptimize">
+                            ✨ AI Tối Ưu Tuyến
+                        </button>
+                        <button id="btn-dl-map-week" class="btn-primary btn-purple" onclick="downloadWeeklyMap()" disabled data-i18n="btnMapWeek">
+                            🗺️ Tải Ảnh Bản Đồ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-card" id="dashboard-section" style="display: none;">
+            <div class="header-title-row">
+                <h2 data-i18n="kpiHeader">📊 Bảng Tổng Hợp Tuyến Đường</h2>
+            </div>
+            
+            <div class="kpi-grid">
+                <div class="kpi-box" style="border-color: #10b981;">
+                    <div class="kpi-title" data-i18n="kpiCheckin">Giờ Check-in (Thực tế)</div>
+                    <div class="kpi-value" id="kpi-checkin">--</div>
+                </div>
+                <div class="kpi-box" style="border-color: #ef4444;">
+                    <div class="kpi-title" data-i18n="kpiCheckout">Giờ Check-out (Thực tế)</div>
+                    <div class="kpi-value" id="kpi-checkout">--</div>
+                </div>
+                <div class="kpi-box" style="border-color: #8b5cf6;">
+                    <div class="kpi-title" data-i18n="kpiTotalTime">Tổng thời gian làm việc</div>
+                    <div class="kpi-value" id="kpi-totaltime">--</div>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-box" style="border-color: #3b82f6;">
+                    <div class="kpi-title" data-i18n="kpiTotalVisit">Số KH đã ghé thăm (Tổng)</div>
+                    <div class="kpi-value" id="kpi-total-visited">--</div>
+                    <div class="kpi-sub">
+                        <span data-i18n="kpiInRoute">Trong tuyến:</span> <b id="sub-in-route">0</b><br>
+                        <span data-i18n="kpiOutRoute">Ngoại tuyến:</span> <b id="sub-out-route">0</b>
+                    </div>
+                </div>
+                <div class="kpi-box" style="border-color: #0ea5e9;">
+                    <div class="kpi-title" data-i18n="kpiDist">Tổng quãng đường (×1.4)</div>
+                    <div class="kpi-value" id="kpi-distance">--</div>
+                </div>
+                <div class="kpi-box" style="border-color: #ec4899;">
+                    <div class="kpi-title" data-i18n="kpiWorkTime">Thời gian làm việc với KH</div>
+                    <div class="kpi-value" id="kpi-working-kh">--</div>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-box" style="border-color: #64748b;">
+                    <div class="kpi-title" data-i18n="kpiMoveTime">Thời gian di chuyển (v=20km/h)</div>
+                    <div class="kpi-value" id="kpi-moving-time">--</div>
+                </div>
+                <div class="kpi-box" style="border-color: #94a3b8;">
+                    <div class="kpi-title" data-i18n="kpiRest">Thời gian nghỉ trưa</div>
+                    <div class="kpi-value" id="kpi-rest">--</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px;" data-i18n="tableTitle">📋 Chi Tiết Lộ Trình Di Chuyển</h3>
+            <div class="data-table-container">
+                <table id="detail-table">
+                    <thead id="table-head"></thead>
+                    <tbody id="table-body"></tbody>
+                    <tfoot id="table-foot"></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ================= TỪ ĐIỂN SONG NGỮ (I18N) =================
+    const langData = {
+        vi: {
+            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "Báo cáo chi tiết ghé thăm khách hàng",
+            btnLoad: "📥 Tải Dữ Liệu", btnOptimize: "✨ AI Tối Ưu Tuyến", btnMapWeek: "🗺️ Tải Ảnh Bản Đồ",
+            lblRoute: "1. Dữ liệu ghé thăm:",
+            statusEmpty: "(Chưa tải)", statusLoading: "⌛ Đang xử lý...", statusDone: "✅ Đã tải xong", statusError: "❌ Lỗi tải file",
+            filterTitle: "Bộ Lọc", lblArea: "Khu vực", optArea: "-- Chọn Khu vực --", lblNPP: "Đơn vị PP", optNPP: "-- Chọn NPP --", lblNV: "Nhân viên", optNV: "-- Chọn Nhân viên --", lblDay: "Thứ (Day)", optDay: "-- Chọn Thứ --",
+            kpiHeader: "📊 Bảng Tổng Hợp Tuyến Đường", kpiCheckin: "Giờ Check-in (Thực tế)", kpiCheckout: "Giờ Check-out (Thực tế)", kpiTotalTime: "Tổng thời gian làm việc",
+            kpiTotalVisit: "Số KH đã ghé thăm (Tổng)", kpiInRoute: "Trong tuyến:", kpiOutRoute: "Ngoại tuyến:", kpiWorkTime: "Thời gian làm việc tại KH",
+            kpiDist: "Tổng quãng đường", kpiMoveTime: "Thời gian di chuyển (v=20km/h)", kpiRest: "Thời gian nghỉ", 
+            tableTitle: "📋 Chi Tiết Lộ Trình Di Chuyển", thDay: "Ngày", thCode: "Mã KH", thName: "Tên KH", thRouteType: "Loại Tuyến", thStart: "Thời điểm Bắt đầu", thEnd: "Thời điểm Kết thúc", thDist: "Khoảng cách đến KH kế tiếp (km)", thTimeAt: "Thời gian tại KH (phút)", thTimeMove: "Thời gian Di chuyển (phút)",
+            thGrandTotal: "TỔNG CỘNG",
+            unitHour: "giờ", unitMinute: "phút", unitKm: "km", alertNoRoute: "Không tìm thấy lộ trình phù hợp!",
+            lblTime: "Thời gian: ", lblAll: "Tất cả", multiDays: "Nhiều ngày", valIn: "Trong tuyến", valOut: "Ngoại tuyến",
+            optRouteOriginal: "📍 Tuyến Cũ (Thực tế)", optRouteOptimized: "✨ Tuyến Mới (AI Tối ưu)"
+        },
+        en: {
+            pageTitle: "Employee Route Tracking", warningTitle: "Customer Visit Detail Report",
+            btnLoad: "📥 Load Data", btnOptimize: "✨ Optimize Route", btnMapWeek: "🗺️ Download Map",
+            lblRoute: "1. Visit Data:",
+            statusEmpty: "(Not loaded)", statusLoading: "⌛ Loading...", statusDone: "✅ Done", statusError: "❌ Fetch Error",
+            filterTitle: "Filters", lblArea: "Area", optArea: "-- Select Area --", lblNPP: "Distributor", optNPP: "-- Select Distributor --", lblNV: "Employee", optNV: "-- Select Employee --", lblDay: "Day (Multi-select)", optDay: "-- Select Day --",
+            kpiHeader: "📊 Route Summary Dashboard", kpiCheckin: "Check-in Time (Actual)", kpiCheckout: "Check-out Time (Actual)", kpiTotalTime: "Total Working Time",
+            kpiTotalVisit: "Total Visited Customers", kpiInRoute: "In-route:", kpiOutRoute: "Out-of-route:", kpiWorkTime: "Time spent with Customers",
+            kpiDist: "Total Distance", kpiMoveTime: "Moving Time (v=20km/h)", kpiRest: "Lunch Break", 
+            tableTitle: "📋 Visit Route Details", thDay: "Day", thCode: "Cust. Code", thName: "Cust. Name", thRouteType: "Route Type", thStart: "Start", thEnd: "End", thDist: "Distance to next (km)", thTimeAt: "Time at store (mins)", thTimeMove: "Moving time (mins)",
+            thGrandTotal: "GRAND TOTAL",
+            unitHour: "hrs", unitMinute: "mins", unitKm: "km", alertNoRoute: "No matching route found!",
+            lblTime: "Time: ", lblAll: "All", multiDays: "Multiple days", valIn: "In-route", valOut: "Out-of-route",
+            optRouteOriginal: "📍 Original Route", optRouteOptimized: "✨ Optimized Route"
+        }
+    };
+
+    let curLang = 'vi';
+    let globalReportTime = ""; 
+    let selectedDays = []; 
+    let loadStatus = { route: 'idle' };
+
+    // ======= STATE QUẢN LÝ LỘ TRÌNH =======
+    let rawRouteData = []; 
+    let currentRouteOriginal = [];  // Lưu mảng tuyến gốc
+    let currentRouteOptimized = []; // Lưu mảng tuyến đã được AI tối ưu
+    let isOptimizedView = false;    // Trạng thái cờ (đang xem tuyến cũ hay mới)
+
+    // ======= SUPABASE =======
+    const SUPABASE_URL = 'https://mrqldgycwovpbmzdeuyz.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p'; 
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const BUCKET_NAME = 'mappingdata';
+    const FILE_ROUTE = 'map.xlsx';
+    const HUB_URL = 'https://nguyen842-ai.github.io/Tong-hop-bao-cao/';
+
+    const COL = {
+        NPP: 2, NV: 6, THU: 11, STT_GHE: 12, LO_TRINH: 13, MA_KH: 14, TEN_KH: 15,
+        TIME_IN: 19, TIME_OUT: 20, TIME_TOTAL: 21, LAT: 30, LNG: 31, AREA: 37
+    };
+
+    const colorMap = {
+        'Thứ 2': '#22c55e', 'Thứ 3': '#ef4444', 'Thứ 4': '#a855f7', 'Thứ 5': '#eab308', 'Thứ 6': '#000000', 'Thứ 7': '#3b82f6', 'Chủ nhật': '#f97316'
+    };
+
+    const map = L.map('map').setView([10.8231, 106.6297], 10);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+    let routeLayer = L.layerGroup().addTo(map);
+
+    const selArea = document.getElementById('sel-area');
+    const selNPP = document.getElementById('sel-npp');
+    const selNV = document.getElementById('sel-nv');
+    const dashboard = document.getElementById('dashboard-section');
+    const btnOptimize = document.getElementById('btn-ai-optimize'); 
+    const btnDlMapWeek = document.getElementById('btn-dl-map-week');
+    const toggleToolbar = document.getElementById('route-toggle-toolbar');
+
+    // ================= LOGIC ĐỔI NGÔN NGỮ =================
+    function renderStatusBadge(elId, statusKey) {
+        const el = document.getElementById(elId);
+        const lang = langData[curLang];
+        const mapStyle = {
+            idle:    { text: lang.statusEmpty,   color: '#64748b', bold: false },
+            loading: { text: lang.statusLoading, color: '#ea580c', bold: true },
+            done:    { text: lang.statusDone,    color: '#16a34a', bold: true },
+            error:   { text: lang.statusError,   color: '#dc2626', bold: true }
+        };
+        const s = mapStyle[statusKey] || mapStyle.idle;
+        el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
+    }
+
+    function setLang(lang) {
+        curLang = lang;
+        document.getElementById('page-title').innerText = langData[curLang].pageTitle;
+        document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-lang-' + lang).classList.add('active');
+        
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            let key = el.getAttribute('data-i18n');
+            if (langData[curLang][key]) el.innerHTML = langData[curLang][key];
+        });
+
+        if (!selArea.value && selArea.options.length > 0) selArea.options[0].text = langData[curLang].optArea;
+        if (!selNPP.value && selNPP.options.length > 0) selNPP.options[0].text = langData[curLang].optNPP;
+        if (!selNV.value && selNV.options.length > 0) selNV.options[0].text = langData[curLang].optNV;
+        
+        let chipAll = document.getElementById('chip-all');
+        if(chipAll) chipAll.innerText = langData[curLang].lblAll;
+        if(selectedDays.length === 0) {
+            document.getElementById('day-chips-container').innerHTML = `<span style="color:#94a3b8; font-size: 13px;">${langData[curLang].optDay}</span>`;
+        }
+
+        renderStatusBadge('statusRoute', loadStatus.route);
+
+        if (globalReportTime) {
+            document.getElementById('report-time').innerText = langData[curLang].lblTime + globalReportTime;
+        }
+
+        if (selectedDays.length > 0) processDataAndRender();
+    }
+
+    // ================= LOAD DỮ LIỆU TỪ SUPABASE =================
+    async function loadDataFromSupabase() {
+        const btn = document.getElementById('btnLoadData');
+        btn.disabled = true;
+
+        loadStatus.route = 'loading';
+        renderStatusBadge('statusRoute', loadStatus.route);
+
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                alert("Phiên làm việc hết hạn hoặc chưa đăng nhập. Đang chuyển về Trang Hub...");
+                window.location.href = HUB_URL;
+                return;
+            }
+
+            const { data: signedUrls, error } = await supabaseClient.storage
+                .from(BUCKET_NAME).createSignedUrls([FILE_ROUTE], 60);
+
+            if (error || !signedUrls || signedUrls.length < 1) throw new Error("Không có quyền tải file từ hệ thống!");
+
+            const urlRouteSigned = signedUrls.find(u => u.path === FILE_ROUTE).signedUrl;
+
+            let resRoute = await fetch(urlRouteSigned);
+            if (!resRoute.ok) throw new Error("Lỗi tải file Route");
+            let arrRoute = await resRoute.arrayBuffer();
+            let wbRoute = XLSX.read(arrRoute, {type: 'array'});
+            let jsonRoute = XLSX.utils.sheet_to_json(wbRoute.Sheets[wbRoute.SheetNames[0]], {header: 1});
+            
+            if (jsonRoute.length > 1 && jsonRoute[1][4] !== undefined) {
+                globalReportTime = jsonRoute[1][4];
+                document.getElementById('report-time').innerText = langData[curLang].lblTime + globalReportTime;
+            }
+
+            // Lưu dữ liệu hợp lệ (Bỏ qua header hoặc dòng rỗng)
+            rawRouteData = jsonRoute.filter(row => row[COL.AREA] && row[COL.NPP] && row[COL.NV] && !isNaN(parseInt(row[0])));
+            
+            loadStatus.route = 'done';
+            renderStatusBadge('statusRoute', loadStatus.route);
+            
+            updateFilters();
+
+        } catch (err) {
+            console.error("Lỗi:", err);
+            loadStatus.route = 'error';
+            renderStatusBadge('statusRoute', loadStatus.route);
+            alert("Lỗi tải dữ liệu. Vui lòng kiểm tra lại quyền truy cập hoặc đăng nhập lại.");
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ================= XỬ LÝ SỰ KIỆN FILTER =================
+    function resetViewStates() {
+        // Ẩn bảng, làm sạch mảng lưu và ẩn toggle toolbar khi chuyển đổi filter
+        dashboard.style.display = 'none';
+        currentRouteOriginal = [];
+        currentRouteOptimized = [];
+        isOptimizedView = false;
+        toggleToolbar.style.display = 'none';
+        document.querySelector('input[name="routeType"][value="original"]').checked = true;
+    }
+
+    function updateFilters() {
+        let areas = [...new Set(rawRouteData.map(r => r[COL.AREA]))].filter(Boolean);
+        selArea.innerHTML = `<option value="">${langData[curLang].optArea}</option>`;
+        areas.forEach(area => selArea.innerHTML += `<option value="${area}">${area}</option>`);
+        selArea.disabled = false;
+        selNPP.innerHTML = `<option value="">${langData[curLang].optNPP}</option>`; selNPP.disabled = true;
+        selNV.innerHTML = `<option value="">${langData[curLang].optNV}</option>`; selNV.disabled = true;
+        
+        clearDayChips();
+        btnOptimize.disabled = true;
+        btnDlMapWeek.disabled = true;
+    }
+
+    function clearDayChips() {
+        selectedDays = [];
+        document.getElementById('day-chips-container').innerHTML = `<span style="color:#94a3b8; font-size: 13px;">${langData[curLang].optDay}</span>`;
+    }
+
+    selArea.addEventListener('change', () => {
+        resetViewStates();
+        const area = selArea.value;
+        if (!area) { selNPP.disabled = true; selNV.disabled = true; clearDayChips(); return; }
+        
+        let npps = [...new Set(rawRouteData.filter(r => r[COL.AREA] === area).map(r => r[COL.NPP]))].filter(Boolean);
+        selNPP.innerHTML = `<option value="">${langData[curLang].optNPP}</option>`;
+        npps.forEach(npp => selNPP.innerHTML += `<option value="${npp}">${npp}</option>`);
+        selNPP.disabled = false;
+        
+        selNV.innerHTML = `<option value="">${langData[curLang].optNV}</option>`; selNV.disabled = true;
+        clearDayChips();
+        btnOptimize.disabled = true; btnDlMapWeek.disabled = true;
+    });
+
+    selNPP.addEventListener('change', () => {
+        resetViewStates();
+        const area = selArea.value;
+        const npp = selNPP.value;
+        if (!npp) { selNV.disabled = true; clearDayChips(); return; }
+        
+        let nvs = [...new Set(rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp).map(r => r[COL.NV]))].filter(Boolean);
+        selNV.innerHTML = `<option value="">${langData[curLang].optNV}</option>`;
+        nvs.forEach(nv => selNV.innerHTML += `<option value="${nv}">${nv}</option>`);
+        selNV.disabled = false;
+        
+        clearDayChips();
+        btnOptimize.disabled = true; btnDlMapWeek.disabled = true;
+    });
+
+    selNV.addEventListener('change', () => {
+        resetViewStates();
+        const area = selArea.value; const npp = selNPP.value; const nv = selNV.value; 
+        if (!nv) { clearDayChips(); return; }
+        
+        // Đổi hình Avatar (Giả lập)
+        document.getElementById('avatar-img').src = `New folder/images/${nv}.PNG`;
+        
+        let thus = [...new Set(rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv).map(r => r[COL.THU]))].filter(Boolean);
+        const order = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
+        thus.sort((a, b) => (order[a]||99) - (order[b]||99));
+        
+        let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">${langData[curLang].lblAll}</div>`;
+        thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
+        document.getElementById('day-chips-container').innerHTML = chipsHTML;
+    });
+
+    window.toggleDay = function(day) {
+        let idx = selectedDays.indexOf(day);
+        if(idx > -1) selectedDays.splice(idx, 1);
+        else selectedDays.push(day);
+        updateDaySelection();
+    };
+
+    window.toggleAllDays = function() {
+        let chipElements = Array.from(document.querySelectorAll('.chip-day'));
+        if(selectedDays.length === chipElements.length) selectedDays = []; 
+        else selectedDays = chipElements.map(el => el.getAttribute('data-day'));
+        updateDaySelection();
+    };
+
+    function updateDaySelection() {
+        // Cập nhật style CSS cho Chips
+        document.querySelectorAll('.chip-day').forEach(el => {
+            if(selectedDays.includes(el.getAttribute('data-day'))) el.classList.add('active');
+            else el.classList.remove('active');
+        });
+        let chipAll = document.getElementById('chip-all');
+        if(chipAll) {
+            let totalDays = document.querySelectorAll('.chip-day').length;
+            if(selectedDays.length === totalDays && totalDays > 0) chipAll.classList.add('active');
+            else chipAll.classList.remove('active');
+        }
+
+        // Bật/Tắt các nút bấm
+        btnDlMapWeek.disabled = (selectedDays.length === 0);
+        // Chức năng AI chỉ mở khi chọn đúng 1 ngày
+        btnOptimize.disabled = (selectedDays.length !== 1);
+
+        resetViewStates();
+        if (selectedDays.length > 0) processDataAndRender();
+    }
+
+    // ================= XỬ LÝ DỮ LIỆU & RENDER =================
+    function processDataAndRender() {
+        const area = selArea.value; const npp = selNPP.value; const nv = selNV.value;
+        if (!area || !npp || !nv || selectedDays.length === 0) return;
+
+        // Nếu mảng gốc đang rỗng (mới đổi ngày filter), tạo lại mảng gốc
+        if (currentRouteOriginal.length === 0) {
+            currentRouteOriginal = rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv && selectedDays.includes(r[COL.THU]));
+            
+            // Sắp xếp mặc định theo Thứ -> Thời gian Check-in
+            const order = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
+            currentRouteOriginal.sort((a, b) => {
+                let dayDiff = (order[a[COL.THU]]||99) - (order[b[COL.THU]]||99);
+                if (dayDiff !== 0) return dayDiff;
+                return timeStrToMinutes(a[COL.TIME_IN]) - timeStrToMinutes(b[COL.TIME_IN]);
+            });
+        }
+
+        // Dữ liệu dùng để render phụ thuộc vào cờ isOptimizedView
+        let activeData = isOptimizedView ? currentRouteOptimized : currentRouteOriginal;
+
+        drawMap(activeData);
+        calculateKPIs(activeData);
+        renderDetailTable(activeData);
+        
+        dashboard.style.display = 'block';
+    }
+
+    function drawMap(data) {
+        routeLayer.clearLayers(); 
+        let allLatLngs = []; 
+        
+        selectedDays.forEach(day => {
+            let dayData = data.filter(r => r[COL.THU] === day);
+            if(dayData.length === 0) return;
+
+            // Màu của tuyến tối ưu sẽ đổi sang cam/đỏ để dễ phân biệt
+            let color = isOptimizedView ? '#f59e0b' : (colorMap[day] || '#3b82f6');
+            let dayLatLngs = [];
+            
+            dayData.forEach((row, index) => {
+                let lat = parseFloat(row[COL.LAT]); let lng = parseFloat(row[COL.LNG]); 
+                let stt = index + 1; 
+                
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    dayLatLngs.push([lat, lng]);
+                    allLatLngs.push([lat, lng]);
+                    let icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class="route-marker" style="background-color: ${color};">${stt}</div>`,
+                        iconSize: [26, 26], iconAnchor: [13, 13]
+                    });
+                    let marker = L.marker([lat, lng], {icon: icon});
+                    marker.bindPopup(`<b>${row[COL.THU]}</b><br><b>${row[COL.TEN_KH] || 'N/A'}</b><br>Mã KH: ${row[COL.MA_KH]}<br>STT: ${stt}<br>Time IN: ${row[COL.TIME_IN] || '--'}`);
+                    routeLayer.addLayer(marker);
+                }
+            });
+            if (dayLatLngs.length > 1) {
+                L.polyline(dayLatLngs, {color: color, weight: 3, opacity: 0.8, dashArray: isOptimizedView ? '' : '5, 5'}).addTo(routeLayer);
+            }
+        });
+
+        if (allLatLngs.length > 0) {
+            map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]});
+        }
+    }
+
+    function calculateKPIs(data) {
+        let totalWorkMins = 0;
+        let totalDist = 0;
+        let inRouteCount = 0, outRouteCount = 0, khTimeMins = 0;
+        let multiDayText = langData[curLang].multiDays;
+        let displayCheckin = '--'; let displayCheckout = '--';
+
+        selectedDays.forEach(day => {
+            let dayData = data.filter(r => r[COL.THU] === day);
+            if(dayData.length === 0) return;
+            
+            let minIn = Infinity; let maxOut = -Infinity;
+            let dayCheckIn = '--'; let dayCheckOut = '--';
+
+            dayData.forEach(r => {
+                let tInStr = r[COL.TIME_IN]; let tOutStr = r[COL.TIME_OUT];
+                let tIn = timeStrToMinutes(tInStr); let tOut = timeStrToMinutes(tOutStr);
+                if (tIn > 0 && tIn < minIn) { minIn = tIn; dayCheckIn = tInStr; }
+                if (tOut > 0 && tOut > maxOut) { maxOut = tOut; dayCheckOut = tOutStr; }
+            });
+
+            if (minIn !== Infinity && maxOut !== -Infinity) {
+                totalWorkMins += Math.max(0, maxOut - minIn);
+            }
+
+            if (selectedDays.length === 1) {
+                displayCheckin = dayCheckIn; displayCheckout = dayCheckOut;
+            }
+
+            // Tính quãng đường dồn theo mảng truyền vào (đã xếp thứ tự)
+            for(let i = 0; i < dayData.length - 1; i++) {
+                totalDist += getHaversine14(dayData[i][COL.LAT], dayData[i][COL.LNG], dayData[i+1][COL.LAT], dayData[i+1][COL.LNG]);
+            }
+        });
+
+        document.getElementById('kpi-checkin').innerText = selectedDays.length === 1 ? displayCheckin : multiDayText;
+        document.getElementById('kpi-checkout').innerText = selectedDays.length === 1 ? displayCheckout : multiDayText;
+        document.getElementById('kpi-totaltime').innerText = minutesToStr(totalWorkMins);
+
+        data.forEach(r => {
+            let loTrinh = (r[COL.LO_TRINH] || '').toString().toLowerCase();
+            if(loTrinh.includes('trong') || loTrinh.includes('in')) inRouteCount++;
+            else outRouteCount++;
+            
+            let tIn = r[COL.TIME_IN] || ''; let tOut = r[COL.TIME_OUT] || '';
+            khTimeMins += Math.max(0, timeStrToMinutes(tOut) - timeStrToMinutes(tIn));
+        });
+
+        document.getElementById('kpi-total-visited').innerText = data.length;
+        document.getElementById('sub-in-route').innerText = inRouteCount;
+        document.getElementById('sub-out-route').innerText = outRouteCount;
+        document.getElementById('kpi-working-kh').innerText = minutesToStr(khTimeMins);
+        
+        document.getElementById('kpi-distance').innerText = `${formatNum(totalDist)} ${langData[curLang].unitKm}`;
+        document.getElementById('kpi-moving-time').innerText = minutesToStr((totalDist / 20) * 60);
+        document.getElementById('kpi-rest').innerText = `${selectedDays.length} ${langData[curLang].unitHour} 0 ${langData[curLang].unitMinute}`;
+    }
+
+    function renderDetailTable(data) {
+        const thead = document.getElementById('table-head');
+        const tbody = document.getElementById('table-body');
+        const tfoot = document.getElementById('table-foot');
+        let lang = langData[curLang];
+
+        let headerHTML = `
+            <tr>
+                <th class="route-th">${lang.thDay}</th>
+                <th class="route-th">${lang.thCode}</th>
+                <th class="route-th" style="max-width:200px;">${lang.thName}</th>
+                <th class="route-th">${lang.thRouteType}</th> 
+                <th class="route-th">${lang.thStart}</th>
+                <th class="route-th">${lang.thEnd}</th>
+                <th class="route-th num-right">${lang.thDist}</th>
+                <th class="route-th num-right">${lang.thTimeAt}</th>
+                <th class="route-th num-right">${lang.thTimeMove}</th>
+            </tr>
+        `;
+        thead.innerHTML = headerHTML;
+
+        let totalKHTime = 0, totalMoveTime = 0, totalDist = 0;
+        tbody.innerHTML = '';
+        
+        data.forEach((row, index) => {
+            let distToNext = 0;
+            if(index < data.length - 1 && row[COL.THU] === data[index+1][COL.THU]) {
+                distToNext = getHaversine14(row[COL.LAT], row[COL.LNG], data[index+1][COL.LAT], data[index+1][COL.LNG]);
+            }
+            totalDist += distToNext;
+
+            let timeIn = row[COL.TIME_IN] || ''; let timeOut = row[COL.TIME_OUT] || '';
+            let timeAtKH = Math.max(0, timeStrToMinutes(timeOut) - timeStrToMinutes(timeIn));
+            let moveTime = (distToNext / 20) * 60;
+            
+            totalKHTime += timeAtKH; totalMoveTime += moveTime;
+
+            let loTrinhText = (row[COL.LO_TRINH] || '').toString().toLowerCase();
+            let isTrongTuyen = loTrinhText.includes('trong') || loTrinhText.includes('in');
+            let routeLabel = isTrongTuyen ? `<span style="color:#16a34a; font-weight:bold;">${lang.valIn}</span>` : `<span style="color:#f59e0b; font-weight:bold;">${lang.valOut}</span>`;
+
+            let tr = document.createElement('tr');
+            // Nếu là dòng của tuyến Tối ưu, bôi nền nhẹ để phân biệt
+            if (isOptimizedView) tr.style.backgroundColor = '#fffbeb'; 
+
+            tr.innerHTML = `
+                <td style="font-weight:bold; color: ${colorMap[row[COL.THU]] || '#475569'};">${row[COL.THU] || ''}</td>
+                <td>${row[COL.MA_KH] || ''}</td>
+                <td style="white-space: normal;">${row[COL.TEN_KH] || ''}</td>
+                <td style="text-align: center;">${routeLabel}</td>
+                <td>${timeIn}</td>
+                <td>${timeOut}</td>
+                <td class="num-right" style="font-weight:bold; color:#1e40af;">${formatNum(distToNext)}</td>
+                <td class="num-right">${formatNum(timeAtKH)}</td>
+                <td class="num-right">${formatNum(moveTime)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        let grandTotalHTML = `
+            <tr>
+                <td colspan="6" style="text-align:right; font-size:14px; font-weight:bold;">${lang.thGrandTotal}</td>
+                <td class="num-right" style="color:#1e40af; font-size:14px; font-weight:bold;">${formatNum(totalDist)} ${lang.unitKm}</td>
+                <td class="num-right" style="color:#ec4899; font-size:14px; font-weight:bold;">${minutesToStr(totalKHTime)}</td>
+                <td class="num-right" style="color:#64748b; font-size:14px; font-weight:bold;">${minutesToStr(totalMoveTime)}</td>
+            </tr>
+        `;
+        tfoot.innerHTML = grandTotalHTML;
+    }
+
+    // ================= CHỨC NĂNG AI TỐI ƯU TUYẾN =================
+    async function optimizeRouteWithAI() {
+        if (currentRouteOriginal.length < 3) {
+            alert("Số lượng khách hàng quá ít, không cần thiết dùng AI tối ưu.");
+            return;
+        }
+
+        btnOptimize.innerText = "⌛ AI Đang Tính...";
+        btnOptimize.disabled = true;
+
+        try {
+            // 1. Đóng gói payload gửi đi
+            // Payload bao gồm Tọa độ khách hàng. Điểm đầu tiên (index = 0) thường được giữ nguyên là điểm xuất phát.
+            const payload = currentRouteOriginal.map((row, index) => ({
+                id: row[COL.MA_KH],
+                lat: parseFloat(row[COL.LAT]),
+                lng: parseFloat(row[COL.LNG])
+            }));
+
+            // 2. GỌI API (THAY BẰNG API THẬT TRÊN VERCEL CỦA BẠN)
+            // LƯU Ý: Dưới đây là mô phỏng (Mock API) để bạn có thể test ngay giao diện.
+            // Để nối backend, bạn bỏ comment đoạn fetch và truyền API Vercel của bạn vào.
+            /* 
+            const response = await fetch('/api/optimizeRoute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locations: payload })
+            });
+            if (!response.ok) throw new Error("Lỗi API Vercel");
+            const data = await response.json();
+            const optimizedOrderIDs = data.optimized_ids; // Mảng các ID đã sắp xếp. VD: ['KH001', 'KH005', 'KH003'...]
+            */
+
+            // --- ĐOẠN MOCK DATA (Giả lập AI xáo trộn thứ tự cho tối ưu hơn) ---
+            await new Promise(r => setTimeout(r, 1500)); // Delay giả lập mạng
+            let mockIDs = currentRouteOriginal.map(r => r[COL.MA_KH]);
+            // Giữ nguyên phần tử đầu, đảo ngược hoặc shuffle nhẹ phần tử còn lại để tạo cảm giác đổi
+            let firstID = mockIDs.shift();
+            mockIDs.sort(() => Math.random() - 0.5); 
+            const optimizedOrderIDs = [firstID, ...mockIDs];
+            // -----------------------------------------------------------------
+
+            // 3. Clone mảng gốc và sắp xếp theo mảng ID trả về
+            currentRouteOptimized = [...currentRouteOriginal].sort((a, b) => {
+                let idxA = optimizedOrderIDs.indexOf(a[COL.MA_KH]);
+                let idxB = optimizedOrderIDs.indexOf(b[COL.MA_KH]);
+                return idxA - idxB;
+            });
+
+            // 4. Bật Toggle Toolbar và chuyển mode sang View Optimzed
+            toggleToolbar.style.display = 'flex';
+            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+            isOptimizedView = true;
+
+            // 5. Render lại toàn bộ dữ liệu
+            processDataAndRender();
+            alert("✨ AI đã tối ưu xong lộ trình! Vui lòng xem bản đồ và so sánh khoảng cách.");
+
+        } catch (error) {
+            console.error(error);
+            alert("Lỗi khi kết nối với hệ thống AI Optimizer.");
+        } finally {
+            btnOptimize.innerText = langData[curLang].btnOptimize;
+            btnOptimize.disabled = false;
+        }
+    }
+
+    // Lắng nghe sự kiện click trên Toggle
+    function handleRouteToggle() {
+        const routeType = document.querySelector('input[name="routeType"]:checked').value;
+        isOptimizedView = (routeType === 'optimized');
+        processDataAndRender();
+    }
+
+    // ================= DOWNLOAD BẢN ĐỒ =================
+    async function downloadWeeklyMap() {
+        btnDlMapWeek.disabled = true;
+        let originalText = btnDlMapWeek.innerText;
+        btnDlMapWeek.innerText = "⌛ Đang chụp...";
+
+        try {
+            await new Promise(r => setTimeout(r, 1000));
+            let canvas = await html2canvas(document.getElementById('map'), { 
+                useCORS: true, allowTaint: false, scale: 2 
+            });
+            let link = document.createElement('a');
+            let prefix = isOptimizedView ? "Toi_Uu" : "Thuc_Te";
+            link.download = `BanDo_${prefix}_${selNV.value.replace(/\s+/g, '_')}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            alert("Có lỗi xảy ra khi tạo ảnh bản đồ!");
+        } finally {
+            btnDlMapWeek.innerText = originalText;
+            btnDlMapWeek.disabled = false;
+        }
+    }
+
+    // ================= TIỆN ÍCH =================
+    function timeStrToMinutes(timeStr) {
+        if (!timeStr) return 0;
+        let p = timeStr.toString().trim().split(':');
+        return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0) + (parseInt(p[2])||0)/60;
+    }
+
+    function minutesToStr(mins) {
+        if (isNaN(mins) || mins <= 0) return `0 ${langData[curLang].unitHour} 0 ${langData[curLang].unitMinute}`;
+        let totalMins = Math.round(mins);
+        return `${Math.floor(totalMins/60)} ${langData[curLang].unitHour} ${totalMins%60} ${langData[curLang].unitMinute}`;
+    }
+
+    function getHaversine14(lat1, lon1, lat2, lon2) {
+        lat1 = parseFloat(lat1); lon1 = parseFloat(lon1); lat2 = parseFloat(lat2); lon2 = parseFloat(lon2);
+        if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
+        const R = 6371; 
+        const dLat = (lat2 - lat1) * (Math.PI / 180); const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; // Hệ số nhân 1.4 đường thực tế
+    }
+    
+    function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
+    
+    setLang('vi');
+</script>
+
+</body>
+</html>
