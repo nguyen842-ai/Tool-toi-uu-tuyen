@@ -444,18 +444,19 @@
             warningSection.style.display = 'block';
         }
 
+        // --- ĐÃ THÊM LOGIC SẮP XẾP CHUẨN TỪ THỨ 2 -> CHỦ NHẬT ---
         currentNVDataOriginal = allValidData.filter(r => r.npp === npp && r.nv === nv);
+        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
+        currentNVDataOriginal.sort((a,b) => (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99));
+        // --------------------------------------------------------
         
         let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
         let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
         
-        const dayOrder = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-        thus.sort((a,b) => dayOrder[a] - dayOrder[b]);
-
         thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
         document.getElementById('day-chips-container').innerHTML = chipsHTML;
     });
-
+          
     window.toggleDay = function(day) {
         let idx = selectedDays.indexOf(day);
         if(idx > -1) selectedDays.splice(idx, 1);
@@ -573,9 +574,10 @@
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
-        // Thêm cột Tần Suất vào giao diện
+        
         thead.innerHTML = `<tr>
             <th class="route-th">Thứ</th>
+            <th class="route-th">Nhóm Tuyến</th>
             <th class="route-th">STT</th>
             <th class="route-th">Mã KH</th>
             <th class="route-th">Tên KH</th>
@@ -584,31 +586,50 @@
         </tr>`;
         tbody.innerHTML = '';
         
-        let currentDay = '';
-        let sttInDay = 0; // Biến đếm STT nội bộ cho từng ngày
+        // 1. Lọc ra các Ngày duy nhất và sắp xếp T2 -> CN
+        const dayOrder = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
+        let uniqueDays = [...new Set(data.map(r => r.thu))].sort((a,b) => dayOrder[a] - dayOrder[b]);
 
-        data.forEach((row, index) => {
-            // Logic tách bạch: Đặt lại STT về 1 khi chuyển Thứ
-            if (row.thu !== currentDay) {
-                currentDay = row.thu;
-                sttInDay = 1;
+        uniqueDays.forEach(day => {
+            let dayData = data.filter(r => r.thu === day);
+
+            // 2. Hàm nội bộ để render từng nhóm và tự động tính lại KM chuẩn xác
+            const renderGroup = (groupData, groupLabel) => {
+                if (groupData.length === 0) return;
+                groupData.forEach((row, index) => {
+                    let distToNext = 0;
+                    // Tính khoảng cách nối đuôi nhau ĐÚNG theo lộ trình của Tuần đó
+                    if (index < groupData.length - 1) {
+                        distToNext = getHaversine14(row.lat, row.lng, groupData[index+1].lat, groupData[index+1].lng);
+                    }
+                    tbody.innerHTML += `<tr ${isOptimizedView ? 'style="background-color: #fffbeb;"' : ''}>
+                        <td style="font-weight:bold; color: ${colorMap[row.thu]};">${row.thu}</td>
+                        <td style="text-align:center; font-weight:bold; color:#0f766e; background:#f0fdfa;">${groupLabel}</td>
+                        <td style="text-align:center; font-weight:bold; font-size:14px;">${index + 1}</td>
+                        <td>${row.ma_kh}</td>
+                        <td style="white-space: normal;">${row.ten_kh}</td>
+                        <td style="text-align:center;"><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:bold; color:#334155;">${row.freq || 'N/A'}</span></td>
+                        <td class="num-right" style="font-weight:bold; color:#1e40af;">${formatNum(distToNext)}</td>
+                    </tr>`;
+                });
+            };
+
+            // 3. Logic tách luồng nếu phát hiện có trộn tuyến F2
+            let hasF21 = dayData.some(r => r.freq === 'F2-1');
+            let hasF22 = dayData.some(r => r.freq === 'F2-2');
+
+            if (hasF21 || hasF22) {
+                // Tuyến Tuần 1 & 3: Bắt khách F4 và F2-1
+                let routeW13 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-1');
+                // Tuyến Tuần 2 & 4: Bắt khách F4 và F2-2
+                let routeW24 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-2');
+                
+                renderGroup(routeW13, "Tuần 1 & 3");
+                renderGroup(routeW24, "Tuần 2 & 4");
             } else {
-                sttInDay++;
+                // Nếu tuyến toàn F4, không có trộn
+                renderGroup(dayData, "Mỗi Tuần");
             }
-
-            let distToNext = 0;
-            if (index < data.length - 1 && row.thu === data[index+1].thu) {
-                distToNext = getHaversine14(row.lat, row.lng, data[index+1].lat, data[index+1].lng);
-            }
-            
-            tbody.innerHTML += `<tr ${isOptimizedView ? 'style="background-color: #fffbeb;"' : ''}>
-                <td style="font-weight:bold; color: ${colorMap[row.thu]};">${row.thu}</td>
-                <td style="text-align:center; font-weight:bold; font-size:14px;">${sttInDay}</td>
-                <td>${row.ma_kh}</td>
-                <td style="white-space: normal;">${row.ten_kh}</td>
-                <td style="text-align:center;"><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:bold; color:#334155;">${row.freq || 'N/A'}</span></td>
-                <td class="num-right" style="font-weight:bold; color:#1e40af;">${formatNum(distToNext)}</td>
-            </tr>`;
         });
     }
 
