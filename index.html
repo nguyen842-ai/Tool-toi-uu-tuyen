@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Báo cáo chi tiết ghé thăm khách hàng</title>
+    <title id="page-title"></title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -50,6 +50,9 @@
 
         .btn-purple { background-color: #8b5cf6; margin: 0; padding: 8px 10px; flex: 1; }
         .btn-purple:hover { background-color: #7c3aed; }
+
+        .btn-green { background-color: #10b981; width: auto; margin: 0; padding: 8px 15px; }
+        .btn-green:hover { background-color: #059669; }
 
         .file-status-box { margin-bottom: 10px; display: flex; justify-content: space-between; font-weight: bold;}
         .status-badge { font-weight: normal; font-size: 12px; }
@@ -100,18 +103,17 @@
 
         .summary-card { margin-bottom: 20px; }
         .header-title-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; }
-        .header-title-row h2 { margin: 0; color: #0f172a; }
+        .header-title-row h2, .header-title-row h3 { margin: 0; color: #0f172a; }
         
-        .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .kpi-box { background: #f8fafc; padding: 12px; border-radius: 6px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .kpi-title { font-size: 13px; color: #64748b; font-weight: bold; margin-bottom: 5px;}
-        .kpi-value { font-size: 18px; color: #0f172a; font-weight: bold; }
-        .kpi-sub { font-size: 11px; color: #64748b; margin-top: 5px; border-top: 1px dashed #cbd5e1; padding-top: 5px; }
+        .warning-tag {
+            background: #fee2e2; color: #ef4444; padding: 4px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: bold; border: 1px solid #fca5a5; display: inline-block;
+        }
 
-        .data-table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .data-table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 25px;}
         table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 13px; }
         th, td { padding: 8px 10px; text-align: left; border: 1px solid #e2e8f0; }
-        th.route-th { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; white-space: normal !important; word-wrap: break-word; max-width: 120px; }
+        th.route-th { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; white-space: normal !important; word-wrap: break-word; }
         th { position: sticky; top: 0; }
         td { white-space: nowrap; }
         tfoot { background-color: #e2e8f0; font-weight: bold; }
@@ -125,7 +127,7 @@
     <div id="left-panel">
         <div id="upload-section">
             <div class="upload-warning">
-                <div data-i18n="warningTitle">Báo cáo chi tiết ghé thăm khách hàng</div>
+                <div data-i18n="warningTitle">CÔNG CỤ TỐI ƯU TUYẾN BÁN HÀNG</div>
                 <div id="report-time" style="font-size: 13px; font-weight: normal; text-transform: none; margin-top: 5px; color: #1e293b;"></div>
             </div>
             
@@ -210,56 +212,26 @@
         </div>
 
         <div class="summary-card" id="dashboard-section" style="display: none;">
-            <div class="header-title-row">
-                <h2 data-i18n="kpiHeader">📊 Bảng Tổng Hợp Tuyến Đường</h2>
-            </div>
             
-            <div class="kpi-grid">
-                <div class="kpi-box" style="border-color: #10b981;">
-                    <div class="kpi-title" data-i18n="kpiCheckin">Giờ Check-in (Thực tế)</div>
-                    <div class="kpi-value" id="kpi-checkin">--</div>
-                </div>
-                <div class="kpi-box" style="border-color: #ef4444;">
-                    <div class="kpi-title" data-i18n="kpiCheckout">Giờ Check-out (Thực tế)</div>
-                    <div class="kpi-value" id="kpi-checkout">--</div>
-                </div>
-                <div class="kpi-box" style="border-color: #8b5cf6;">
-                    <div class="kpi-title" data-i18n="kpiTotalTime">Tổng thời gian làm việc</div>
-                    <div class="kpi-value" id="kpi-totaltime">--</div>
-                </div>
+            <!-- BẢNG SO SÁNH HIỆU QUẢ CŨ - MỚI -->
+            <div class="header-title-row">
+                <h2 data-i18n="compTitle">📊 Bảng So Sánh Hiệu Quả (Cũ vs Mới)</h2>
+            </div>
+            <div class="data-table-container">
+                <table id="comparison-table">
+                    <thead id="comp-head"></thead>
+                    <tbody id="comp-body"></tbody>
+                    <tfoot id="comp-foot"></tfoot>
+                </table>
             </div>
 
-            <div class="kpi-grid">
-                <div class="kpi-box" style="border-color: #3b82f6;">
-                    <div class="kpi-title" data-i18n="kpiTotalVisit">Số KH đã ghé thăm (Tổng)</div>
-                    <div class="kpi-value" id="kpi-total-visited">--</div>
-                    <div class="kpi-sub">
-                        <span data-i18n="kpiInRoute">Trong tuyến:</span> <b id="sub-in-route">0</b><br>
-                        <span data-i18n="kpiOutRoute">Ngoại tuyến:</span> <b id="sub-out-route">0</b>
-                    </div>
-                </div>
-                <div class="kpi-box" style="border-color: #0ea5e9;">
-                    <div class="kpi-title" data-i18n="kpiDist">Tổng quãng đường (×1.4)</div>
-                    <div class="kpi-value" id="kpi-distance">--</div>
-                </div>
-                <div class="kpi-box" style="border-color: #ec4899;">
-                    <div class="kpi-title" data-i18n="kpiWorkTime">Thời gian làm việc với KH</div>
-                    <div class="kpi-value" id="kpi-working-kh">--</div>
-                </div>
+            <!-- BẢNG CHI TIẾT LỘ TRÌNH DI CHUYỂN -->
+            <div class="header-title-row" style="margin-top: 30px;">
+                <h2 data-i18n="tableTitle">📋 Chi Tiết Lộ Trình Di Chuyển</h2>
+                <button class="btn-primary btn-green" onclick="exportDetailToExcel()" data-i18n="btnExportDetail">
+                    📥 Tải Bảng Excel
+                </button>
             </div>
-
-            <div class="kpi-grid">
-                <div class="kpi-box" style="border-color: #64748b;">
-                    <div class="kpi-title" data-i18n="kpiMoveTime">Thời gian di chuyển (v=20km/h)</div>
-                    <div class="kpi-value" id="kpi-moving-time">--</div>
-                </div>
-                <div class="kpi-box" style="border-color: #94a3b8;">
-                    <div class="kpi-title" data-i18n="kpiRest">Thời gian nghỉ trưa</div>
-                    <div class="kpi-value" id="kpi-rest">--</div>
-                </div>
-            </div>
-
-            <h3 style="margin-top: 20px;" data-i18n="tableTitle">📋 Chi Tiết Lộ Trình Di Chuyển</h3>
             <div class="data-table-container">
                 <table id="detail-table">
                     <thead id="table-head"></thead>
@@ -267,6 +239,7 @@
                     <tfoot id="table-foot"></tfoot>
                 </table>
             </div>
+
         </div>
     </div>
 </div>
@@ -275,33 +248,29 @@
     // ================= TỪ ĐIỂN SONG NGỮ (I18N) =================
     const langData = {
         vi: {
-            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "Báo cáo chi tiết ghé thăm khách hàng",
-            btnLoad: "📥 Tải Dữ Liệu", btnOptimize: "✨ AI Tối Ưu Tuyến", btnMapWeek: "🗺️ Tải Ảnh Bản Đồ",
+            pageTitle: "Theo Dõi Đi Tuyến Nhân Viên", warningTitle: "CÔNG CỤ TỐI ƯU TUYẾN BÁN HÀNG",
+            btnLoad: "📥 Tải Dữ Liệu", btnOptimize: "✨ AI Tối Ưu Tuyến", btnMapWeek: "🗺️ Tải Ảnh Bản Đồ", btnExportDetail: "📥 Tải Bảng Excel",
             lblRoute: "1. Dữ liệu ghé thăm:",
             statusEmpty: "(Chưa tải)", statusLoading: "⌛ Đang xử lý...", statusDone: "✅ Đã tải xong", statusError: "❌ Lỗi tải file",
             filterTitle: "Bộ Lọc", lblArea: "Khu vực", optArea: "-- Chọn Khu vực --", lblNPP: "Đơn vị PP", optNPP: "-- Chọn NPP --", lblNV: "Nhân viên", optNV: "-- Chọn Nhân viên --", lblDay: "Thứ (Day)", optDay: "-- Chọn Thứ --",
-            kpiHeader: "📊 Bảng Tổng Hợp Tuyến Đường", kpiCheckin: "Giờ Check-in (Thực tế)", kpiCheckout: "Giờ Check-out (Thực tế)", kpiTotalTime: "Tổng thời gian làm việc",
-            kpiTotalVisit: "Số KH đã ghé thăm (Tổng)", kpiInRoute: "Trong tuyến:", kpiOutRoute: "Ngoại tuyến:", kpiWorkTime: "Thời gian làm việc tại KH",
-            kpiDist: "Tổng quãng đường", kpiMoveTime: "Thời gian di chuyển (v=20km/h)", kpiRest: "Thời gian nghỉ", 
-            tableTitle: "📋 Chi Tiết Lộ Trình Di Chuyển", thDay: "Ngày", thCode: "Mã KH", thName: "Tên KH", thRouteType: "Loại Tuyến", thStart: "Thời điểm Bắt đầu", thEnd: "Thời điểm Kết thúc", thDist: "Khoảng cách đến KH kế tiếp (km)", thTimeAt: "Thời gian tại KH (phút)", thTimeMove: "Thời gian Di chuyển (phút)",
-            thGrandTotal: "TỔNG CỘNG",
+            compTitle: "📊 Bảng So Sánh Hiệu Quả (Cũ vs Mới)", compDay: "Thứ", compCustOld: "Khách (Cũ)", compCustNew: "Khách (Mới)", compDistOld: "Km (Cũ)", compDistNew: "Km (Mới)", compTimeOld: "Phút di chuyển (Cũ)", compTimeNew: "Phút di chuyển (Mới)", compNote: "Cảnh báo",
+            tableTitle: "📋 Chi Tiết Lộ Trình Di Chuyển", thDay: "Ngày", thOrder: "Thứ tự ghé thăm", thCode: "Mã KH", thName: "Tên KH", thRouteType: "Loại Tuyến", thDist: "Khoảng cách đến KH kế tiếp (km)", thEstMoveTime: "Thời gian di chuyển ước tính (phút)",
+            thGrandTotal: "TỔNG CỘNG", alertAddCust: "⚠️ Yêu cầu bổ sung thêm khách (<18)",
             unitHour: "giờ", unitMinute: "phút", unitKm: "km", alertNoRoute: "Không tìm thấy lộ trình phù hợp!",
-            lblTime: "Thời gian: ", lblAll: "Tất cả", multiDays: "Nhiều ngày", valIn: "Trong tuyến", valOut: "Ngoại tuyến",
+            lblTime: "Thời gian: ", lblAll: "Tất cả", valIn: "Trong tuyến", valOut: "Ngoại tuyến",
             optRouteOriginal: "📍 Tuyến Cũ (Thực tế)", optRouteOptimized: "✨ Tuyến Mới (AI Tối ưu)"
         },
         en: {
-            pageTitle: "Employee Route Tracking", warningTitle: "Customer Visit Detail Report",
-            btnLoad: "📥 Load Data", btnOptimize: "✨ Optimize Route", btnMapWeek: "🗺️ Download Map",
+            pageTitle: "Employee Route Tracking", warningTitle: "SALES ROUTE OPTIMIZATION TOOLS",
+            btnLoad: "📥 Load Data", btnOptimize: "✨ Optimize Route", btnMapWeek: "🗺️ Download Map", btnExportDetail: "📥 Export Excel",
             lblRoute: "1. Visit Data:",
             statusEmpty: "(Not loaded)", statusLoading: "⌛ Loading...", statusDone: "✅ Done", statusError: "❌ Fetch Error",
             filterTitle: "Filters", lblArea: "Area", optArea: "-- Select Area --", lblNPP: "Distributor", optNPP: "-- Select Distributor --", lblNV: "Employee", optNV: "-- Select Employee --", lblDay: "Day (Multi-select)", optDay: "-- Select Day --",
-            kpiHeader: "📊 Route Summary Dashboard", kpiCheckin: "Check-in Time (Actual)", kpiCheckout: "Check-out Time (Actual)", kpiTotalTime: "Total Working Time",
-            kpiTotalVisit: "Total Visited Customers", kpiInRoute: "In-route:", kpiOutRoute: "Out-of-route:", kpiWorkTime: "Time spent with Customers",
-            kpiDist: "Total Distance", kpiMoveTime: "Moving Time (v=20km/h)", kpiRest: "Lunch Break", 
-            tableTitle: "📋 Visit Route Details", thDay: "Day", thCode: "Cust. Code", thName: "Cust. Name", thRouteType: "Route Type", thStart: "Start", thEnd: "End", thDist: "Distance to next (km)", thTimeAt: "Time at store (mins)", thTimeMove: "Moving time (mins)",
-            thGrandTotal: "GRAND TOTAL",
+            compTitle: "📊 Efficiency Comparison (Old vs New)", compDay: "Day", compCustOld: "Cust (Old)", compCustNew: "Cust (New)", compDistOld: "Km (Old)", compDistNew: "Km (New)", compTimeOld: "Move Mins (Old)", compTimeNew: "Move Mins (New)", compNote: "Warning",
+            tableTitle: "📋 Visit Route Details", thDay: "Day", thOrder: "Visit Order", thCode: "Cust. Code", thName: "Cust. Name", thRouteType: "Route Type", thDist: "Distance to next (km)", thEstMoveTime: "Est. Moving time (mins)",
+            thGrandTotal: "GRAND TOTAL", alertAddCust: "⚠️ Needs more customers (<18)",
             unitHour: "hrs", unitMinute: "mins", unitKm: "km", alertNoRoute: "No matching route found!",
-            lblTime: "Time: ", lblAll: "All", multiDays: "Multiple days", valIn: "In-route", valOut: "Out-of-route",
+            lblTime: "Time: ", lblAll: "All", valIn: "In-route", valOut: "Out-of-route",
             optRouteOriginal: "📍 Original Route", optRouteOptimized: "✨ Optimized Route"
         }
     };
@@ -311,11 +280,12 @@
     let selectedDays = []; 
     let loadStatus = { route: 'idle' };
 
-    // ======= STATE QUẢN LÝ LỘ TRÌNH =======
+    // ======= STATE QUẢN LÝ LỘ TRÌNH MỚI (LƯU TRỮ VĨNH VIỄN TRONG PHIÊN) =======
     let rawRouteData = []; 
-    let currentRouteOriginal = [];  // Lưu mảng tuyến gốc
-    let currentRouteOptimized = []; // Lưu mảng tuyến đã được AI tối ưu
-    let isOptimizedView = false;    // Trạng thái cờ (đang xem tuyến cũ hay mới)
+    let currentNVDataOriginal = [];  // Lưu TOÀN BỘ data các ngày của NV đang chọn
+    let currentNVDataOptimized = []; // Lưu TOÀN BỘ data sau khi AI tối ưu
+    let hasOptimizedData = false;    // Cờ đánh dấu đã có kết quả AI hay chưa
+    let isOptimizedView = false;    
 
     // ======= SUPABASE =======
     const SUPABASE_URL = 'https://mrqldgycwovpbmzdeuyz.supabase.co';
@@ -424,7 +394,6 @@
                 document.getElementById('report-time').innerText = langData[curLang].lblTime + globalReportTime;
             }
 
-            // Lưu dữ liệu hợp lệ (Bỏ qua header hoặc dòng rỗng)
             rawRouteData = jsonRoute.filter(row => row[COL.AREA] && row[COL.NPP] && row[COL.NV] && !isNaN(parseInt(row[0])));
             
             loadStatus.route = 'done';
@@ -443,13 +412,16 @@
     }
 
     // ================= XỬ LÝ SỰ KIỆN FILTER =================
-    function resetViewStates() {
+    // Hàm này CHỈ DÙNG để xóa trắng bộ nhớ khi đổi Area, NPP hoặc NV
+    function clearNVData() {
         dashboard.style.display = 'none';
-        currentRouteOriginal = [];
-        currentRouteOptimized = [];
+        currentNVDataOriginal = [];
+        currentNVDataOptimized = [];
+        hasOptimizedData = false;
         isOptimizedView = false;
         toggleToolbar.style.display = 'none';
-        document.querySelector('input[name="routeType"][value="original"]').checked = true;
+        let originalRadio = document.querySelector('input[name="routeType"][value="original"]');
+        if(originalRadio) originalRadio.checked = true;
     }
 
     function updateFilters() {
@@ -471,7 +443,7 @@
     }
 
     selArea.addEventListener('change', () => {
-        resetViewStates();
+        clearNVData(); // Đổi vùng -> xóa bộ nhớ
         const area = selArea.value;
         if (!area) { selNPP.disabled = true; selNV.disabled = true; clearDayChips(); return; }
         
@@ -486,7 +458,7 @@
     });
 
     selNPP.addEventListener('change', () => {
-        resetViewStates();
+        clearNVData(); // Đổi NPP -> xóa bộ nhớ
         const area = selArea.value;
         const npp = selNPP.value;
         if (!npp) { selNV.disabled = true; clearDayChips(); return; }
@@ -501,15 +473,24 @@
     });
 
     selNV.addEventListener('change', () => {
-        resetViewStates();
+        clearNVData(); // Đổi NV -> xóa bộ nhớ
         const area = selArea.value; const npp = selNPP.value; const nv = selNV.value; 
         if (!nv) { clearDayChips(); return; }
         
         document.getElementById('avatar-img').src = `New folder/images/${nv}.PNG`;
         
-        let thus = [...new Set(rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv).map(r => r[COL.THU]))].filter(Boolean);
+        // TẢI TOÀN BỘ DATA CỦA NHÂN VIÊN NÀY VÀO BỘ NHỚ
+        currentNVDataOriginal = rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv);
+        
         const order = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
-        thus.sort((a, b) => (order[a]||99) - (order[b]||99));
+        currentNVDataOriginal.sort((a, b) => {
+            let dayDiff = (order[a[COL.THU]]||99) - (order[b[COL.THU]]||99);
+            if (dayDiff !== 0) return dayDiff;
+            return timeStrToMinutes(a[COL.TIME_IN]) - timeStrToMinutes(b[COL.TIME_IN]);
+        });
+
+        // Lấy danh sách các Thứ nhân viên này đi làm
+        let thus = [...new Set(currentNVDataOriginal.map(r => r[COL.THU]))].filter(Boolean);
         
         let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">${langData[curLang].lblAll}</div>`;
         thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
@@ -531,6 +512,7 @@
     };
 
     function updateDaySelection() {
+        // Hàm này KHÔNG còn xóa data nữa
         document.querySelectorAll('.chip-day').forEach(el => {
             if(selectedDays.includes(el.getAttribute('data-day'))) el.classList.add('active');
             else el.classList.remove('active');
@@ -543,34 +525,31 @@
         }
 
         btnDlMapWeek.disabled = (selectedDays.length === 0);
-        
-        // MỞ KHÓA CHO NHIỀU NGÀY: Giờ đây chỉ cần chọn ít nhất 1 ngày là được phép dùng AI
         btnOptimize.disabled = (selectedDays.length === 0);
 
-        resetViewStates();
-        if (selectedDays.length > 0) processDataAndRender();
+        if (selectedDays.length > 0) {
+            processDataAndRender();
+        } else {
+            dashboard.style.display = 'none';
+            routeLayer.clearLayers();
+        }
     }
 
     // ================= XỬ LÝ DỮ LIỆU & RENDER =================
     function processDataAndRender() {
-        const area = selArea.value; const npp = selNPP.value; const nv = selNV.value;
-        if (!area || !npp || !nv || selectedDays.length === 0) return;
-
-        if (currentRouteOriginal.length === 0) {
-            currentRouteOriginal = rawRouteData.filter(r => r[COL.AREA] === area && r[COL.NPP] === npp && r[COL.NV] === nv && selectedDays.includes(r[COL.THU]));
-            
-            const order = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
-            currentRouteOriginal.sort((a, b) => {
-                let dayDiff = (order[a[COL.THU]]||99) - (order[b[COL.THU]]||99);
-                if (dayDiff !== 0) return dayDiff;
-                return timeStrToMinutes(a[COL.TIME_IN]) - timeStrToMinutes(b[COL.TIME_IN]);
-            });
+        if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) {
+            dashboard.style.display = 'none';
+            return;
         }
 
-        let activeData = isOptimizedView ? currentRouteOptimized : currentRouteOriginal;
+        // Chọn bộ nhớ Cũ hay Mới để mang ra lọc
+        let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
+        
+        // Chỉ lấy những dòng thuộc các "Thứ" đang được chọn hiển thị
+        let activeData = baseData.filter(r => selectedDays.includes(r[COL.THU]));
 
         drawMap(activeData);
-        calculateKPIs(activeData);
+        renderComparisonTable();
         renderDetailTable(activeData);
         
         dashboard.style.display = 'block';
@@ -584,7 +563,6 @@
             let dayData = data.filter(r => r[COL.THU] === day);
             if(dayData.length === 0) return;
 
-            // Sử dụng màu theo ngày để dễ phân biệt khi xáo khách hàng giữa các ngày
             let color = colorMap[day] || '#3b82f6';
             let dayLatLngs = [];
             
@@ -615,63 +593,82 @@
         }
     }
 
-    function calculateKPIs(data) {
-        let totalWorkMins = 0;
-        let totalDist = 0;
-        let inRouteCount = 0, outRouteCount = 0, khTimeMins = 0;
-        let multiDayText = langData[curLang].multiDays;
-        let displayCheckin = '--'; let displayCheckout = '--';
-
-        selectedDays.forEach(day => {
-            let dayData = data.filter(r => r[COL.THU] === day);
-            if(dayData.length === 0) return;
-            
-            let minIn = Infinity; let maxOut = -Infinity;
-            let dayCheckIn = '--'; let dayCheckOut = '--';
-
-            dayData.forEach(r => {
-                let tInStr = r[COL.TIME_IN]; let tOutStr = r[COL.TIME_OUT];
-                let tIn = timeStrToMinutes(tInStr); let tOut = timeStrToMinutes(tOutStr);
-                if (tIn > 0 && tIn < minIn) { minIn = tIn; dayCheckIn = tInStr; }
-                if (tOut > 0 && tOut > maxOut) { maxOut = tOut; dayCheckOut = tOutStr; }
-            });
-
-            if (minIn !== Infinity && maxOut !== -Infinity) {
-                totalWorkMins += Math.max(0, maxOut - minIn);
-            }
-
-            if (selectedDays.length === 1) {
-                displayCheckin = dayCheckIn; displayCheckout = dayCheckOut;
-            }
-
-            for(let i = 0; i < dayData.length - 1; i++) {
-                totalDist += getHaversine14(dayData[i][COL.LAT], dayData[i][COL.LNG], dayData[i+1][COL.LAT], dayData[i+1][COL.LNG]);
-            }
-        });
-
-        document.getElementById('kpi-checkin').innerText = selectedDays.length === 1 ? displayCheckin : multiDayText;
-        document.getElementById('kpi-checkout').innerText = selectedDays.length === 1 ? displayCheckout : multiDayText;
-        document.getElementById('kpi-totaltime').innerText = minutesToStr(totalWorkMins);
-
-        data.forEach(r => {
-            let loTrinh = (r[COL.LO_TRINH] || '').toString().toLowerCase();
-            if(loTrinh.includes('trong') || loTrinh.includes('in')) inRouteCount++;
-            else outRouteCount++;
-            
-            let tIn = r[COL.TIME_IN] || ''; let tOut = r[COL.TIME_OUT] || '';
-            khTimeMins += Math.max(0, timeStrToMinutes(tOut) - timeStrToMinutes(tIn));
-        });
-
-        document.getElementById('kpi-total-visited').innerText = data.length;
-        document.getElementById('sub-in-route').innerText = inRouteCount;
-        document.getElementById('sub-out-route').innerText = outRouteCount;
-        document.getElementById('kpi-working-kh').innerText = minutesToStr(khTimeMins);
-        
-        document.getElementById('kpi-distance').innerText = `${formatNum(totalDist)} ${langData[curLang].unitKm}`;
-        document.getElementById('kpi-moving-time').innerText = minutesToStr((totalDist / 20) * 60);
-        document.getElementById('kpi-rest').innerText = `${selectedDays.length} ${langData[curLang].unitHour} 0 ${langData[curLang].unitMinute}`;
+    // ================= TÍNH TOÁN VÀ VẼ BẢNG SO SÁNH =================
+    function getRouteStatsByDay(data, day) {
+        let dayData = data.filter(r => r[COL.THU] === day);
+        let count = dayData.length;
+        let dist = 0;
+        for(let i = 0; i < dayData.length - 1; i++) {
+            dist += getHaversine14(dayData[i][COL.LAT], dayData[i][COL.LNG], dayData[i+1][COL.LAT], dayData[i+1][COL.LNG]);
+        }
+        let moveTime = (dist / 20) * 60; // minutes
+        return { count, dist, moveTime };
     }
 
+    function renderComparisonTable() {
+        const thead = document.getElementById('comp-head');
+        const tbody = document.getElementById('comp-body');
+        const tfoot = document.getElementById('comp-foot');
+        let lang = langData[curLang];
+
+        thead.innerHTML = `
+            <tr>
+                <th class="route-th">${lang.compDay}</th>
+                <th class="route-th">${lang.compCustOld}</th>
+                <th class="route-th">${lang.compCustNew}</th>
+                <th class="route-th num-right">${lang.compDistOld}</th>
+                <th class="route-th num-right">${lang.compDistNew}</th>
+                <th class="route-th num-right">${lang.compTimeOld}</th>
+                <th class="route-th num-right">${lang.compTimeNew}</th>
+                <th class="route-th">${lang.compNote}</th>
+            </tr>
+        `;
+
+        tbody.innerHTML = '';
+        let tOldCount = 0, tNewCount = 0, tOldDist = 0, tNewDist = 0, tOldTime = 0, tNewTime = 0;
+
+        selectedDays.forEach(day => {
+            let oldStats = getRouteStatsByDay(currentNVDataOriginal, day);
+            let newStats = hasOptimizedData ? getRouteStatsByDay(currentNVDataOptimized, day) : { count: 0, dist: 0, moveTime: 0 };
+
+            tOldCount += oldStats.count; tNewCount += newStats.count;
+            tOldDist += oldStats.dist; tNewDist += newStats.dist;
+            tOldTime += oldStats.moveTime; tNewTime += newStats.moveTime;
+
+            let note = '';
+            if (hasOptimizedData && newStats.count > 0 && newStats.count < 18) {
+                note = `<span class="warning-tag">${lang.alertAddCust}</span>`;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td style="font-weight:bold; color: ${colorMap[day] || '#475569'}; text-align: center;">${day}</td>
+                    <td style="text-align:center;">${oldStats.count}</td>
+                    <td style="text-align:center; font-weight:bold; color:#f59e0b;">${hasOptimizedData ? newStats.count : '--'}</td>
+                    <td class="num-right">${formatNum(oldStats.dist)}</td>
+                    <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? formatNum(newStats.dist) : '--'}</td>
+                    <td class="num-right">${minutesToStr(oldStats.moveTime)}</td>
+                    <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? minutesToStr(newStats.moveTime) : '--'}</td>
+                    <td style="text-align:center;">${note}</td>
+                </tr>
+            `;
+        });
+
+        tfoot.innerHTML = `
+            <tr>
+                <td style="font-weight:bold; text-align:right;">${lang.thGrandTotal}</td>
+                <td style="text-align:center; font-weight:bold;">${tOldCount}</td>
+                <td style="text-align:center; font-weight:bold; color:#f59e0b;">${hasOptimizedData ? tNewCount : '--'}</td>
+                <td class="num-right" style="font-weight:bold;">${formatNum(tOldDist)} ${lang.unitKm}</td>
+                <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? formatNum(tNewDist) + ' ' + lang.unitKm : '--'}</td>
+                <td class="num-right" style="font-weight:bold;">${minutesToStr(tOldTime)}</td>
+                <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? minutesToStr(tNewTime) : '--'}</td>
+                <td></td>
+            </tr>
+        `;
+    }
+
+    // ================= TẠO BẢNG CHI TIẾT MỚI =================
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head');
         const tbody = document.getElementById('table-body');
@@ -681,33 +678,29 @@
         let headerHTML = `
             <tr>
                 <th class="route-th">${lang.thDay}</th>
+                <th class="route-th">${lang.thOrder}</th>
                 <th class="route-th">${lang.thCode}</th>
                 <th class="route-th" style="max-width:200px;">${lang.thName}</th>
                 <th class="route-th">${lang.thRouteType}</th> 
-                <th class="route-th">${lang.thStart}</th>
-                <th class="route-th">${lang.thEnd}</th>
                 <th class="route-th num-right">${lang.thDist}</th>
-                <th class="route-th num-right">${lang.thTimeAt}</th>
-                <th class="route-th num-right">${lang.thTimeMove}</th>
+                <th class="route-th num-right">${lang.thEstMoveTime}</th>
             </tr>
         `;
         thead.innerHTML = headerHTML;
 
-        let totalKHTime = 0, totalMoveTime = 0, totalDist = 0;
+        let totalMoveTime = 0, totalDist = 0;
         tbody.innerHTML = '';
         
         data.forEach((row, index) => {
             let distToNext = 0;
+            // Tính khoảng cách đến khách tiếp theo (cùng 1 ngày)
             if(index < data.length - 1 && row[COL.THU] === data[index+1][COL.THU]) {
                 distToNext = getHaversine14(row[COL.LAT], row[COL.LNG], data[index+1][COL.LAT], data[index+1][COL.LNG]);
             }
             totalDist += distToNext;
 
-            let timeIn = row[COL.TIME_IN] || ''; let timeOut = row[COL.TIME_OUT] || '';
-            let timeAtKH = Math.max(0, timeStrToMinutes(timeOut) - timeStrToMinutes(timeIn));
-            let moveTime = (distToNext / 20) * 60;
-            
-            totalKHTime += timeAtKH; totalMoveTime += moveTime;
+            let moveTime = (distToNext / 20) * 60; // Tính theo phút
+            totalMoveTime += moveTime;
 
             let loTrinhText = (row[COL.LO_TRINH] || '').toString().toLowerCase();
             let isTrongTuyen = loTrinhText.includes('trong') || loTrinhText.includes('in');
@@ -718,13 +711,11 @@
 
             tr.innerHTML = `
                 <td style="font-weight:bold; color: ${colorMap[row[COL.THU]] || '#475569'};">${row[COL.THU] || ''}</td>
+                <td style="text-align:center; font-weight:bold;">${index + 1}</td>
                 <td>${row[COL.MA_KH] || ''}</td>
                 <td style="white-space: normal;">${row[COL.TEN_KH] || ''}</td>
                 <td style="text-align: center;">${routeLabel}</td>
-                <td>${timeIn}</td>
-                <td>${timeOut}</td>
                 <td class="num-right" style="font-weight:bold; color:#1e40af;">${formatNum(distToNext)}</td>
-                <td class="num-right">${formatNum(timeAtKH)}</td>
                 <td class="num-right">${formatNum(moveTime)}</td>
             `;
             tbody.appendChild(tr);
@@ -732,18 +723,28 @@
 
         let grandTotalHTML = `
             <tr>
-                <td colspan="6" style="text-align:right; font-size:14px; font-weight:bold;">${lang.thGrandTotal}</td>
+                <td colspan="5" style="text-align:right; font-size:14px; font-weight:bold;">${lang.thGrandTotal}</td>
                 <td class="num-right" style="color:#1e40af; font-size:14px; font-weight:bold;">${formatNum(totalDist)} ${lang.unitKm}</td>
-                <td class="num-right" style="color:#ec4899; font-size:14px; font-weight:bold;">${minutesToStr(totalKHTime)}</td>
                 <td class="num-right" style="color:#64748b; font-size:14px; font-weight:bold;">${minutesToStr(totalMoveTime)}</td>
             </tr>
         `;
         tfoot.innerHTML = grandTotalHTML;
     }
 
+    // ================= XUẤT EXCEL CHI TIẾT =================
+    function exportDetailToExcel() {
+        let table = document.getElementById("detail-table");
+        let wb = XLSX.utils.table_to_book(table, {sheet: "Chi Tiết Lộ Trình"});
+        let fileName = `Chi_Tiet_Lo_Trinh_${selNV.value.replace(/\s+/g, '_')}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    }
+
     // ================= CHỨC NĂNG AI TỐI ƯU TUYẾN =================
     async function optimizeRouteWithAI() {
-        if (currentRouteOriginal.length < 3) {
+        // Chỉ lấy những data của những ngày ĐANG ĐƯỢC CHỌN để gửi cho AI xử lý
+        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r[COL.THU]));
+
+        if (dataToOptimize.length < 3) {
             alert("Số lượng khách hàng quá ít, không cần thiết dùng AI tối ưu.");
             return;
         }
@@ -752,22 +753,20 @@
         btnOptimize.disabled = true;
 
         try {
-            // 1. Đóng gói payload gửi đi
-            const payload = currentRouteOriginal.map((row) => ({
+            const payload = dataToOptimize.map((row) => ({
                 id: row[COL.MA_KH],
                 lat: parseFloat(row[COL.LAT]),
                 lng: parseFloat(row[COL.LNG])
             }));
 
-            // Đổi từ link dài thòong thành link gốc ngắn gọn này, nhớ là KHÔNG CÓ dấu gạch chéo ở cuối cùng nhé:
-        const vercelURL = 'https://tool-toi-uu-tuyen.vercel.app/api/optimizeRoute';
+            const vercelURL = 'https://tool-toi-uu-tuyen.vercel.app/api/optimizeRoute';
             
             const response = await fetch(vercelURL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     locations: payload,
-                    availableDays: selectedDays // Truyền cả danh sách ngày đang chọn cho AI biết
+                    availableDays: selectedDays
                 })
             });
 
@@ -777,33 +776,42 @@
             }
 
             const data = await response.json();
-            const aiResults = data.optimized_data; // Mảng object: [{id, day, order}]
+            const aiResults = data.optimized_data;
 
-            // 3. Mapping lại mảng tuyến đường: Cập nhật Ngày mới và Thứ tự mới
-            currentRouteOptimized = currentRouteOriginal.map(row => {
-                let newRow = [...row]; // Clone row để không ghi đè dữ liệu gốc
-                let khID = newRow[COL.MA_KH];
+            // Áp dụng kết quả AI đè lên bộ nhớ gốc, lưu vào bộ nhớ Optimized
+            currentNVDataOptimized = currentNVDataOriginal.map(row => {
+                let newRow = [...row];
                 
-                // Tìm phán quyết của AI cho khách hàng này
-                let aiDecision = aiResults.find(item => item.id === khID);
-                if (aiDecision) {
-                    newRow[COL.THU] = aiDecision.day; // Gán lại ngày AI phán quyết
-                    newRow._ai_order = aiDecision.order; // Gán tạm trường order để lát sort
+                // Chỉ áp dụng AI cho những KH nằm trong các ngày đã gửi đi tối ưu
+                if (selectedDays.includes(row[COL.THU])) {
+                    let khID = newRow[COL.MA_KH];
+                    let aiDecision = aiResults.find(item => item.id === khID);
+                    if (aiDecision) {
+                        newRow[COL.THU] = aiDecision.day;
+                        newRow._ai_order = aiDecision.order;
+                    } else {
+                        newRow._ai_order = 999;
+                    }
                 } else {
-                    newRow._ai_order = 999;
+                    newRow._ai_order = 0; // Khách hàng của những ngày không gửi đi AI thì giữ nguyên
                 }
                 return newRow;
             });
 
-            // 4. Sắp xếp lại danh sách theo Ngày -> Thứ tự AI
+            // Sắp xếp lại bộ nhớ AI
             const orderRules = {"Thứ 2":2, "Thứ 3":3, "Thứ 4":4, "Thứ 5":5, "Thứ 6":6, "Thứ 7":7, "Chủ nhật":8};
-            currentRouteOptimized.sort((a, b) => {
+            currentNVDataOptimized.sort((a, b) => {
                 let dayDiff = (orderRules[a[COL.THU]] || 99) - (orderRules[b[COL.THU]] || 99);
                 if (dayDiff !== 0) return dayDiff;
-                return (a._ai_order || 0) - (b._ai_order || 0);
+                
+                if (a._ai_order !== undefined && b._ai_order !== undefined) {
+                    if (a._ai_order !== b._ai_order) return a._ai_order - b._ai_order;
+                }
+                return timeStrToMinutes(a[COL.TIME_IN]) - timeStrToMinutes(b[COL.TIME_IN]);
             });
 
-            // 5. Hiển thị Toolbar chọn tuyến và cập nhật giao diện
+            // Bật cờ đánh dấu đã có kết quả AI và chuyển sang View Mới
+            hasOptimizedData = true;
             toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             isOptimizedView = true;
@@ -858,8 +866,9 @@
     }
 
     function minutesToStr(mins) {
-        if (isNaN(mins) || mins <= 0) return `0 ${langData[curLang].unitHour} 0 ${langData[curLang].unitMinute}`;
+        if (isNaN(mins) || mins <= 0) return `0 ${langData[curLang].unitMinute}`;
         let totalMins = Math.round(mins);
+        if (totalMins < 60) return `${totalMins} ${langData[curLang].unitMinute}`;
         return `${Math.floor(totalMins/60)} ${langData[curLang].unitHour} ${totalMins%60} ${langData[curLang].unitMinute}`;
     }
 
