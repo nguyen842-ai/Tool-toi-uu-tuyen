@@ -95,11 +95,11 @@
                 BẢN ĐỒ QUY HOẠCH TUYẾN MASTER
             </div>
             
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button id="btnLoadData" class="btn-primary" style="margin-bottom:0;" onclick="loadDataFromSupabase()">📥 Tải dữ liệu từ hệ thống</button>
-                <input type="file" id="localFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleLocalFileUpload(event)">
-                <button id="btnLocalUpload" class="btn-primary btn-purple" style="margin-bottom:0; width: 180px;" onclick="document.getElementById('localFileInput').click()">📁 Tự tải dữ liệu lên</button>
-            </div>
+           <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+    <button id="btnLoadData" class="btn-primary" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="loadDataFromSupabase()">📥 Dữ liệu hệ thống</button>
+    <input type="file" id="localFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleLocalFileUpload(event)">
+    <button id="btnLocalUpload" class="btn-primary btn-purple" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="document.getElementById('localFileInput').click()">📁 Tự tải dữ liệu lên</button>
+</div>
 
             <div class="file-status-box">
                 <span>1. Dữ liệu Tuyến:</span>
