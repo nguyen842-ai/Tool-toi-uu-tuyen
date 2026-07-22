@@ -30,7 +30,7 @@ ${JSON.stringify(locations)}
 Danh sách các ca làm việc (Ngày) hiện có: ${availableDays.join(', ')}
 
 NHIỆM VỤ CỦA BẠN:
-1. Gom cụm: Gom các khách hàng có tọa độ (lat, lng) gần nhau vào cùng 1 ngày để tối ưu thời gian di chuyển.
+1. Gom cụm: Gom toàn bộ khách hàng được gửi vào một rổ, sau đó nhặt những khách hàng gần nhau thành 1 cụm và trả về 1 ngày làm việc
 2. Phân bổ đều: Cố gắng chia đều số lượng khách hàng cho các ngày trong danh sách ca làm việc.
 3. Sắp xếp: Trong mỗi ngày, sắp xếp thứ tự viếng thăm sao cho quãng đường đi ngắn nhất.
 4. Ràng buộc Output: TRẢ VỀ DUY NHẤT 1 mảng JSON thuần túy (không bọc trong markdown \`\`\`json, không giải thích). 
