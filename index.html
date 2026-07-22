@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Quy Hoạch Lộ Trình Di Chuyển</title>
-    
+    <title id="page-title">CÔNG CỤ QUY HOẠCH LỘ TRÌNH ĐI TUYẾN</title>
+    <link rel="icon" type="image/png" href="faviconTCI.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -86,11 +86,11 @@
     <div id="left-panel">
         <div id="upload-section">
             <div class="upload-warning">
-                BẢN ĐỒ QUY HOẠCH TUYẾN MASTER
+                CÔNG CỤ QUY HOẠCH LỘ TRÌNH ĐI TUYẾN
             </div>
-            <button id="btnLoadData" class="btn-primary" onclick="loadDataFromSupabase()">📥 Tải Dữ Liệu Kế Hoạch</button>
+            <button id="btnLoadData" class="btn-primary" onclick="loadDataFromSupabase()">📥 Tải Dữ Liệu Tuyến</button>
             <div class="file-status-box">
-                <span>1. Dữ liệu Tuyến:</span>
+                <span>Dữ liệu Tuyến:</span>
                 <span id="statusRoute" class="status-badge" style="color:#64748b;">(Chưa tải)</span>
             </div>
             <!-- KHUNG CHÚ THÍCH KÝ HIỆU BẢN ĐỒ -->
@@ -104,8 +104,8 @@
         </div>
         <div id="map-container">
             <div id="route-toggle-toolbar">
-                <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Tuyến Gốc (Excel)</span></label>
-                <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến Mới (AI Điều chỉnh)</span></label>
+                <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Tuyến Gốc Trên hệ thống</span></label>
+                <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến đề xuất bởi AI</span></label>
             </div>
             <div id="map"></div>
         </div>
@@ -129,7 +129,7 @@
                 <div class="filter-row">
                     <h3 style="min-width: 90px; margin: 0;"></h3>
                     <div class="filter-item">
-                        <label>Đơn vị PP (NPP)</label>
+                        <label>Đơn vị PP (Distributor)</label>
                         <select id="sel-npp" disabled><option value="">-- Chọn NPP --</option></select>
                     </div>
                 </div>
@@ -137,7 +137,7 @@
                 <div class="filter-row">
                     <h3 style="min-width: 90px; margin: 0;"></h3>
                     <div class="filter-item">
-                        <label>Nhân viên</label>
+                        <label>Nhân viên (KAE/DSR)</label>
                         <select id="sel-nv" disabled><option value="">-- Chọn Nhân viên --</option></select>
                     </div>
                 </div>
@@ -145,7 +145,7 @@
                 <div class="filter-row">
                     <h3 style="min-width: 90px; margin: 0;"></h3>
                     <div class="filter-item" style="flex: 2;">
-                        <label>Thứ (Day) - Chọn nhiều ngày</label>
+                        <label>Thứ (Day) - Vui lòng chờ bản đồ và bảng chi tiết load xong trước khi lựa chọn dữ liệu ngày khác</label>
                         <div id="day-chips-container" class="day-chips">
                             <span style="color:#94a3b8; font-size: 13px;">-- Chọn Thứ --</span>
                         </div>
@@ -155,7 +155,7 @@
                 <div class="filter-row" style="margin-top: 15px;">
                     <h3 style="min-width: 90px; margin: 0;"></h3>
                     <div class="action-buttons-container">
-                        <button id="btn-ai-optimize" class="btn-primary btn-warning" onclick="optimizeRouteWithAI()" disabled>✨ AI Tối Ưu Tuyến</button>
+                        <button id="btn-ai-optimize" class="btn-primary btn-warning" onclick="optimizeRouteWithAI()" disabled>✨ TỐI ƯU TUYẾN NGAY</button>
                         <button id="btn-dl-map-week" class="btn-primary btn-purple" onclick="downloadWeeklyMap()" disabled>🗺️ Tải Ảnh Bản Đồ</button>
                     </div>
                 </div>
@@ -166,16 +166,16 @@
             <h3 class="warning-title">🚨 CẢNH BÁO: DANH SÁCH KHÁCH HÀNG CẦN KIỂM TRA LẠI</h3>
             <div style="margin-top:0; margin-bottom: 12px; font-size:12px; color:#475569; line-height: 1.5;">
                 <strong>Lưu ý:</strong><br>
-                - Khách bị <strong>lỗi tọa độ</strong> sẽ tạm ẩn khỏi bản đồ để tránh làm hỏng thuật toán AI.<br>
-                - Khách bị <strong>lỗi Chủ nhật</strong> hoặc <strong>sai Tần suất</strong> vẫn hiển thị trên bản đồ để bạn có thể ra lệnh cho Trợ lý AI dời tuyến.
+                - Khách bị <strong>lỗi tọa độ</strong> sẽ tạm ẩn khỏi bản đồ để tránh làm hỏng thuật toán xếp tuyến.<br>
+                - Khách bị <strong>Khách nằm trong tuyến ngày Chủ nhật</strong> hoặc <strong>sai Tần suất</strong> vẫn hiển thị trên bản đồ để có thể đặt lệnh dời tuyến.
             </div>
             <div class="data-table-container" style="margin-bottom: 0;">
                 <table id="warning-table" style="min-width: 600px;">
                     <thead>
                         <tr>
-                            <th class="route-th danger-th" style="width: 80px;">Mã KH</th>
-                            <th class="route-th danger-th">Tên Khách Hàng</th>
-                            <th class="route-th danger-th" style="width: 200px;">Chi Tiết Lỗi</th>
+                            <th class="route-th danger-th" style="width: 80px;">Mã KH (Cus Code)</th>
+                            <th class="route-th danger-th">Tên Khách Hàng (Cus name)</th>
+                            <th class="route-th danger-th" style="width: 200px;">Chi Tiết Lỗi ( Error detail)</th>
                         </tr>
                     </thead>
                     <tbody id="warning-body"></tbody>
@@ -185,7 +185,7 @@
 
         <div class="summary-card" id="dashboard-section" style="display: none;">
             <div class="header-title-row">
-                <h2>📊 Bảng So Sánh Khoảng Cách</h2>
+                <h2>📊 Bảng chi tiết tuyến</h2>
             </div>
             <div class="data-table-container">
                 <table id="comparison-table">
@@ -197,22 +197,22 @@
 
             <div id="ai-chat-section" style="display: none; margin-top: 25px; margin-bottom: 25px;">
                 <div class="header-title-row">
-                    <h3>✨ Trợ Lý AI Tinh Chỉnh Lộ Trình</h3>
+                    <h3>✨ Đặt lệnh tinh chỉnh lộ trình </h3>
                 </div>
                 <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
                     <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; font-style: italic;">
-                        *Ví dụ: "Dời các khách hàng Chủ nhật sang Thứ 6 và đưa lên đầu tuyến"*
+                        *Ví dụ: "Dời khách hàng 1,2 thứ 7 qua thứ 5, tối ưu lại lộ trình sau khi dời,..."*
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <input type="text" id="ai-chat-input" placeholder="Nhập yêu cầu điều chỉnh tuyến tại đây..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                        <input type="text" id="ai-chat-input" placeholder="Nhập lệnh yêu cầu điều chỉnh tại đây..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
                         <button id="btn-send-ai-chat" class="btn-primary btn-warning" onclick="sendCustomRequestToAI()" style="margin: 0; padding: 10px 15px; width: auto; font-size: 13px;">🚀 Gửi yêu cầu</button>
                     </div>
                 </div>
             </div>
 
             <div class="header-title-row" style="margin-top: 30px;">
-                <h2>📋 Bảng Chi Tiết Ghé Thăm</h2>
-                <button class="btn-primary btn-green" onclick="exportDetailToExcel()">📥 Tải Bảng Excel</button>
+                <h2>📋 Bảng Chi Tiết tuyến bán hàng </h2>
+                <button class="btn-primary btn-green" onclick="exportDetailToExcel()">📥 Tải Excel</button>
             </div>
             <div class="data-table-container">
                 <table id="detail-table">
@@ -342,9 +342,9 @@
                         let dayName = DAYS_TEXT[i];
                         let warnings = [];
                         
-                        if (!isValidCoord) warnings.push("Trống / Sai Tọa độ");
+                        if (!isValidCoord) warnings.push("Không có tọa độ");
                         if (dayName === 'Chủ nhật') warnings.push("Tuyến rơi vào Chủ nhật");
-                        if (freqType === "Lỗi Tần Suất") warnings.push("Sai chuẩn tần suất (Không phải F4, F2-1, F2-2)");
+                        if (freqType === "Lỗi Tần Suất") warnings.push("Sai tần suất quy định bởi công ty (Không phải F4, F2-1, F2-2)");
 
                         if (warnings.length > 0 && !addedToWarning) {
                             allWarningData.push({
