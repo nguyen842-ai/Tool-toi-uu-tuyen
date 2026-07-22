@@ -65,7 +65,7 @@
         th, td { padding: 8px 10px; text-align: left; border: 1px solid #e2e8f0; }
         th.route-th { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; white-space: normal !important; word-wrap: break-word; }
         th.danger-th { background-color: #dc2626 !important; color: white !important; }
-        th { position: sticky; top: 0; }
+        th { position: sticky; top: 0; z-index: 2; }
         td { white-space: nowrap; }
         tfoot { background-color: #e2e8f0; font-weight: bold; }
         .num-right { text-align: right; }
@@ -669,24 +669,33 @@
         const tbody = document.getElementById('table-body');
         const tfoot = document.getElementById('table-foot');
 
-        // ĐIỀU CHỈNH: HEADER DẠNG MA TRẬN TẦN SUẤT
-        thead.innerHTML = `<tr>
-            <th class="route-th">STT</th>
-            <th class="route-th">Mã KH</th>
-            <th class="route-th">Tên KH</th>
-            <th class="route-th">Tần Suất</th>
-            <th class="route-th" style="width: 50px;">Thứ 2</th>
-            <th class="route-th" style="width: 50px;">Thứ 3</th>
-            <th class="route-th" style="width: 50px;">Thứ 4</th>
-            <th class="route-th" style="width: 50px;">Thứ 5</th>
-            <th class="route-th" style="width: 50px;">Thứ 6</th>
-            <th class="route-th" style="width: 50px;">Thứ 7</th>
-            <th class="route-th" style="width: 50px;">Chủ nhật</th>
+        // ĐIỀU CHỈNH: TẠO THÊM MERGE HEADER (ROWSPAN VÀ COLSPAN)
+        thead.innerHTML = `
+        <tr>
+            <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
+            <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
+            <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
+            <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
+            <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
+        </tr>
+        <tr>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Chủ nhật</th>
         </tr>`;
+        
         tbody.innerHTML = '';
-        tfoot.innerHTML = ''; // Ma trận không cần footer tính tổng km
+        tfoot.innerHTML = '';
 
-        // Gom nhóm data theo Mã KH để tạo Ma Trận
+        // Gom nhóm data theo Mã KH
         let customerMap = new Map();
         let uniqueCustomers = [];
 
@@ -704,17 +713,29 @@
             customerMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        // Sắp xếp tạm theo Mã Khách Hàng (Hoặc bạn có thể để nguyên thứ tự xuất hiện)
-        // uniqueCustomers.sort((a, b) => a.ma_kh.localeCompare(b.ma_kh));
-
         uniqueCustomers.forEach((cust, index) => {
             const renderX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
+            
+            // Xử lý ma trận Tần Suất (W1, W2, W3, W4)
+            const isF4 = cust.freq === 'F4';
+            const isF21 = cust.freq === 'F2-1';
+            const isF22 = cust.freq === 'F2-2';
+            
+            const renderW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+            
+            const w1 = renderW(isF4 || isF21);
+            const w2 = renderW(isF4 || isF22);
+            const w3 = renderW(isF4 || isF21);
+            const w4 = renderW(isF4 || isF22);
 
             tbody.innerHTML += `<tr>
                 <td style="text-align:center; font-weight:bold; font-size:13px;">${index + 1}</td>
                 <td style="font-weight:600;">${cust.ma_kh}</td>
                 <td style="white-space: normal;">${cust.ten_kh}</td>
-                <td style="text-align:center;"><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:bold; color:#334155;">${cust.freq || 'N/A'}</span></td>
+                <td style="text-align:center; background:#f0fdfa;">${w1}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w2}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w3}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w4}</td>
                 <td style="text-align:center; background:#f8fafc;">${renderX('Thứ 2')}</td>
                 <td style="text-align:center; background:#fff;">${renderX('Thứ 3')}</td>
                 <td style="text-align:center; background:#f8fafc;">${renderX('Thứ 4')}</td>
