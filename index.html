@@ -74,6 +74,10 @@
         .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 12px; box-sizing: border-box; }
         .marker-circle { border-radius: 50%; }
         .marker-square { border-radius: 6px; }
+
+        /* CSS HIỆU ỨNG HOVER CHO BẢNG CHI TIẾT */
+        .hover-row { transition: background-color 0.2s ease; }
+        .hover-row:hover td { background-color: #bfdbfe !important; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -243,13 +247,13 @@
     
     // BẢNG MÀU MỚI: Màu Gốc (Tuần 1&3) và Màu Nhạt 3 tone (Tuần 2&4)
     const palettes = {
-        'Thứ 2': { base: '#22c55e', light: '#bbf7d0', textLight: '#000' }, // Xanh lá
-        'Thứ 3': { base: '#ef4444', light: '#fecaca', textLight: '#000' }, // Đỏ
-        'Thứ 4': { base: '#a855f7', light: '#e9d5ff', textLight: '#000' }, // Tím
-        'Thứ 5': { base: '#eab308', light: '#fef08a', textLight: '#000' }, // Vàng
-        'Thứ 6': { base: '#000000', light: '#cbd5e1', textLight: '#000' }, // Đen -> Xám pastel
-        'Thứ 7': { base: '#3b82f6', light: '#bfdbfe', textLight: '#000' }, // Xanh dương
-        'Chủ nhật': { base: '#f97316', light: '#fed7aa', textLight: '#000' } // Cam
+        'Thứ 2': { base: '#22c55e', light: '#bbf7d0', textLight: '#000' }, 
+        'Thứ 3': { base: '#ef4444', light: '#fecaca', textLight: '#000' }, 
+        'Thứ 4': { base: '#a855f7', light: '#e9d5ff', textLight: '#000' }, 
+        'Thứ 5': { base: '#eab308', light: '#fef08a', textLight: '#000' }, 
+        'Thứ 6': { base: '#000000', light: '#cbd5e1', textLight: '#000' }, 
+        'Thứ 7': { base: '#3b82f6', light: '#bfdbfe', textLight: '#000' }, 
+        'Chủ nhật': { base: '#f97316', light: '#fed7aa', textLight: '#000' } 
     };
 
     const map = L.map('map').setView([10.8231, 106.6297], 10);
@@ -311,6 +315,7 @@
                 let nv = row[4];
                 let ma_kh = row[5];
                 let ten_kh = row[6];
+                let dia_chi = row[7] ? row[7].toString().trim() : 'Chưa có thông tin địa chỉ'; // LẤY ĐỊA CHỈ
                 
                 let lat = parseFloat(row[22]); 
                 let lng = parseFloat(row[23]); 
@@ -350,7 +355,7 @@
 
                         if (isValidCoord) {
                             allValidData.push({
-                                area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, 
+                                area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, dia_chi: dia_chi, 
                                 thu: dayName, lat: lat, lng: lng, freq: freqType, _ai_order: 999
                             });
                         }
@@ -449,8 +454,15 @@
         }
 
         currentNVDataOriginal = allValidData.filter(r => r.area === area && r.npp === npp && r.nv === nv);
+        
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-        currentNVDataOriginal.sort((a,b) => (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99));
+        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
+        
+        currentNVDataOriginal.sort((a, b) => {
+            let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
+            if (dayDiff !== 0) return dayDiff;
+            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+        });
         
         let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
         let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
@@ -512,6 +524,8 @@
     // TÁCH LUỒNG VẼ BẢN ĐỒ VỚI HÌNH TAM GIÁC (CÓ VIỀN TRẮNG)
     async function drawMapSequentially(data) {
         routeLayer.clearLayers(); 
+        window.currentMarkerMap = {}; // Khởi tạo bộ nhớ tạm để lưu Marker cho hiệu ứng Hover
+
         let allLatLngs = []; 
         
         data.forEach(row => { if (!isNaN(row.lat) && !isNaN(row.lng)) allLatLngs.push([row.lat, row.lng]); });
@@ -536,7 +550,6 @@
 
                     let iconHtml = '';
                     if (shape === 'marker-triangle') {
-                        // SỬ DỤNG HÌNH TAM GIÁC CÓ VIỀN TRẮNG ĐỒNG BỘ
                         iconHtml = `
                         <div style="position:relative; width: 34px; height: 34px; display:flex; align-items:center; justify-content:center; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">
                             <svg width="34" height="34" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;">
@@ -550,13 +563,26 @@
 
                     let icon = L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
                     let marker = L.marker([row.lat, row.lng], {icon: icon});
-                    marker.bindPopup(`<b>${row.thu}</b><br><b>${row.ten_kh || 'N/A'}</b><br>Mã KH: ${row.ma_kh}<br>STT: ${stt}<br>Tần suất: ${row.freq}`);
+                    
+                    // CẬP NHẬT GIAO DIỆN POPUP CHỨA ĐỊA CHỈ (Tắt tính năng AutoPan để tránh bản đồ nhảy lung tung khi Hover)
+                    marker.bindPopup(`
+                        <div style="font-size: 13px; line-height: 1.5; min-width: 180px;">
+                            <b style="color:#1e40af; font-size:14px; text-transform: uppercase;">${row.ten_kh || 'N/A'}</b><br>
+                            <b style="color:#ef4444;">Mã KH:</b> ${row.ma_kh}<br>
+                            <b style="color:#10b981;">Địa chỉ:</b> ${row.dia_chi}<br>
+                            <hr style="margin: 5px 0; border: 0; border-top: 1px solid #e2e8f0;">
+                            <b>Tần suất:</b> ${row.freq}
+                        </div>
+                    `, { autoPan: false });
+                    
                     routeLayer.addLayer(marker);
+                    
+                    // LƯU MARKER LẠI VÀO MAP ĐỂ GỌI BẰNG JAVASCRIPT KHI HOVER
+                    window.currentMarkerMap[row.ma_kh] = marker;
                     
                     await new Promise(resolve => setTimeout(resolve, 30));
                 }
                 
-                // ĐIỀU CHỈNH: CHỈ NỐI ĐƯỜNG KHI LÀ TUYẾN MỚI (AI ĐÃ SẮP XẾP)
                 if (coords.length > 1 && isOptimizedView) {
                     L.polyline(coords, { color: bgColor, weight: 3, opacity: 0.9, dashArray: lineDash }).addTo(routeLayer);
                 }
@@ -569,21 +595,33 @@
                 let shape13 = (routeW13.some(r=>r.freq==='F4') && routeW13.some(r=>r.freq==='F2-1')) ? 'marker-triangle' : (routeW13.some(r=>r.freq==='F2-1') ? 'marker-square' : 'marker-circle');
                 let shape24 = (routeW24.some(r=>r.freq==='F4') && routeW24.some(r=>r.freq==='F2-2')) ? 'marker-triangle' : (routeW24.some(r=>r.freq==='F2-2') ? 'marker-square' : 'marker-circle');
 
-                // Vẽ Tuần 1&3 (Sử dụng màu Gốc "base")
                 if (routeW13.length > 0) {
                     await drawGroup(routeW13, shape13, p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
                 }
                 
-                // Vẽ Tuần 2&4 (Sử dụng màu Nhạt "light")
                 if (routeW24.length > 0) {
                     await drawGroup(routeW24, shape24, p.light, p.textLight, isOptimizedView ? '8, 4' : '2, 6');
                 }
             } else {
-                // Tuyến F4 thuần 
                 await drawGroup(dayData, 'marker-circle', p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
             }
         }
     }
+
+    // 2 HÀM JAVASCRIPT ĐỂ BẬT/TẮT POPUP TRÊN BẢN ĐỒ
+    window.highlightMarker = function(ma_kh) {
+        let marker = window.currentMarkerMap[ma_kh];
+        if (marker) {
+            marker.openPopup();
+        }
+    };
+
+    window.resetHighlightMarker = function(ma_kh) {
+        let marker = window.currentMarkerMap[ma_kh];
+        if (marker) {
+            marker.closePopup();
+        }
+    };
 
     function getRouteStatsForGroup(groupData) {
         let dist = 0;
@@ -599,7 +637,6 @@
         const tbody = document.getElementById('comp-body'); 
         const tfoot = document.getElementById('comp-foot');
         
-        // ĐIỀU CHỈNH: XÓA CỘT KM (GỐC)
         thead.innerHTML = `<tr>
             <th class="route-th">Thứ</th>
             <th class="route-th">Nhóm Tuyến</th>
@@ -644,7 +681,6 @@
                 
                 if (hasOptimizedData) tNewDist += newStats.dist;
 
-                // ĐIỀU CHỈNH: XÓA DỮ LIỆU KM (GỐC) TẠI ĐÂY
                 tbody.innerHTML += `<tr>
                     <td style="font-weight:bold; color: ${palettes[day].base}; text-align: center;">${day}</td>
                     <td style="text-align:center; font-weight:bold; color:#0f766e; background:#f0fdfa;">${g.label}</td>
@@ -655,7 +691,6 @@
             });
         });
         
-        // ĐIỀU CHỈNH: BỎ TỔNG KM (GỐC)
         tfoot.innerHTML = `<tr>
             <td colspan="2" style="font-weight:bold; text-align:right;">TỔNG CÁC NHÓM</td>
             <td style="text-align:center; font-weight:bold;">${tOldCount}</td>
@@ -669,20 +704,15 @@
         const tbody = document.getElementById('table-body');
         const tfoot = document.getElementById('table-foot');
 
-        // ĐIỀU CHỈNH: TẠO THÊM MERGE HEADER (ROWSPAN VÀ COLSPAN)
         thead.innerHTML = `
         <tr>
             <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
             <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
             <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
-            <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
             <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
+            <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
         </tr>
         <tr>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
@@ -690,12 +720,15 @@
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Chủ nhật</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
         </tr>`;
         
         tbody.innerHTML = '';
         tfoot.innerHTML = '';
 
-        // Gom nhóm data theo Mã KH
         let customerMap = new Map();
         let uniqueCustomers = [];
 
@@ -713,10 +746,20 @@
             customerMap.get(row.ma_kh).days.add(row.thu);
         });
 
+        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
+        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
+
+        uniqueCustomers.sort((a, b) => {
+            let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
+            let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
+            
+            if (minDayA !== minDayB) return minDayA - minDayB;
+            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+        });
+
         uniqueCustomers.forEach((cust, index) => {
             const renderX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
             
-            // Xử lý ma trận Tần Suất (W1, W2, W3, W4)
             const isF4 = cust.freq === 'F4';
             const isF21 = cust.freq === 'F2-1';
             const isF22 = cust.freq === 'F2-2';
@@ -728,14 +771,11 @@
             const w3 = renderW(isF4 || isF21);
             const w4 = renderW(isF4 || isF22);
 
-            tbody.innerHTML += `<tr>
+            // BỔ SUNG SỰ KIỆN onmouseenter VÀ onmouseleave ĐỂ LIÊN KẾT TỚI BẢN ĐỒ
+            tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
                 <td style="text-align:center; font-weight:bold; font-size:13px;">${index + 1}</td>
                 <td style="font-weight:600;">${cust.ma_kh}</td>
                 <td style="white-space: normal;">${cust.ten_kh}</td>
-                <td style="text-align:center; background:#f0fdfa;">${w1}</td>
-                <td style="text-align:center; background:#f0fdfa;">${w2}</td>
-                <td style="text-align:center; background:#f0fdfa;">${w3}</td>
-                <td style="text-align:center; background:#f0fdfa;">${w4}</td>
                 <td style="text-align:center; background:#f8fafc;">${renderX('Thứ 2')}</td>
                 <td style="text-align:center; background:#fff;">${renderX('Thứ 3')}</td>
                 <td style="text-align:center; background:#f8fafc;">${renderX('Thứ 4')}</td>
@@ -743,6 +783,10 @@
                 <td style="text-align:center; background:#f8fafc;">${renderX('Thứ 6')}</td>
                 <td style="text-align:center; background:#fff;">${renderX('Thứ 7')}</td>
                 <td style="text-align:center; background:#fef2f2;">${renderX('Chủ nhật')}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w1}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w2}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w3}</td>
+                <td style="text-align:center; background:#f0fdfa;">${w4}</td>
             </tr>`;
         });
     }
