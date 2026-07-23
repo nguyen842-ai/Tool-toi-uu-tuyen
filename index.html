@@ -261,7 +261,6 @@
     let hasOptimizedData = false;    
     let isOptimizedView = false;    
     
-    // BIẾN LƯU DỮ LIỆU DOANH SỐ TỪNG KHÁCH HÀNG
     window.salesDataMap = {}; 
 
     const SUPABASE_URL = 'https://mrqldgycwovpbmzdeuyz.supabase.co';
@@ -309,56 +308,84 @@
             loading: { text: "⌛ Đang xử lý...", color: '#ea580c', bold: true },
             done: { text: "✅ Đã tải xong", color: '#16a34a', bold: true },
             error: { text: "❌ Lỗi", color: '#dc2626', bold: true },
-            warn: { text: "⚠️ Chỉ tải được 1 phần", color: '#f59e0b', bold: true }
+            warn: { text: "⚠️ Tải 1 phần", color: '#f59e0b', bold: true }
         };
         const s = mapStyle[statusKey] || mapStyle.idle;
         el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
     }
 
-    // --- HÀM TẢI DOANH SỐ TỪ BUCKET 'data' ---
+    // --- HÀM TẢI DOANH SỐ ĐƯỢC CẢI TIẾN TRÁNH LỖI BIẾN ---
     async function loadSalesData() {
         renderStatusBadge('statusSales', 'loading');
         try {
-            const months = ['M5', 'M6', 'M7']; // Có thể thêm M8, M9 sau này
-            const { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { 
+                console.error("Chưa đăng nhập, không thể lấy file doanh số.");
+                renderStatusBadge('statusSales', 'error'); 
+                return; 
+            }
+
+            const months = ['M5', 'M6', 'M7']; 
             
+            // Tìm trong bucket 'data' (Nếu bạn tạo bucket riêng)
+            let { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
+            
+            // Nếu lỗi, thử tìm trong folder 'data' của bucket 'mappingdata'
+            if (error || !signedUrls || signedUrls.length === 0 || signedUrls[0].error) {
+                console.log("Thử tìm doanh số trong mappingdata/data/ ...");
+                const alt = await supabaseClient.storage.from(BUCKET_NAME).createSignedUrls(months.map(m => `data/data${m}.js`), 60);
+                if (!alt.error && alt.data) signedUrls = alt.data;
+            }
+
             if (signedUrls && signedUrls.length > 0) {
                 let successCount = 0;
                 for (let item of signedUrls) {
                     if (!item.error && item.signedUrl) {
-                        let res = await fetch(item.signedUrl);
-                        if (res.ok) {
-                            let text = await res.text();
-                            let arr = [];
-                            try {
-                                // Phân tích file JS bằng Function ẩn danh để lấy mảng dữ liệu an toàn
-                                arr = new Function(`
-                                    var db_sales, dataM5, dataM6, dataM7;
-                                    ${text}
-                                    if (typeof db_sales !== 'undefined' && db_sales.length) return db_sales;
-                                    if (typeof dataM5 !== 'undefined' && dataM5.length) return dataM5;
-                                    if (typeof dataM6 !== 'undefined' && dataM6.length) return dataM6;
-                                    if (typeof dataM7 !== 'undefined' && dataM7.length) return dataM7;
-                                    return [];
-                                `)();
-                            } catch(e) {
-                                let match = text.match(/\[.*\]/s);
-                                if (match) arr = JSON.parse(match[0]);
-                            }
-                            
-                            let mName = item.path.replace('.js', '').replace('data', ''); // Trả về 'M5', 'M6'...
-                            if (Array.isArray(arr) && arr.length > 0) {
-                                successCount++;
-                                arr.forEach(row => {
-                                    let ma_kh = row['Mã KH'] || row['ma_kh'] || row['Customer ID'] || row['Ma_KH'] || row[Object.keys(row)[0]];
-                                    let ds = row['Doanh số'] || row['doanh_so'] || row['Sales'] || row['DS'] || row[Object.keys(row)[1]];
-                                    if (ma_kh) {
-                                        let id = ma_kh.toString().trim();
-                                        if (!window.salesDataMap[id]) window.salesDataMap[id] = {};
-                                        window.salesDataMap[id][mName] = parseFloat(ds) || 0;
+                        try {
+                            let res = await fetch(item.signedUrl);
+                            if (res.ok) {
+                                let text = await res.text();
+                                let mMatch = item.path.match(/M\d+/);
+                                let mName = mMatch ? mMatch[0] : 'M5'; 
+                                
+                                let arr = [];
+                                
+                                // Dò tìm đoạn mảng JSON nằm giữa cặp ngoặc vuông [ ... ]
+                                let matchArray = text.match(/\[[\s\S]*\]/);
+                                if (matchArray) {
+                                    try {
+                                        // eval an toàn bọc trong ngoặc tròn để parse mảng
+                                        arr = eval('(' + matchArray[0] + ')'); 
+                                    } catch(e) {
+                                        console.warn("Lỗi parse array từ file doanh số:", e);
                                     }
-                                });
+                                }
+                                
+                                if (Array.isArray(arr) && arr.length > 0) {
+                                    successCount++;
+                                    arr.forEach(row => {
+                                        let keys = Object.keys(row);
+                                        if(keys.length < 2) return;
+                                        
+                                        // Linh hoạt tên cột với sự bổ sung cusCode và sales
+                                        let ma_kh = row['cusCode'] || row['Mã KH'] || row['ma_kh'] || row['Customer ID'] || row['Ma_KH'] || row['Mã Khách Hàng'];
+                                        let ds = row['sales'] || row['Doanh số'] || row['doanh_so'] || row['Sales'] || row['DS'] || row['Thực Đạt'];
+                                        
+                                        if(ma_kh === undefined) ma_kh = row[keys[0]];
+                                        if(ds === undefined) ds = row[keys[1]];
+                                        
+                                        if (ma_kh !== undefined && ma_kh !== null) {
+                                            let id = ma_kh.toString().trim();
+                                            if (!window.salesDataMap[id]) window.salesDataMap[id] = {};
+                                            // Chống lỗi chuỗi DS có chứa phẩy
+                                            let cleanDs = ds ? ds.toString().replace(/,/g, '').replace(/\s/g, '') : "0";
+                                            window.salesDataMap[id][mName] = parseFloat(cleanDs) || 0;
+                                        }
+                                    });
+                                }
                             }
+                        } catch(err) {
+                            console.error("Lỗi đọc nội dung file:", item.path, err);
                         }
                     }
                 }
@@ -367,12 +394,11 @@
                 renderStatusBadge('statusSales', 'warn');
             }
         } catch (e) {
-            console.error("Lỗi tải Doanh số:", e);
+            console.error("Lỗi tổng quát khi tải Doanh số:", e);
             renderStatusBadge('statusSales', 'error');
         }
     }
 
-    // --- HÀM SẮP XẾP VÀ ĐÁNH LẠI STT THEO TỪNG NGÀY ---
     function normalizeOrder(targetData) {
         let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
@@ -388,7 +414,6 @@
             return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
         
-        // Đánh lại STT 1,2,3,4,5 cho từng ngày liên tục
         targetData.forEach(r => {
             if (dayCounters[r.thu] !== undefined) {
                 r._ai_order = dayCounters[r.thu]++;
@@ -459,7 +484,7 @@
         btn.disabled = true;
         loadStatus.route = 'loading'; renderStatusBadge('statusRoute', loadStatus.route);
         
-        await loadSalesData(); // Tải doanh số trước
+        await loadSalesData(); 
         
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -489,7 +514,7 @@
         
         loadStatus.route = 'loading'; renderStatusBadge('statusRoute', loadStatus.route);
         
-        await loadSalesData(); // Đảm bảo luôn lấy doanh số dù dùng file local
+        await loadSalesData(); 
         
         const reader = new FileReader();
         
@@ -508,8 +533,6 @@
                 selNV.innerHTML = `<option>-- Dữ liệu Local --</option>`;
                 
                 currentNVDataOriginal = [...allValidData];
-                
-                // Đánh lại STT chuẩn chỉ cho dữ liệu vừa upload
                 normalizeOrder(currentNVDataOriginal);
 
                 let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
@@ -668,7 +691,6 @@
         else { dashboard.style.display = 'none'; routeLayer.clearLayers(); lineLayer.clearLayers(); window.currentMarkers = {}; }
     }
 
-    // --- CÁC HÀM XỬ LÝ SỰ KIỆN LIVE EDIT ---
     function ensureEditMode() {
         if (!hasOptimizedData) {
             currentNVDataOptimized = currentNVDataOriginal.map(r => ({...r}));
@@ -687,10 +709,10 @@
         if(isNaN(newOrder)) newOrder = 999;
         
         currentNVDataOptimized.forEach(r => {
-            if(r.ma_kh === ma_kh) r._ai_order = newOrder; // Tạm set giá trị để đẩy lên vị trí mới
+            if(r.ma_kh === ma_kh) r._ai_order = newOrder; 
         });
         
-        normalizeOrder(currentNVDataOptimized); // Sort và Đánh lại STT 1,2,3 chuẩn
+        normalizeOrder(currentNVDataOptimized); 
         processDataAndRender(); 
     };
 
@@ -735,7 +757,6 @@
         normalizeOrder(currentNVDataOptimized);
         processDataAndRender();
     };
-    // ----------------------------------------
 
     async function processDataAndRender() {
         if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) { dashboard.style.display = 'none'; return; }
@@ -774,7 +795,7 @@
                     coords.push([row.lat, row.lng]);
                     allLatLngs.push([row.lat, row.lng]);
                     
-                    let stt = row._ai_order; // Lấy đúng STT liên tục của ngày
+                    let stt = row._ai_order; 
 
                     let iconHtml = '';
                     if (shape === 'marker-triangle') {
@@ -936,7 +957,6 @@
         const tbody = document.getElementById('table-body');
         const tfoot = document.getElementById('table-foot');
 
-        // BỔ SUNG CỘT DOANH SỐ VÀO HEADER
         thead.innerHTML = `
         <tr>
             <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
@@ -988,7 +1008,6 @@
             let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
             if (minDayA !== minDayB) return minDayA - minDayB;
             
-            // Tìm Record của ngày nhỏ nhất để so STT
             let getEarliestOrder = (kh, minDay) => {
                 let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
                 return r ? r._ai_order : 999;
@@ -1015,7 +1034,6 @@
             let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
             let valSTT = firstRecord ? firstRecord._ai_order : 999;
 
-            // Rút dữ liệu doanh số
             let dsKH = window.salesDataMap[cust.ma_kh] || {};
             let dsM5 = formatNum(dsKH['M5'] || 0);
             let dsM6 = formatNum(dsKH['M6'] || 0);
