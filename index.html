@@ -95,11 +95,11 @@
                 BẢN ĐỒ QUY HOẠCH TUYẾN MASTER
             </div>
             
-           <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-    <button id="btnLoadData" class="btn-primary" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="loadDataFromSupabase()">📥 Dữ liệu hệ thống</button>
-    <input type="file" id="localFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleLocalFileUpload(event)">
-    <button id="btnLocalUpload" class="btn-primary btn-purple" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="document.getElementById('localFileInput').click()">📁 Tự tải dữ liệu lên</button>
-</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btnLoadData" class="btn-primary" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="loadDataFromSupabase()">📥 Dữ liệu hệ thống</button>
+                <input type="file" id="localFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleLocalFileUpload(event)">
+                <button id="btnLocalUpload" class="btn-primary btn-purple" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="document.getElementById('localFileInput').click()">📁 Tự tải dữ liệu lên</button>
+            </div>
 
             <div class="file-status-box">
                 <span>1. Dữ liệu Tuyến:</span>
@@ -116,8 +116,14 @@
         </div>
         <div id="map-container">
             <div id="route-toggle-toolbar">
-                <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Tuyến Gốc (Excel)</span></label>
-                <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến Mới (AI/Chỉnh Sửa)</span></label>
+                <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Tuyến Gốc</span></label>
+                <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến Mới</span></label>
+                <!-- NÚT BẬT TẮT ĐƯỜNG LIÊN KẾT MỚI -->
+                <div style="width: 2px; height: 16px; background: #cbd5e1; margin: 0 8px;"></div>
+                <label class="toggle-option">
+                    <input type="checkbox" id="chk-draw-lines" onchange="processDataAndRender()">
+                    <span style="color:#10b981;">🔗 Hiện liên kết</span>
+                </label>
             </div>
             <div id="map"></div>
         </div>
@@ -225,7 +231,7 @@
             <div class="header-title-row" style="margin-top: 30px;">
                 <div style="display: flex; align-items: baseline; gap: 15px;">
                     <h2>📋 Bảng Chi Tiết Ghé Thăm</h2>
-                    <span style="font-size: 13px; color: #059669; font-weight: 500;">(Có thể click vào các ô Thứ/Tần suất hoặc nhập số STT để sửa Live)</span>
+                    <span style="font-size: 13px; color: #059669; font-weight: 500;">(Click các ô Tần suất / Thứ hoặc nhập số STT để Sửa Live Bản đồ)</span>
                 </div>
                 <button class="btn-primary btn-green" onclick="exportDetailToExcel()">📥 Tải Bảng Excel</button>
             </div>
@@ -272,7 +278,13 @@
 
     const map = L.map('map').setView([10.8231, 106.6297], 10);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-    let routeLayer = L.layerGroup().addTo(map);
+    
+    // TÁCH THÀNH 2 LỚP ĐỘC LẬP ĐỂ VẼ RIÊNG TỪNG PHẦN
+    let routeLayer = L.layerGroup().addTo(map); // Chứa Điểm
+    let lineLayer = L.layerGroup().addTo(map);  // Chứa Đường Liên Kết
+    
+    window.currentMarkers = {}; // Bộ lưu trữ Marker thông minh để Diffing
+    window.isFirstMapRender = true; // Cờ kiểm soát góc nhìn bản đồ
 
     const selArea = document.getElementById('sel-area');
     const selNPP = document.getElementById('sel-npp');
@@ -427,10 +439,16 @@
                 
                 // Reset dữ liệu Optimized để nếu có AI trước đó thì xóa đi
                 currentNVDataOptimized = []; hasOptimizedData = false; isOptimizedView = false;
-                toggleToolbar.style.display = 'none';
+                toggleToolbar.style.display = 'flex';
                 let originalRadio = document.querySelector('input[name="routeType"][value="original"]');
                 if(originalRadio) originalRadio.checked = true;
                 
+                // MẶC ĐỊNH TẮT LIÊN KẾT KHI VỪA TẢI FILE LÊN ĐỂ TỐC ĐỘ NHANH NHẤT
+                document.getElementById('chk-draw-lines').checked = false;
+                
+                // Bật cờ để map có quyền căn góc lại màn hình
+                window.isFirstMapRender = true; 
+
                 // Cảnh báo nếu có
                 if (allWarningData.length > 0) {
                     let tbody = document.getElementById('warning-body'); tbody.innerHTML = '';
@@ -471,6 +489,7 @@
         currentNVDataOriginal = []; currentNVDataOptimized = [];
         hasOptimizedData = false; isOptimizedView = false;
         toggleToolbar.style.display = 'none';
+        document.getElementById('chk-draw-lines').checked = false;
         let originalRadio = document.querySelector('input[name="routeType"][value="original"]');
         if(originalRadio) originalRadio.checked = true;
     }
@@ -539,6 +558,8 @@
         let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
         thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
         document.getElementById('day-chips-container').innerHTML = chipsHTML;
+        
+        window.isFirstMapRender = true;
     });
 
     window.toggleDay = function(day) {
@@ -570,8 +591,11 @@
         btnDlMapWeek.disabled = (selectedDays.length === 0);
         btnOptimize.disabled = (selectedDays.length === 0);
 
-        if (selectedDays.length > 0) processDataAndRender();
-        else { dashboard.style.display = 'none'; routeLayer.clearLayers(); }
+        if (selectedDays.length > 0) {
+            window.isFirstMapRender = true; // Cho phép căn góc lại nếu đổi Thứ
+            processDataAndRender();
+        }
+        else { dashboard.style.display = 'none'; routeLayer.clearLayers(); lineLayer.clearLayers(); window.currentMarkers = {}; }
     }
 
     // --- CÁC HÀM XỬ LÝ SỰ KIỆN LIVE EDIT ---
@@ -602,10 +626,8 @@
         ensureEditMode();
         let existingIndex = currentNVDataOptimized.findIndex(r => r.ma_kh === ma_kh && r.thu === day);
         if (existingIndex > -1) {
-            // Xóa ngày
             currentNVDataOptimized.splice(existingIndex, 1);
         } else {
-            // Thêm ngày mới (clone data)
             let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh) || currentNVDataOriginal.find(r => r.ma_kh === ma_kh);
             if (template) {
                 currentNVDataOptimized.push({...template, thu: day});
@@ -614,30 +636,35 @@
         processDataAndRender();
     };
 
+    // LOGIC ĐỒNG BỘ CẶP TẦN SUẤT
     window.toggleFrequency = function(ma_kh, week) {
         ensureEditMode();
         let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh);
         if(!template) return;
         let currentFreq = template.freq;
         
-        let w1 = ['F4', 'F2-1'].includes(currentFreq);
-        let w2 = ['F4', 'F2-2'].includes(currentFreq);
-        let w3 = ['F4', 'F2-1'].includes(currentFreq);
-        let w4 = ['F4', 'F2-2'].includes(currentFreq);
+        let w13 = ['F4', 'F2-1'].includes(currentFreq); // Cặp 1 và 3
+        let w24 = ['F4', 'F2-2'].includes(currentFreq); // Cặp 2 và 4
 
-        if(week === 'W1') w1 = !w1;
-        if(week === 'W2') w2 = !w2;
-        if(week === 'W3') w3 = !w3;
-        if(week === 'W4') w4 = !w4;
+        // Click ô nào, lật ô cặp đó
+        if (week === 'W1' || week === 'W3') {
+            w13 = !w13;
+        } else if (week === 'W2' || week === 'W4') {
+            w24 = !w24;
+        }
 
-        let newFreq = 'Lỗi Tần Suất';
-        if (w1 && w2 && w3 && w4) newFreq = 'F4';
-        else if (w1 && !w2 && w3 && !w4) newFreq = 'F2-1';
-        else if (!w1 && w2 && !w3 && w4) newFreq = 'F2-2';
+        // Chặn tắt hết (nếu lỡ tắt hết sẽ ép thành F2-1 hoặc F2-2 để không lỗi map)
+        if (!w13 && !w24) {
+            if (week === 'W1' || week === 'W3') w24 = true;
+            else w13 = true;
+        }
+
+        let newFreq = (w13 && w24) ? 'F4' : (w13 ? 'F2-1' : 'F2-2');
 
         currentNVDataOptimized.forEach(r => {
             if(r.ma_kh === ma_kh) r.freq = newFreq;
         });
+        
         processDataAndRender();
     };
     // ----------------------------------------
@@ -646,7 +673,6 @@
         if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) { dashboard.style.display = 'none'; return; }
         dashboard.style.display = 'none';
 
-        // Sắp xếp lại dữ liệu nếu ở chế độ Optimized (hỗ trợ Live Edit Order)
         if (hasOptimizedData) {
             const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
             currentNVDataOptimized.sort((a,b) => {
@@ -660,9 +686,8 @@
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r.thu));
 
-        btnOptimize.disabled = true;
-        await drawMapSequentially(activeData);
-        btnOptimize.disabled = false;
+        // RENDER SIÊU NHANH TRỰC TIẾP
+        renderMapOptimized(activeData);
 
         renderComparisonTable();
         renderDetailTable(activeData);
@@ -671,13 +696,11 @@
         dashboard.style.display = 'block';
     }
 
-    async function drawMapSequentially(data) {
-        routeLayer.clearLayers(); 
-        window.currentMarkerMap = {}; 
-        let allLatLngs = []; 
-        
-        data.forEach(row => { if (!isNaN(row.lat) && !isNaN(row.lng)) allLatLngs.push([row.lat, row.lng]); });
-        if (allLatLngs.length > 0) map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]});
+    // THUẬT TOÁN RENDER UPDATE (DIFFING) GIÚP CHỈ CẬP NHẬT MARKER THAY ĐỔI
+    function renderMapOptimized(data) {
+        let seenIds = new Set();
+        lineLayer.clearLayers(); // Đường liên kết (Line) luôn được xóa để vẽ lại nếu STT đổi
+        let allLatLngs = [];
 
         const dayOrder = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
         let uniqueDays = [...new Set(data.map(r => r.thu))].sort((a,b) => dayOrder[a] - dayOrder[b]);
@@ -688,12 +711,13 @@
             let hasF22 = dayData.some(r => r.freq === 'F2-2');
             let p = palettes[day] || palettes['Thứ 2'];
 
-            const drawGroup = async (groupData, shape, bgColor, textColor, lineDash) => {
+            const processGroup = (groupData, shape, bgColor, textColor, lineDash) => {
                 if (groupData.length === 0) return;
                 let coords = [];
                 for (let i = 0; i < groupData.length; i++) {
                     let row = groupData[i];
                     coords.push([row.lat, row.lng]);
+                    allLatLngs.push([row.lat, row.lng]);
                     let stt = i + 1;
 
                     let iconHtml = '';
@@ -710,9 +734,10 @@
                     }
 
                     let icon = L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
-                    let marker = L.marker([row.lat, row.lng], {icon: icon});
-                    
-                    marker.bindPopup(`
+                    let markerId = row.ma_kh + '_' + day; // Key độc nhất
+                    seenIds.add(markerId);
+
+                    let popupHtml = `
                         <div style="font-size: 13px; line-height: 1.5; min-width: 180px;">
                             <b style="color:#1e40af; font-size:14px; text-transform: uppercase;">${row.ten_kh || 'N/A'}</b><br>
                             <b style="color:#ef4444;">Mã KH:</b> ${row.ma_kh}<br>
@@ -720,17 +745,26 @@
                             <hr style="margin: 5px 0; border: 0; border-top: 1px solid #e2e8f0;">
                             <b>Tần suất:</b> ${row.freq}
                         </div>
-                    `, { autoPan: false });
-                    
-                    routeLayer.addLayer(marker);
-                    window.currentMarkerMap[row.ma_kh] = marker;
-                    
-                    await new Promise(resolve => setTimeout(resolve, 30)); // Delay animation
+                    `;
+
+                    // CHỈ UPDATE NẾU ĐÃ TỒN TẠI (Giúp Map không bị giật nháy)
+                    if (window.currentMarkers[markerId]) {
+                        let m = window.currentMarkers[markerId];
+                        m.setIcon(icon);
+                        m.setPopupContent(popupHtml);
+                    } else {
+                        // TẠO MỚI NẾU CHƯA CÓ
+                        let m = L.marker([row.lat, row.lng], {icon: icon});
+                        m.bindPopup(popupHtml, { autoPan: false });
+                        routeLayer.addLayer(m);
+                        window.currentMarkers[markerId] = m;
+                    }
                 }
-                
-                // Vẽ line nếu đang ở chế độ Tuyến Mới/Chỉnh sửa
-                if (coords.length > 1 && isOptimizedView) {
-                    L.polyline(coords, { color: bgColor, weight: 3, opacity: 0.9, dashArray: lineDash }).addTo(routeLayer);
+
+                // CÓ NÊN VẼ ĐƯỜNG LINE KHÔNG?
+                let chkLines = document.getElementById('chk-draw-lines');
+                if (coords.length > 1 && chkLines && chkLines.checked) {
+                    L.polyline(coords, { color: bgColor, weight: 3, opacity: 0.9, dashArray: lineDash }).addTo(lineLayer);
                 }
             };
 
@@ -741,22 +775,43 @@
                 let shape13 = (routeW13.some(r=>r.freq==='F4') && routeW13.some(r=>r.freq==='F2-1')) ? 'marker-triangle' : (routeW13.some(r=>r.freq==='F2-1') ? 'marker-square' : 'marker-circle');
                 let shape24 = (routeW24.some(r=>r.freq==='F4') && routeW24.some(r=>r.freq==='F2-2')) ? 'marker-triangle' : (routeW24.some(r=>r.freq==='F2-2') ? 'marker-square' : 'marker-circle');
 
-                if (routeW13.length > 0) await drawGroup(routeW13, shape13, p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
-                if (routeW24.length > 0) await drawGroup(routeW24, shape24, p.light, p.textLight, isOptimizedView ? '8, 4' : '2, 6');
+                processGroup(routeW13, shape13, p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
+                processGroup(routeW24, shape24, p.light, p.textLight, isOptimizedView ? '8, 4' : '2, 6');
             } else {
-                await drawGroup(dayData, 'marker-circle', p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
+                processGroup(dayData, 'marker-circle', p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
             }
+        }
+
+        // TỰ ĐỘNG XÓA MARKER RÁC KHÔNG CÒN TRONG BẢNG (Giữ nhẹ bản đồ)
+        for (let id in window.currentMarkers) {
+            if (!seenIds.has(id)) {
+                routeLayer.removeLayer(window.currentMarkers[id]);
+                delete window.currentMarkers[id];
+            }
+        }
+
+        // Chỉ căn lại khung hình khi là Lần tải đầu tiên
+        if (window.isFirstMapRender && allLatLngs.length > 0) {
+            map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]});
+            window.isFirstMapRender = false;
         }
     }
 
+    // XỬ LÝ HOVER THÔNG MINH CHO CẢ KHÁCH ĐI 2 TUYẾN TRONG TUẦN
     window.highlightMarker = function(ma_kh) {
-        let marker = window.currentMarkerMap[ma_kh];
-        if (marker) marker.openPopup();
+        for(let id in window.currentMarkers) {
+            if (id.startsWith(ma_kh + "_")) {
+                window.currentMarkers[id].openPopup();
+            }
+        }
     };
 
     window.resetHighlightMarker = function(ma_kh) {
-        let marker = window.currentMarkerMap[ma_kh];
-        if (marker) marker.closePopup();
+        for(let id in window.currentMarkers) {
+            if (id.startsWith(ma_kh + "_")) {
+                window.currentMarkers[id].closePopup();
+            }
+        }
     };
 
     function getRouteStatsForGroup(groupData) {
@@ -945,7 +1000,12 @@
             });
             hasOptimizedData = true; toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            isOptimizedView = true; await processDataAndRender();
+            isOptimizedView = true; 
+            
+            // Vẽ đường lại cho AI vì AI đã xếp tuyến
+            document.getElementById('chk-draw-lines').checked = true;
+            
+            await processDataAndRender();
         } catch (error) { alert("⚠️ " + error.message); } 
         finally { btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; btnOptimize.disabled = false; }
     }
