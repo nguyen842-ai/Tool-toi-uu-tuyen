@@ -314,7 +314,6 @@
         el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
     }
 
-    // --- HÀM TẢI DOANH SỐ FIX LỖI PARSE 1.00 ---
     async function loadSalesData() {
         renderStatusBadge('statusSales', 'loading');
         try {
@@ -325,9 +324,8 @@
                 return; 
             }
 
-            const months = ['M5', 'M6', 'M7']; // Tìm đúng file dataM5.js, dataM6.js, dataM7.js
+            const months = ['M5', 'M6', 'M7']; 
             
-            // Tìm trong bucket 'data'
             let { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
             
             if (error || !signedUrls || signedUrls.length === 0 || signedUrls[0].error) {
@@ -350,9 +348,7 @@
                                 let arr = [];
                                 
                                 try {
-                                    // Loại bỏ export để tránh lỗi syntax
                                     let safeText = text.replace(/export\s+/g, '');
-                                    // Chạy function ảo và chỉ đích danh mảng dbSales (bỏ qua dbMaster)
                                     arr = new Function(`
                                         ${safeText};
                                         if (typeof dbSales${mName} !== 'undefined') return dbSales${mName};
@@ -375,16 +371,12 @@
                                         let keys = Object.keys(row);
                                         if(keys.length < 2) return;
                                         
-                                        // Ưu tiên cao cho cusCode và sales
                                         let ma_kh = row['cusCode'] || row['Mã KH'] || row['ma_kh'] || row['Customer ID'] || row['Ma_KH'] || row['Mã Khách Hàng'];
                                         let ds = row['sales'] || row['Doanh số'] || row['doanh_so'] || row['Sales'] || row['DS'] || row['Thực Đạt'];
                                         
-                                        // CHỈ LẤY DATA KHI TÌM THẤY ĐÚNG CỘT SALES
                                         if (ma_kh !== undefined && ma_kh !== null && ds !== undefined && ds !== null) {
                                             let id = ma_kh.toString().trim();
                                             if (!window.salesDataMap[id]) window.salesDataMap[id] = {};
-                                            
-                                            // Chống lỗi chuỗi DS có chứa phẩy
                                             let cleanDs = ds.toString().replace(/,/g, '').replace(/\s/g, '');
                                             window.salesDataMap[id][mName] = parseFloat(cleanDs) || 0;
                                         }
@@ -723,17 +715,18 @@
         processDataAndRender(); 
     };
 
+    // ĐÃ FIX: CHỈ CHO PHÉP 1 NGÀY DUY NHẤT KHI CHỌN LẠI LỘ TRÌNH
     window.toggleRouteDay = function(ma_kh, day) {
         ensureEditMode();
-        let existingIndex = currentNVDataOptimized.findIndex(r => r.ma_kh === ma_kh && r.thu === day);
-        if (existingIndex > -1) {
-            currentNVDataOptimized.splice(existingIndex, 1);
-        } else {
-            let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh) || currentNVDataOriginal.find(r => r.ma_kh === ma_kh);
-            if (template) {
-                currentNVDataOptimized.push({...template, thu: day});
-            }
-        }
+        let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh) || currentNVDataOriginal.find(r => r.ma_kh === ma_kh);
+        if (!template) return;
+        
+        // 1. Xóa toàn bộ lịch cũ của KH này (để đảm bảo không bị nhân bản thành 2 ngày)
+        currentNVDataOptimized = currentNVDataOptimized.filter(r => r.ma_kh !== ma_kh);
+        
+        // 2. Chèn lại duy nhất 1 lịch của ngày mới
+        currentNVDataOptimized.push({...template, thu: day});
+        
         normalizeOrder(currentNVDataOptimized);
         processDataAndRender();
     };
@@ -765,7 +758,11 @@
         processDataAndRender();
     };
 
+    // ĐÃ FIX: THÊM CƠ CHẾ GIỮ NGUYÊN VỊ TRÍ THANH CUỘN BẢNG KHI RENDER
     async function processDataAndRender() {
+        let rightPanel = document.getElementById('right-panel');
+        let savedScrollTop = rightPanel ? rightPanel.scrollTop : 0;
+
         if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) { dashboard.style.display = 'none'; return; }
         dashboard.style.display = 'none';
 
@@ -778,6 +775,11 @@
         
         document.getElementById('ai-chat-section').style.display = hasOptimizedData ? 'block' : 'none';
         dashboard.style.display = 'block';
+
+        // Phục hồi lại thanh cuộn
+        if (rightPanel) {
+            setTimeout(() => { rightPanel.scrollTop = savedScrollTop; }, 0);
+        }
     }
 
     function renderMapOptimized(data) {
@@ -964,7 +966,6 @@
         const tbody = document.getElementById('table-body');
         const tfoot = document.getElementById('table-foot');
 
-        // BỔ SUNG CỘT DOANH SỐ ĐƯỢC ĐỔI TÊN THÀNH MAY, JUN, JUL
         thead.innerHTML = `
         <tr>
             <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
