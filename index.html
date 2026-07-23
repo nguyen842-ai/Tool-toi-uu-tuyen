@@ -314,7 +314,7 @@
         el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
     }
 
-   // --- HÀM TẢI DOANH SỐ TỪ BUCKET THEO CẤU TRÚC CHUẨN (ĐÃ FIX LỖI PARSE) ---
+    // --- HÀM TẢI DOANH SỐ ĐƯỢC FIX LỖI PARSE AN TOÀN TUYỆT ĐỐI ---
     async function loadSalesData() {
         renderStatusBadge('statusSales', 'loading');
         try {
@@ -327,7 +327,6 @@
 
             const months = ['M5', 'M6', 'M7']; // Tìm đúng file dataM5.js, dataM6.js, dataM7.js
             
-            // Tìm trong bucket 'data'
             let { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
             
             if (error || !signedUrls || signedUrls.length === 0 || signedUrls[0].error) {
@@ -351,12 +350,12 @@
                                 
                                 try {
                                     // FIX: Chuyển đổi lệnh khai báo biến (var/let/const) thành lệnh return để bóc tách mảng
-                                    // Phương pháp này loại bỏ hoàn toàn lỗi dấu chấm phẩy (;) thừa
-                                    let funcBody = text.replace(/(var|let|const)\s+[a-zA-Z0-9_]+\s*=\s*/, 'return ');
+                                    // Thay thế các từ khoá khai báo đứng trước tên biến và chuyển thành `return`
+                                    let funcBody = text.replace(/(export\s+)?(var|let|const)\s+[a-zA-Z0-9_]+\s*=\s*/, 'return ');
                                     arr = new Function(funcBody)();
                                 } catch(e) {
                                     console.warn("Lỗi parse array qua Function, thử dùng Fallback:", e);
-                                    // Fallback dự phòng
+                                    // Fallback: Tìm dấu [ đầu tiên và chạy eval (loại bỏ lỗi cú pháp thừa phía sau)
                                     let firstBracket = text.indexOf('[');
                                     if(firstBracket !== -1) {
                                         let tempText = text.substring(firstBracket);
@@ -403,6 +402,7 @@
             renderStatusBadge('statusSales', 'error');
         }
     }
+
     function normalizeOrder(targetData) {
         let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
@@ -971,9 +971,9 @@
             <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
         </tr>
         <tr>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">M5</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">M6</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">M7</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
