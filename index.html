@@ -961,119 +961,135 @@
         </tr>`;
     }
 
-    function renderDetailTable(data) {
-        const thead = document.getElementById('table-head'); 
-        const tbody = document.getElementById('table-body');
-        const tfoot = document.getElementById('table-foot');
+  function renderDetailTable(data) {
+    const thead = document.getElementById('table-head'); 
+    const tbody = document.getElementById('table-body');
+    const tfoot = document.getElementById('table-foot');
 
-        thead.innerHTML = `
-        <tr>
-            <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
-            <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
-            <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
-            <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
-            <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
-            <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
-        </tr>
-        <tr>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">CN</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
-        </tr>`;
-        
-        tbody.innerHTML = ''; tfoot.innerHTML = '';
+    thead.innerHTML = `
+    <tr>
+        <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
+        <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
+        <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
+        <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
+        <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
+        <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
+        <!-- Thêm cụm tiêu đề cho các cột kỹ thuật để đồng bộ import/export -->
+        <th class="route-th" colspan="3" style="z-index: 3; background-color: #475569 !important;">Thông tin Tọa độ & Vùng</th>
+    </tr>
+    <tr>
+        <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
+        <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
+        <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
+        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">CN</th>
+        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
+        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
+        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
+        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
+        <!-- Tiêu đề cột chi tiết -->
+        <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lat</th>
+        <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lng</th>
+        <th class="route-th" style="width: 90px; top: 36px; z-index: 2; background-color: #64748b !important;">Area</th>
+    </tr>`;
+    
+    tbody.innerHTML = ''; tfoot.innerHTML = '';
 
-        let customerMap = new Map();
-        let uniqueCustomers = [];
-        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
+    let customerMap = new Map();
+    let uniqueCustomers = [];
+    const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
 
-        data.forEach(row => {
-            if (!customerMap.has(row.ma_kh)) {
-                let custInfo = {
-                    ma_kh: row.ma_kh, ten_kh: row.ten_kh, freq: row.freq,
-                    days: new Set()
-                };
-                customerMap.set(row.ma_kh, custInfo);
-                uniqueCustomers.push(custInfo);
-            }
-            customerMap.get(row.ma_kh).days.add(row.thu);
-        });
-
-        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-
-        uniqueCustomers.sort((a, b) => {
-            let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
-            let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
-            if (minDayA !== minDayB) return minDayA - minDayB;
-            
-            let getEarliestOrder = (kh, minDay) => {
-                let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
-                return r ? r._ai_order : 999;
+    data.forEach(row => {
+        if (!customerMap.has(row.ma_kh)) {
+            let custInfo = {
+                ma_kh: row.ma_kh, 
+                ten_kh: row.ten_kh, 
+                freq: row.freq,
+                lat: row.lat,      // Lưu lại thông tin tọa độ gốc
+                lng: row.lng,      // Lưu lại thông tin tọa độ gốc
+                area: row.area,    // Lưu lại khu vực gốc
+                days: new Set()
             };
+            customerMap.set(row.ma_kh, custInfo);
+            uniqueCustomers.push(custInfo);
+        }
+        customerMap.get(row.ma_kh).days.add(row.thu);
+    });
+
+    const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
+
+    uniqueCustomers.sort((a, b) => {
+        let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
+        let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
+        if (minDayA !== minDayB) return minDayA - minDayB;
+        
+        let getEarliestOrder = (kh, minDay) => {
+            let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
+            return r ? r._ai_order : 999;
+        };
+        
+        let orderA = getEarliestOrder(a.ma_kh, minDayA);
+        let orderB = getEarliestOrder(b.ma_kh, minDayB);
+
+        let orderDiff = orderA - orderB;
+        if(orderDiff !== 0) return orderDiff;
+
+        return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+    });
+
+    uniqueCustomers.forEach((cust, index) => {
+        const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
+        const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+        
+        const isF4 = cust.freq === 'F4';
+        const isF21 = cust.freq === 'F2-1';
+        const isF22 = cust.freq === 'F2-2';
+        
+        let minDayNum = Math.min(...Array.from(cust.days).map(d => dayOrderRules[d] || 99));
+        let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
+        let valSTT = firstRecord ? firstRecord._ai_order : 999;
+
+        let dsKH = window.salesDataMap[cust.ma_kh] || {};
+        let dsM5 = formatNum(dsKH['M5'] || 0);
+        let dsM6 = formatNum(dsKH['M6'] || 0);
+        let dsM7 = formatNum(dsKH['M7'] || 0);
+
+        tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
+            <td style="text-align:center;">
+                <input type="number" class="stt-input" value="${valSTT}" onchange="editOrder('${cust.ma_kh}', this.value)">
+            </td>
+            <td style="font-weight:600;">${cust.ma_kh}</td>
+            <td style="white-space: normal;">${cust.ten_kh}</td>
             
-            let orderA = getEarliestOrder(a.ma_kh, minDayA);
-            let orderB = getEarliestOrder(b.ma_kh, minDayB);
+            <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+            <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+            <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
 
-            let orderDiff = orderA - orderB;
-            if(orderDiff !== 0) return orderDiff;
-
-            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-        });
-
-        uniqueCustomers.forEach((cust, index) => {
-            const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
-            const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+            <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
+            <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
+            <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
+            <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 5')">${getX('Thứ 5')}</td>
+            <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 6')">${getX('Thứ 6')}</td>
+            <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 7')">${getX('Thứ 7')}</td>
+            <td class="edit-cell" style="text-align:center; background:#fef2f2;" onclick="toggleRouteDay('${cust.ma_kh}', 'Chủ nhật')">${getX('Chủ nhật')}</td>
             
-            const isF4 = cust.freq === 'F4';
-            const isF21 = cust.freq === 'F2-1';
-            const isF22 = cust.freq === 'F2-2';
-            
-            let minDayNum = Math.min(...Array.from(cust.days).map(d => dayOrderRules[d] || 99));
-            let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
-            let valSTT = firstRecord ? firstRecord._ai_order : 999;
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
 
-            let dsKH = window.salesDataMap[cust.ma_kh] || {};
-            let dsM5 = formatNum(dsKH['M5'] || 0);
-            let dsM6 = formatNum(dsKH['M6'] || 0);
-            let dsM7 = formatNum(dsKH['M7'] || 0);
-
-            tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
-                <td style="text-align:center;">
-                    <input type="number" class="stt-input" value="${valSTT}" onchange="editOrder('${cust.ma_kh}', this.value)">
-                </td>
-                <td style="font-weight:600;">${cust.ma_kh}</td>
-                <td style="white-space: normal;">${cust.ten_kh}</td>
-                
-                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
-                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
-
-                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
-                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 5')">${getX('Thứ 5')}</td>
-                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 6')">${getX('Thứ 6')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 7')">${getX('Thứ 7')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fef2f2;" onclick="toggleRouteDay('${cust.ma_kh}', 'Chủ nhật')">${getX('Chủ nhật')}</td>
-                
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-            </tr>`;
-        });
-    }
+            <!-- Điền dữ liệu text trực tiếp vào ô để thư viện thư viện Excel tự động quét trúng khi Export -->
+            <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lat || 0}</td>
+            <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lng || 0}</td>
+            <td style="text-align:center; color:#64748b; background:#f1f5f9;">${cust.area || ''}</td>
+        </tr>`;
+    });
+}
 
  async function optimizeRouteWithAI() {
     const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
