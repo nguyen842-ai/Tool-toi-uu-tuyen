@@ -1075,44 +1075,77 @@
         });
     }
 
-    async function optimizeRouteWithAI() {
-        const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
-        if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
-        
-        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần AI tối ưu.");
-        btnOptimize.innerText = "⌛ AI Đang Tính Toán..."; btnOptimize.disabled = true;
-        try {
-            const payload = dataToOptimize.map(row => ({ id: row.ma_kh, lat: row.lat, lng: row.lng }));
-            const response = await fetch('https://tool-toi-uu-tuyen.vercel.app/api/optimizeRoute', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ locations: payload, availableDays: selectedDays })
-            });
-            if (response.status === 503) throw new Error("AI đang quá tải, vui lòng thử lại sau!");
-            if (!response.ok) throw new Error("Lỗi xử lý từ AI");
-
-            const data = await response.json(); const aiResults = data.optimized_data;
-            currentNVDataOptimized = currentNVDataOriginal.map(row => {
-                let newRow = {...row};
-                if (selectedDays.includes(row.thu)) {
-                    let ai = aiResults.find(i => i.id === row.ma_kh);
-                    if (ai) { newRow.thu = ai.day; newRow._ai_order = ai.order; }
-                }
-                return newRow;
-            });
-            
-            normalizeOrder(currentNVDataOptimized);
-            
-            hasOptimizedData = true; toggleToolbar.style.display = 'flex';
-            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            isOptimizedView = true; 
-            
-            document.getElementById('chk-draw-lines').checked = true;
-            window.isFirstMapRender = true;
-            await processDataAndRender();
-        } catch (error) { alert("⚠️ " + error.message); } 
-        finally { btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; btnOptimize.disabled = false; }
+   async function optimizeRouteWithAI() {
+    const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
+    if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
+    
+    let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
+    if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần AI tối ưu.");
+    
+    // Giới hạn số lượng khách hàng gửi lên AI để tránh quá tải
+    if (dataToOptimize.length > 50) {
+        let confirmRun = confirm(`Số lượng khách hàng hiện tại quá lớn (${dataToOptimize.length} KH). Vui lòng lọc bớt ngày để AI tính toán nhanh hơn, tránh lỗi 503. Bạn vẫn muốn tiếp tục?`);
+        if (!confirmRun) return;
     }
+
+    btnOptimize.innerText = "⌛ AI Đang Tính Toán..."; btnOptimize.disabled = true;
+
+    // Hàm gọi API kèm cơ chế Retry
+    const fetchWithRetry = async (url, options, retries = 3, delay = 2000) => {
+        try {
+            const res = await fetch(url, options);
+            if (res.status === 503 && retries > 0) {
+                console.warn(`Server 503! Thử lại sau ${delay}ms... (Còn ${retries} lần thử)`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return await fetchWithRetry(url, options, retries - 1, delay * 1.5); // Tăng dần thời gian chờ
+            }
+            return res;
+        } catch (err) {
+            if (retries > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return await fetchWithRetry(url, options, retries - 1, delay * 1.5);
+            }
+            throw err;
+        }
+    };
+
+    try {
+        const payload = dataToOptimize.map(row => ({ id: row.ma_kh, lat: row.lat, lng: row.lng }));
+        
+        const response = await fetchWithRetry('https://tool-toi-uu-tuyen.vercel.app/api/optimizeRoute', {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ locations: payload, availableDays: selectedDays })
+        }, 3, 2000); // Thử lại tối đa 3 lần, mỗi lần cách nhau từ 2 giây
+
+        if (response.status === 503) throw new Error("AI đang quá tải hoặc tính toán quá lâu, vui lòng lọc bớt Thứ (Day) để giảm số lượng KH rồi thử lại!");
+        if (!response.ok) throw new Error("Lỗi xử lý từ AI");
+
+        const data = await response.json(); const aiResults = data.optimized_data;
+        currentNVDataOptimized = currentNVDataOriginal.map(row => {
+            let newRow = {...row};
+            if (selectedDays.includes(row.thu)) {
+                let ai = aiResults.find(i => i.id === row.ma_kh);
+                if (ai) { newRow.thu = ai.day; newRow._ai_order = ai.order; }
+            }
+            return newRow;
+        });
+        
+        normalizeOrder(currentNVDataOptimized);
+        
+        hasOptimizedData = true; toggleToolbar.style.display = 'flex';
+        document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+        isOptimizedView = true; 
+        
+        document.getElementById('chk-draw-lines').checked = true;
+        window.isFirstMapRender = true;
+        await processDataAndRender();
+    } catch (error) { 
+        alert("⚠️ " + error.message); 
+    } finally { 
+        btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; btnOptimize.disabled = false; 
+    }
+}
 
     async function sendCustomRequestToAI() {
         const inputEl = document.getElementById('ai-chat-input');
