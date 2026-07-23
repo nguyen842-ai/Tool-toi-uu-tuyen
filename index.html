@@ -1076,7 +1076,7 @@
     }
 
     async function optimizeRouteWithAI() {
-        const passcode = prompt("Vui lòng nhập mật khẩu để sử dụng tính năng AI:");
+        const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
         if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
         
         let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
