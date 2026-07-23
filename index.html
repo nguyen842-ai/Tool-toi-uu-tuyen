@@ -1284,13 +1284,11 @@
     }
     
     function exportDetailToExcel() {
-    // 1. Lấy dữ liệu hiện tại dựa trên chế độ xem (Tuyến Mới hoặc Tuyến Gốc)
     let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
     let activeData = baseData.filter(r => selectedDays.includes(r.thu));
     
     if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
 
-    // 2. Gom nhóm khách hàng lại giống như cấu trúc bảng chi tiết
     let customerMap = new Map();
     activeData.forEach(row => {
         if (!customerMap.has(row.ma_kh)) {
@@ -1307,69 +1305,69 @@
         customerMap.get(row.ma_kh).days.add(row.thu);
     });
 
-    // 3. Khởi tạo mảng dữ liệu Excel với dòng Tiêu đề chuẩn (Header) theo đúng số cột hệ thống
-    // Cột 0: STT, Cột 2: NPP, Cột 4: NV, Cột 5: Mã KH, Cột 6: Tên KH, Cột 7: Địa chỉ...
-    // Cột 11->17 (L->R): Thứ 2->CN. Cột 18->21 (S->V): W1->W4. Cột 22: Lat, Cột 23: Lng, Cột 24: Area
     let excelRows = [];
     
-    // Dòng tiêu đề tạm để định hình file
+    // TẠO DÒNG TIÊU ĐỀ (HEADER) CHUẨN THEO CỘT EXCEL
     let headerRow = [];
-    headerRow[0] = "STT";
-    headerRow[2] = "NPP";
-    headerRow[4] = "Nhân viên";
-    headerRow[5] = "Mã KH";
-    headerRow[6] = "Tên Khách Hàng";
-    headerRow[7] = "Địa chỉ";
-    
-    // Cột doanh số phụ thêm vào các cột trống (H, I, J tương ứng cột 8, 9, 10) để xem báo cáo
-    headerRow[8] = "DS May";
-    headerRow[9] = "DS Jun";
-    headerRow[10] = "DS Jul";
+    headerRow[0]  = "STT";             // Cột A
+    headerRow[1]  = "";                // Cột B (Để trống)
+    headerRow[2]  = "NPP";             // Cột C
+    headerRow[3]  = "";                // Cột D (Để trống)
+    headerRow[4]  = "Nhân viên";       // Cột E
+    headerRow[5]  = "Mã KH";           // Cột F (Đã chuẩn F)
+    headerRow[6]  = "Tên Khách Hàng";  // Cột G (Đã chuẩn G)
+    headerRow[7]  = "Địa chỉ";         // Cột H (Tạm đè dữ liệu text để dễ đọc)
+    headerRow[8]  = "DS May";          // Cột I (Doanh số âm thầm chèn)
+    headerRow[9]  = "DS Jun";          // Cột J (Doanh số âm thầm chèn)
+    headerRow[10] = "DS Jul";          // Cột K (Doanh số âm thầm chèn)
 
-    // Cột Lộ trình (Chỉ số 11 đến 17)
+    // Lộ trình (Cột L đến R ứng với chỉ số 11 đến 17)
     DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
     
-    // Cột Tần suất (Chỉ số 18 đến 21)
+    // Tần suất (Cột S đến V ứng với chỉ số 18 đến 21)
     headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
     
-    // Cột Kỹ thuật hệ thống (Chỉ số 22 đến 24)
+    // Kỹ thuật (Cột W, X, Y ứng với chỉ số 22, 23, 24)
     headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
     
     excelRows.push(headerRow);
 
-    // 4. Điền dữ liệu chi tiết của từng khách hàng vào đúng vị trí ô cột danh định
+    // ĐIỀN DỮ LIỆU TỪNG KHÁCH HÀNG VÀO ĐÚNG CỘT
     let sttCounter = 1;
     customerMap.forEach((cust) => {
         let row = [];
-        
-        // Lấy thông tin NPP, NV, Địa chỉ từ bản ghi gốc đầu tiên tìm thấy
         let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
         
         row[0] = sttCounter++;
+        row[1] = ""; 
         row[2] = rawRef.npp || "";
+        row[3] = "";
         row[4] = rawRef.nv || "";
-        row[5] = cust.ma_kh;
-        row[6] = cust.ten_kh;
-        row[7] = rawRef.dia_chi || "";
-
-        // Điền doanh số vào cột 8, 9, 10 (H, I, J)
+        
+        // --- ĐÂY RỒI: ÉP ĐÚNG CỘT F VÀ G ---
+        row[5] = cust.ma_kh;           // Cột F (Chỉ số 5)
+        row[6] = cust.ten_kh;          // Cột G (Chỉ số 6)
+        
+        row[7] = rawRef.dia_chi || ""; // Cột H
+        
+        // Điền doanh số (Cột I, J, K)
         let dsKH = window.salesDataMap[cust.ma_kh] || {};
         row[8] = dsKH['M5'] || 0;
         row[9] = dsKH['M6'] || 0;
         row[10] = dsKH['M7'] || 0;
 
-        // Điền Lộ trình chữ 'x' vào chuẩn cột từ 11 đến 17 (Cột L đến R)
+        // Điền dấu lộ trình 'x' (Cột L đến R)
         DAYS_TEXT.forEach((day, idx) => {
             row[11 + idx] = cust.days.has(day) ? "x" : "";
         });
 
-        // Điền Tần suất chữ 'x' vào chuẩn cột từ 18 đến 21 (Cột S đến V)
+        // Điền dấu tần suất 'x' (Cột S đến V)
         row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
         row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
         row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
         row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
 
-        // Điền thông tin kỹ thuật vào cột 22, 23, 24 (Cột W, X, Y) để Re-up không lỗi
+        // Điền tọa độ & khu vực (Cột W, X, Y)
         row[22] = cust.lat || 0;
         row[23] = cust.lng || 0;
         row[24] = cust.area || "Khác";
@@ -1377,12 +1375,9 @@
         excelRows.push(row);
     });
 
-    // 5. Xuất trực tiếp mảng dữ liệu ảo này thành file Excel hoàn chỉnh
     let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
     let workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
-    
-    // Tự động tải file về máy
     XLSX.writeFile(workbook, `Tuyen_Quy_Hoach_Xuong_Excel.xlsx`);
 }
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
