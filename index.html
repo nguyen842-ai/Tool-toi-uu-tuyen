@@ -69,6 +69,7 @@
         td { white-space: nowrap; }
         tfoot { background-color: #e2e8f0; font-weight: bold; }
         .num-right { text-align: right; }
+        .ds-col { background-color: #fef3c7 !important; color: #065f46 !important; font-weight: bold; }
         
         /* CSS HÌNH KHỐI BẢN ĐỒ */
         .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 12px; box-sizing: border-box; }
@@ -105,8 +106,13 @@
                 <span>1. Dữ liệu Tuyến:</span>
                 <span id="statusRoute" class="status-badge" style="color:#64748b;">(Chưa tải)</span>
             </div>
+            <div class="file-status-box">
+                <span>2. Dữ liệu Doanh số:</span>
+                <span id="statusSales" class="status-badge" style="color:#64748b;">(Chưa tải)</span>
+            </div>
+
             <!-- KHUNG CHÚ THÍCH KÝ HIỆU BẢN ĐỒ -->
-            <div style="font-size: 11.5px; color: #334155; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 5px;">
+            <div style="font-size: 11.5px; color: #334155; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 5px; margin-top: 10px;">
                 <span style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#64748b; border:1px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></span> F4 thuần</span>
                 <span style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#64748b; border:1px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></span> F2 thuần</span>
                 <span style="display:flex; align-items:center; gap:4px;">
@@ -118,7 +124,6 @@
             <div id="route-toggle-toolbar">
                 <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Tuyến Gốc</span></label>
                 <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến Mới</span></label>
-                <!-- NÚT BẬT TẮT ĐƯỜNG LIÊN KẾT MỚI -->
                 <div style="width: 2px; height: 16px; background: #cbd5e1; margin: 0 8px;"></div>
                 <label class="toggle-option">
                     <input type="checkbox" id="chk-draw-lines" onchange="processDataAndRender()">
@@ -255,6 +260,9 @@
     let currentNVDataOptimized = []; 
     let hasOptimizedData = false;    
     let isOptimizedView = false;    
+    
+    // BIẾN LƯU DỮ LIỆU DOANH SỐ TỪNG KHÁCH HÀNG
+    window.salesDataMap = {}; 
 
     const SUPABASE_URL = 'https://mrqldgycwovpbmzdeuyz.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p'; 
@@ -279,12 +287,10 @@
     const map = L.map('map').setView([10.8231, 106.6297], 10);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
     
-    // TÁCH THÀNH 2 LỚP ĐỘC LẬP ĐỂ VẼ RIÊNG TỪNG PHẦN
-    let routeLayer = L.layerGroup().addTo(map); // Chứa Điểm
-    let lineLayer = L.layerGroup().addTo(map);  // Chứa Đường Liên Kết
-    
-    window.currentMarkers = {}; // Bộ lưu trữ Marker thông minh để Diffing
-    window.isFirstMapRender = true; // Cờ kiểm soát góc nhìn bản đồ
+    let routeLayer = L.layerGroup().addTo(map); 
+    let lineLayer = L.layerGroup().addTo(map);  
+    window.currentMarkers = {}; 
+    window.isFirstMapRender = true; 
 
     const selArea = document.getElementById('sel-area');
     const selNPP = document.getElementById('sel-npp');
@@ -302,13 +308,94 @@
             idle: { text: "(Chưa tải)", color: '#64748b' },
             loading: { text: "⌛ Đang xử lý...", color: '#ea580c', bold: true },
             done: { text: "✅ Đã tải xong", color: '#16a34a', bold: true },
-            error: { text: "❌ Lỗi", color: '#dc2626', bold: true }
+            error: { text: "❌ Lỗi", color: '#dc2626', bold: true },
+            warn: { text: "⚠️ Chỉ tải được 1 phần", color: '#f59e0b', bold: true }
         };
         const s = mapStyle[statusKey] || mapStyle.idle;
         el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
     }
 
-    // TÁCH HÀM XỬ LÝ ĐỌC EXCEL DÙNG CHUNG CHO SUPABASE & LOCAL
+    // --- HÀM TẢI DOANH SỐ TỪ BUCKET 'data' ---
+    async function loadSalesData() {
+        renderStatusBadge('statusSales', 'loading');
+        try {
+            const months = ['M5', 'M6', 'M7']; // Có thể thêm M8, M9 sau này
+            const { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
+            
+            if (signedUrls && signedUrls.length > 0) {
+                let successCount = 0;
+                for (let item of signedUrls) {
+                    if (!item.error && item.signedUrl) {
+                        let res = await fetch(item.signedUrl);
+                        if (res.ok) {
+                            let text = await res.text();
+                            let arr = [];
+                            try {
+                                // Phân tích file JS bằng Function ẩn danh để lấy mảng dữ liệu an toàn
+                                arr = new Function(`
+                                    var db_sales, dataM5, dataM6, dataM7;
+                                    ${text}
+                                    if (typeof db_sales !== 'undefined' && db_sales.length) return db_sales;
+                                    if (typeof dataM5 !== 'undefined' && dataM5.length) return dataM5;
+                                    if (typeof dataM6 !== 'undefined' && dataM6.length) return dataM6;
+                                    if (typeof dataM7 !== 'undefined' && dataM7.length) return dataM7;
+                                    return [];
+                                `)();
+                            } catch(e) {
+                                let match = text.match(/\[.*\]/s);
+                                if (match) arr = JSON.parse(match[0]);
+                            }
+                            
+                            let mName = item.path.replace('.js', '').replace('data', ''); // Trả về 'M5', 'M6'...
+                            if (Array.isArray(arr) && arr.length > 0) {
+                                successCount++;
+                                arr.forEach(row => {
+                                    let ma_kh = row['Mã KH'] || row['ma_kh'] || row['Customer ID'] || row['Ma_KH'] || row[Object.keys(row)[0]];
+                                    let ds = row['Doanh số'] || row['doanh_so'] || row['Sales'] || row['DS'] || row[Object.keys(row)[1]];
+                                    if (ma_kh) {
+                                        let id = ma_kh.toString().trim();
+                                        if (!window.salesDataMap[id]) window.salesDataMap[id] = {};
+                                        window.salesDataMap[id][mName] = parseFloat(ds) || 0;
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+                renderStatusBadge('statusSales', successCount > 0 ? 'done' : 'error');
+            } else {
+                renderStatusBadge('statusSales', 'warn');
+            }
+        } catch (e) {
+            console.error("Lỗi tải Doanh số:", e);
+            renderStatusBadge('statusSales', 'error');
+        }
+    }
+
+    // --- HÀM SẮP XẾP VÀ ĐÁNH LẠI STT THEO TỪNG NGÀY ---
+    function normalizeOrder(targetData) {
+        let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
+        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
+        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
+        
+        targetData.sort((a, b) => {
+            let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
+            if (dayDiff !== 0) return dayDiff;
+            
+            let orderDiff = (a._ai_order || 999) - (b._ai_order || 999);
+            if (orderDiff !== 0) return orderDiff;
+            
+            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+        });
+        
+        // Đánh lại STT 1,2,3,4,5 cho từng ngày liên tục
+        targetData.forEach(r => {
+            if (dayCounters[r.thu] !== undefined) {
+                r._ai_order = dayCounters[r.thu]++;
+            }
+        });
+    }
+
     function processRawExcelData(jsonRoute) {
         allValidData = [];
         allWarningData = [];
@@ -371,6 +458,9 @@
         const btn = document.getElementById('btnLoadData');
         btn.disabled = true;
         loadStatus.route = 'loading'; renderStatusBadge('statusRoute', loadStatus.route);
+        
+        await loadSalesData(); // Tải doanh số trước
+        
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) { alert("Phiên làm việc hết hạn. Vui lòng đăng nhập lại."); window.location.href = HUB_URL; return; }
@@ -393,12 +483,14 @@
         } finally { btn.disabled = false; }
     }
 
-    // HÀM TẢI FILE LOCAL VÀ VÔ HIỆU HÓA BỘ LỌC
-    function handleLocalFileUpload(event) {
+    async function handleLocalFileUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
         
         loadStatus.route = 'loading'; renderStatusBadge('statusRoute', loadStatus.route);
+        
+        await loadSalesData(); // Đảm bảo luôn lấy doanh số dù dùng file local
+        
         const reader = new FileReader();
         
         reader.onload = function(e) {
@@ -408,28 +500,18 @@
                 let jsonRoute = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
 
                 processRawExcelData(jsonRoute);
-
                 loadStatus.route = 'done'; renderStatusBadge('statusRoute', loadStatus.route);
                 
-                // Khóa bộ lọc
                 selArea.disabled = true; selNPP.disabled = true; selNV.disabled = true;
                 selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`;
                 selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`;
                 selNV.innerHTML = `<option>-- Dữ liệu Local --</option>`;
                 
-                // Set dữ liệu hiển thị trực tiếp bằng toàn bộ file upload
                 currentNVDataOriginal = [...allValidData];
                 
-                // Sắp xếp mặc định
-                const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-                const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-                currentNVDataOriginal.sort((a, b) => {
-                    let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
-                    if (dayDiff !== 0) return dayDiff;
-                    return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-                });
+                // Đánh lại STT chuẩn chỉ cho dữ liệu vừa upload
+                normalizeOrder(currentNVDataOriginal);
 
-                // Set bảng lọc Thứ
                 let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
                 let chipsHTML = `<div class="day-chip active" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
                 thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day active" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
@@ -437,19 +519,14 @@
                 
                 selectedDays = thus;
                 
-                // Reset dữ liệu Optimized để nếu có AI trước đó thì xóa đi
                 currentNVDataOptimized = []; hasOptimizedData = false; isOptimizedView = false;
                 toggleToolbar.style.display = 'flex';
                 let originalRadio = document.querySelector('input[name="routeType"][value="original"]');
                 if(originalRadio) originalRadio.checked = true;
                 
-                // MẶC ĐỊNH TẮT LIÊN KẾT KHI VỪA TẢI FILE LÊN ĐỂ TỐC ĐỘ NHANH NHẤT
                 document.getElementById('chk-draw-lines').checked = false;
-                
-                // Bật cờ để map có quyền căn góc lại màn hình
                 window.isFirstMapRender = true; 
 
-                // Cảnh báo nếu có
                 if (allWarningData.length > 0) {
                     let tbody = document.getElementById('warning-body'); tbody.innerHTML = '';
                     allWarningData.forEach(row => {
@@ -545,14 +622,7 @@
 
         currentNVDataOriginal = allValidData.filter(r => r.area === area && r.npp === npp && r.nv === nv);
         
-        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-        
-        currentNVDataOriginal.sort((a, b) => {
-            let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
-            if (dayDiff !== 0) return dayDiff;
-            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-        });
+        normalizeOrder(currentNVDataOriginal);
         
         let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
         let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
@@ -592,7 +662,7 @@
         btnOptimize.disabled = (selectedDays.length === 0);
 
         if (selectedDays.length > 0) {
-            window.isFirstMapRender = true; // Cho phép căn góc lại nếu đổi Thứ
+            window.isFirstMapRender = true; 
             processDataAndRender();
         }
         else { dashboard.style.display = 'none'; routeLayer.clearLayers(); lineLayer.clearLayers(); window.currentMarkers = {}; }
@@ -617,9 +687,11 @@
         if(isNaN(newOrder)) newOrder = 999;
         
         currentNVDataOptimized.forEach(r => {
-            if(r.ma_kh === ma_kh) r._ai_order = newOrder;
+            if(r.ma_kh === ma_kh) r._ai_order = newOrder; // Tạm set giá trị để đẩy lên vị trí mới
         });
-        processDataAndRender(); // Re-sort & render
+        
+        normalizeOrder(currentNVDataOptimized); // Sort và Đánh lại STT 1,2,3 chuẩn
+        processDataAndRender(); 
     };
 
     window.toggleRouteDay = function(ma_kh, day) {
@@ -633,27 +705,22 @@
                 currentNVDataOptimized.push({...template, thu: day});
             }
         }
+        normalizeOrder(currentNVDataOptimized);
         processDataAndRender();
     };
 
-    // LOGIC ĐỒNG BỘ CẶP TẦN SUẤT
     window.toggleFrequency = function(ma_kh, week) {
         ensureEditMode();
         let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh);
         if(!template) return;
         let currentFreq = template.freq;
         
-        let w13 = ['F4', 'F2-1'].includes(currentFreq); // Cặp 1 và 3
-        let w24 = ['F4', 'F2-2'].includes(currentFreq); // Cặp 2 và 4
+        let w13 = ['F4', 'F2-1'].includes(currentFreq); 
+        let w24 = ['F4', 'F2-2'].includes(currentFreq); 
 
-        // Click ô nào, lật ô cặp đó
-        if (week === 'W1' || week === 'W3') {
-            w13 = !w13;
-        } else if (week === 'W2' || week === 'W4') {
-            w24 = !w24;
-        }
+        if (week === 'W1' || week === 'W3') { w13 = !w13; } 
+        else if (week === 'W2' || week === 'W4') { w24 = !w24; }
 
-        // Chặn tắt hết (nếu lỡ tắt hết sẽ ép thành F2-1 hoặc F2-2 để không lỗi map)
         if (!w13 && !w24) {
             if (week === 'W1' || week === 'W3') w24 = true;
             else w13 = true;
@@ -665,6 +732,7 @@
             if(r.ma_kh === ma_kh) r.freq = newFreq;
         });
         
+        normalizeOrder(currentNVDataOptimized);
         processDataAndRender();
     };
     // ----------------------------------------
@@ -673,22 +741,10 @@
         if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) { dashboard.style.display = 'none'; return; }
         dashboard.style.display = 'none';
 
-        if (hasOptimizedData) {
-            const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-            currentNVDataOptimized.sort((a,b) => {
-                let diff = (dayOrderRules[a.thu]||99) - (dayOrderRules[b.thu]||99);
-                if (diff !== 0) return diff;
-                let orderDiff = (a._ai_order||999) - (b._ai_order||999);
-                return orderDiff !== 0 ? orderDiff : 0;
-            });
-        }
-
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r.thu));
 
-        // RENDER SIÊU NHANH TRỰC TIẾP
         renderMapOptimized(activeData);
-
         renderComparisonTable();
         renderDetailTable(activeData);
         
@@ -696,10 +752,9 @@
         dashboard.style.display = 'block';
     }
 
-    // THUẬT TOÁN RENDER UPDATE (DIFFING) GIÚP CHỈ CẬP NHẬT MARKER THAY ĐỔI
     function renderMapOptimized(data) {
         let seenIds = new Set();
-        lineLayer.clearLayers(); // Đường liên kết (Line) luôn được xóa để vẽ lại nếu STT đổi
+        lineLayer.clearLayers(); 
         let allLatLngs = [];
 
         const dayOrder = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
@@ -718,7 +773,8 @@
                     let row = groupData[i];
                     coords.push([row.lat, row.lng]);
                     allLatLngs.push([row.lat, row.lng]);
-                    let stt = i + 1;
+                    
+                    let stt = row._ai_order; // Lấy đúng STT liên tục của ngày
 
                     let iconHtml = '';
                     if (shape === 'marker-triangle') {
@@ -734,7 +790,7 @@
                     }
 
                     let icon = L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
-                    let markerId = row.ma_kh + '_' + day; // Key độc nhất
+                    let markerId = row.ma_kh + '_' + day; 
                     seenIds.add(markerId);
 
                     let popupHtml = `
@@ -747,13 +803,11 @@
                         </div>
                     `;
 
-                    // CHỈ UPDATE NẾU ĐÃ TỒN TẠI (Giúp Map không bị giật nháy)
                     if (window.currentMarkers[markerId]) {
                         let m = window.currentMarkers[markerId];
                         m.setIcon(icon);
                         m.setPopupContent(popupHtml);
                     } else {
-                        // TẠO MỚI NẾU CHƯA CÓ
                         let m = L.marker([row.lat, row.lng], {icon: icon});
                         m.bindPopup(popupHtml, { autoPan: false });
                         routeLayer.addLayer(m);
@@ -761,7 +815,6 @@
                     }
                 }
 
-                // CÓ NÊN VẼ ĐƯỜNG LINE KHÔNG?
                 let chkLines = document.getElementById('chk-draw-lines');
                 if (coords.length > 1 && chkLines && chkLines.checked) {
                     L.polyline(coords, { color: bgColor, weight: 3, opacity: 0.9, dashArray: lineDash }).addTo(lineLayer);
@@ -782,7 +835,6 @@
             }
         }
 
-        // TỰ ĐỘNG XÓA MARKER RÁC KHÔNG CÒN TRONG BẢNG (Giữ nhẹ bản đồ)
         for (let id in window.currentMarkers) {
             if (!seenIds.has(id)) {
                 routeLayer.removeLayer(window.currentMarkers[id]);
@@ -790,14 +842,12 @@
             }
         }
 
-        // Chỉ căn lại khung hình khi là Lần tải đầu tiên
         if (window.isFirstMapRender && allLatLngs.length > 0) {
             map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]});
             window.isFirstMapRender = false;
         }
     }
 
-    // XỬ LÝ HOVER THÔNG MINH CHO CẢ KHÁCH ĐI 2 TUYẾN TRONG TUẦN
     window.highlightMarker = function(ma_kh) {
         for(let id in window.currentMarkers) {
             if (id.startsWith(ma_kh + "_")) {
@@ -886,22 +936,27 @@
         const tbody = document.getElementById('table-body');
         const tfoot = document.getElementById('table-foot');
 
+        // BỔ SUNG CỘT DOANH SỐ VÀO HEADER
         thead.innerHTML = `
         <tr>
             <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
             <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
             <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
+            <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
             <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
             <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
         </tr>
         <tr>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">M5</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">M6</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">M7</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Chủ nhật</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">CN</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
@@ -912,12 +967,12 @@
 
         let customerMap = new Map();
         let uniqueCustomers = [];
+        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
 
         data.forEach(row => {
             if (!customerMap.has(row.ma_kh)) {
                 let custInfo = {
                     ma_kh: row.ma_kh, ten_kh: row.ten_kh, freq: row.freq,
-                    _ai_order: row._ai_order, // Lưu lại Order để hiển thị
                     days: new Set()
                 };
                 customerMap.set(row.ma_kh, custInfo);
@@ -926,8 +981,6 @@
             customerMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        // Sắp xếp ma trận theo ưu tiên: Ngày Sớm Nhất -> STT tự nhập -> Tần Suất
-        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
         const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
 
         uniqueCustomers.sort((a, b) => {
@@ -935,7 +988,16 @@
             let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
             if (minDayA !== minDayB) return minDayA - minDayB;
             
-            let orderDiff = (a._ai_order || 999) - (b._ai_order || 999);
+            // Tìm Record của ngày nhỏ nhất để so STT
+            let getEarliestOrder = (kh, minDay) => {
+                let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
+                return r ? r._ai_order : 999;
+            };
+            
+            let orderA = getEarliestOrder(a.ma_kh, minDayA);
+            let orderB = getEarliestOrder(b.ma_kh, minDayB);
+
+            let orderDiff = orderA - orderB;
             if(orderDiff !== 0) return orderDiff;
 
             return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
@@ -949,7 +1011,15 @@
             const isF21 = cust.freq === 'F2-1';
             const isF22 = cust.freq === 'F2-2';
             
-            let valSTT = (cust._ai_order !== 999 && cust._ai_order !== undefined) ? cust._ai_order : (index + 1);
+            let minDayNum = Math.min(...Array.from(cust.days).map(d => dayOrderRules[d] || 99));
+            let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
+            let valSTT = firstRecord ? firstRecord._ai_order : 999;
+
+            // Rút dữ liệu doanh số
+            let dsKH = window.salesDataMap[cust.ma_kh] || {};
+            let dsM5 = formatNum(dsKH['M5'] || 0);
+            let dsM6 = formatNum(dsKH['M6'] || 0);
+            let dsM7 = formatNum(dsKH['M7'] || 0);
 
             tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
                 <td style="text-align:center;">
@@ -957,6 +1027,11 @@
                 </td>
                 <td style="font-weight:600;">${cust.ma_kh}</td>
                 <td style="white-space: normal;">${cust.ten_kh}</td>
+                
+                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0.00' ? dsM5 : '-'}</td>
+                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0.00' ? dsM6 : '-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0.00' ? dsM7 : '-'}</td>
+
                 <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
                 <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
                 <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
@@ -998,13 +1073,15 @@
                 }
                 return newRow;
             });
+            
+            normalizeOrder(currentNVDataOptimized);
+            
             hasOptimizedData = true; toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             isOptimizedView = true; 
             
-            // Vẽ đường lại cho AI vì AI đã xếp tuyến
             document.getElementById('chk-draw-lines').checked = true;
-            
+            window.isFirstMapRender = true;
             await processDataAndRender();
         } catch (error) { alert("⚠️ " + error.message); } 
         finally { btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; btnOptimize.disabled = false; }
@@ -1032,6 +1109,10 @@
                 if (match) { newRow.thu = match.day; newRow._ai_order = match.order; }
                 return newRow;
             });
+            
+            normalizeOrder(currentNVDataOptimized);
+            
+            window.isFirstMapRender = true;
             await processDataAndRender(); inputEl.value = ""; 
         } catch (error) { alert("⚠️ " + error.message); } 
         finally { btn.innerText = "🚀 Gửi yêu cầu"; btn.disabled = false; }
@@ -1039,6 +1120,7 @@
 
     function handleRouteToggle() {
         isOptimizedView = (document.querySelector('input[name="routeType"]:checked').value === 'optimized');
+        window.isFirstMapRender = true;
         processDataAndRender();
     }
     
