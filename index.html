@@ -314,7 +314,7 @@
         el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
     }
 
-    // --- HÀM TẢI DOANH SỐ ĐƯỢC FIX LỖI PARSE AN TOÀN TUYỆT ĐỐI ---
+    // --- HÀM TẢI DOANH SỐ FIX LỖI PARSE 1.00 ---
     async function loadSalesData() {
         renderStatusBadge('statusSales', 'loading');
         try {
@@ -327,6 +327,7 @@
 
             const months = ['M5', 'M6', 'M7']; // Tìm đúng file dataM5.js, dataM6.js, dataM7.js
             
+            // Tìm trong bucket 'data'
             let { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
             
             if (error || !signedUrls || signedUrls.length === 0 || signedUrls[0].error) {
@@ -349,19 +350,22 @@
                                 let arr = [];
                                 
                                 try {
-                                    // FIX: Chuyển đổi lệnh khai báo biến (var/let/const) thành lệnh return để bóc tách mảng
-                                    // Thay thế các từ khoá khai báo đứng trước tên biến và chuyển thành `return`
-                                    let funcBody = text.replace(/(export\s+)?(var|let|const)\s+[a-zA-Z0-9_]+\s*=\s*/, 'return ');
-                                    arr = new Function(funcBody)();
+                                    // Loại bỏ export để tránh lỗi syntax
+                                    let safeText = text.replace(/export\s+/g, '');
+                                    // Chạy function ảo và chỉ đích danh mảng dbSales (bỏ qua dbMaster)
+                                    arr = new Function(`
+                                        ${safeText};
+                                        if (typeof dbSales${mName} !== 'undefined') return dbSales${mName};
+                                        if (typeof db_sales !== 'undefined') return db_sales;
+                                        if (typeof dbSales !== 'undefined') return dbSales;
+                                        return [];
+                                    `)();
                                 } catch(e) {
-                                    console.warn("Lỗi parse array qua Function, thử dùng Fallback:", e);
-                                    // Fallback: Tìm dấu [ đầu tiên và chạy eval (loại bỏ lỗi cú pháp thừa phía sau)
-                                    let firstBracket = text.indexOf('[');
-                                    if(firstBracket !== -1) {
-                                        let tempText = text.substring(firstBracket);
-                                        // Cắt bỏ phần sau dấu ; đầu tiên (nếu có)
-                                        tempText = tempText.split(';')[0]; 
-                                        try { arr = eval('(' + tempText + ')'); } catch(err) {}
+                                    console.warn("Lỗi parse array qua Function, thử dùng Regex:", e);
+                                    let regex = new RegExp(`dbSales${mName}\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*(;|\n|$)`);
+                                    let match = text.match(regex);
+                                    if (match) {
+                                        try { arr = eval('(' + match[1] + ')'); } catch(err) {}
                                     }
                                 }
                                 
@@ -371,18 +375,17 @@
                                         let keys = Object.keys(row);
                                         if(keys.length < 2) return;
                                         
-                                        // Ưu tiên cao cho cusCode và sales theo cấu trúc mới
+                                        // Ưu tiên cao cho cusCode và sales
                                         let ma_kh = row['cusCode'] || row['Mã KH'] || row['ma_kh'] || row['Customer ID'] || row['Ma_KH'] || row['Mã Khách Hàng'];
                                         let ds = row['sales'] || row['Doanh số'] || row['doanh_so'] || row['Sales'] || row['DS'] || row['Thực Đạt'];
                                         
-                                        if(ma_kh === undefined) ma_kh = row[keys[0]];
-                                        if(ds === undefined) ds = row[keys[1]];
-                                        
-                                        if (ma_kh !== undefined && ma_kh !== null) {
+                                        // CHỈ LẤY DATA KHI TÌM THẤY ĐÚNG CỘT SALES
+                                        if (ma_kh !== undefined && ma_kh !== null && ds !== undefined && ds !== null) {
                                             let id = ma_kh.toString().trim();
                                             if (!window.salesDataMap[id]) window.salesDataMap[id] = {};
+                                            
                                             // Chống lỗi chuỗi DS có chứa phẩy
-                                            let cleanDs = ds ? ds.toString().replace(/,/g, '').replace(/\s/g, '') : "0";
+                                            let cleanDs = ds.toString().replace(/,/g, '').replace(/\s/g, '');
                                             window.salesDataMap[id][mName] = parseFloat(cleanDs) || 0;
                                         }
                                     });
@@ -961,6 +964,7 @@
         const tbody = document.getElementById('table-body');
         const tfoot = document.getElementById('table-foot');
 
+        // BỔ SUNG CỘT DOANH SỐ ĐƯỢC ĐỔI TÊN THÀNH MAY, JUN, JUL
         thead.innerHTML = `
         <tr>
             <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
@@ -1050,9 +1054,9 @@
                 <td style="font-weight:600;">${cust.ma_kh}</td>
                 <td style="white-space: normal;">${cust.ten_kh}</td>
                 
-                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0.00' ? dsM5 : '-'}</td>
-                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0.00' ? dsM6 : '-'}</td>
-                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0.00' ? dsM7 : '-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
 
                 <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
                 <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
