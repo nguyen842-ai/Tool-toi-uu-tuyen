@@ -1396,6 +1396,45 @@ if (typeof getHaversine14 === 'undefined') {
     var getHaversine14 = window.getHaversine14;
 }
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
+    // ================= HÀM XUẤT ẢNH BẢN ĐỒ =================
+window.downloadWeeklyMap = function() {
+    const btn = document.getElementById('btn-dl-map-week');
+    const originalText = btn.innerHTML;
+    
+    // Đổi trạng thái nút để báo hiệu đang xử lý
+    btn.innerHTML = '⌛ Đang xuất ảnh...';
+    btn.disabled = true;
+
+    // Chọn vùng cần chụp ảnh (khung chứa bản đồ)
+    const mapContainer = document.getElementById('map-container');
+
+    // Cấu hình html2canvas
+    html2canvas(mapContainer, {
+        useCORS: true,       // Bắt buộc: Cho phép tải ảnh chéo miền (cross-origin) từ CartoCDN
+        allowTaint: false,
+        backgroundColor: null // Giữ nền trong suốt/mặc định của bản đồ
+    }).then(canvas => {
+        // Tạo thẻ <a> ảo để kích hoạt tải file xuống
+        const link = document.createElement('a');
+        
+        // Tạo tên file có chứa tên nhân viên (nếu có)
+        const nvName = document.getElementById('sel-nv').value || 'NhanVien';
+        link.download = `BanDo_LoTrinh_${nvName}.png`;
+        
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        // Khôi phục lại trạng thái nút
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }).catch(err => {
+        console.error("Lỗi khi xuất ảnh bản đồ:", err);
+        alert("Có lỗi xảy ra khi chụp ảnh bản đồ. Vui lòng thử lại!");
+        
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+};
 </script>
 </body>
 </html>
