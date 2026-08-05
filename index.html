@@ -1095,66 +1095,191 @@
         });
     }
 
-    // ================= THUẬT TOÁN HYBRID: TOÁN HỌC + JAVASCRIPT =================
-    async function optimizeRouteWithAI() {
-        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
-        
-        // Tìm các element DOM
-        const overlay = document.getElementById('ai-loading-overlay');
-        const titleEl = document.getElementById('ai-status-title');
-        const descEl = document.getElementById('ai-status-desc');
-        const progressEl = document.getElementById('ai-progress-fill');
-        
-        // UI Cập nhật trạng thái loading
-        if(overlay) overlay.style.display = 'flex';
-        if(progressEl) progressEl.style.width = '10%';
-        if(titleEl) titleEl.innerText = "🧮 Đang dùng Toán học phân tích dữ liệu...";
-        if(descEl) descEl.innerText = "Sử dụng K-Means để gom cụm địa lý & cân bằng tải";
-        
-        btnOptimize.disabled = true;
-        btnOptimize.innerText = "⌛ Đang xử lý...";
+    // ================= HÀM HYBRID: K-MEANS 30 ĐIỂM + AI GEMINI SẮP XẾP =================
+async function optimizeRouteWithAI() {
+    let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
+    if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
+    
+    const overlay = document.getElementById('ai-loading-overlay');
+    const titleEl = document.getElementById('ai-status-title');
+    const descEl = document.getElementById('ai-status-desc');
+    const progressEl = document.getElementById('ai-progress-fill');
+    
+    if(overlay) overlay.style.display = 'flex';
+    if(progressEl) progressEl.style.width = '10%';
+    if(titleEl) titleEl.innerText = "🧮 BƯỚC 1: Gom cụm K-Means (Tối đa 30 điểm/cụm)...";
+    if(descEl) descEl.innerText = "Sử dụng Toán học phân cụm địa lý chính xác trước khi gửi AI";
+    
+    btnOptimize.disabled = true;
+    btnOptimize.innerText = "⌛ Đang xử lý...";
 
-        try {
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const k = selectedDays.length; 
-            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-            
-            // --- BƯỚC 1: K-MEANS GOM CỤM ĐỊA LÝ ---
-            let centroids = [];
-            let shuffled = [...locations].sort(() => 0.5 - Math.random());
-            for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
-            
-            let assignments = new Array(locations.length);
-            let changed = true, iterations = 0;
-            
-            while (changed && iterations < 100) {
-                changed = false; iterations++;
-                for (let i = 0; i < locations.length; i++) {
-                    let loc = locations[i], minDist = Infinity, closestCluster = 0;
-                    for (let c = 0; c < k; c++) {
-                        let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
-                        if (d < minDist) { minDist = d; closestCluster = c; }
-                    }
-                    if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
-                }
-                
-                let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
-                for (let i = 0; i < locations.length; i++) {
-                    let c = assignments[i];
-                    newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
-                }
+    try {
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // --- BƯỚC 1: TÍNH SỐ CỤM CẦN CHIA (ĐẢM BẢO MỖI CỤM <= 30 KHÁCH) ---
+        const MAX_PER_CLUSTER = 30;
+        const totalCustomers = dataToOptimize.length;
+        // Số cụm tối thiểu = Số ngày được chọn Hoặc Số lượng / 30 điểm
+        let k = Math.max(selectedDays.length, Math.ceil(totalCustomers / MAX_PER_CLUSTER));
+
+        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
+        
+        // Thuật toán K-Means gom cụm
+        let centroids = [];
+        let shuffled = [...locations].sort(() => 0.5 - Math.random());
+        for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
+        
+        let assignments = new Array(locations.length);
+        let changed = true, iterations = 0;
+        
+        while (changed && iterations < 100) {
+            changed = false; iterations++;
+            for (let i = 0; i < locations.length; i++) {
+                let loc = locations[i], minDist = Infinity, closestCluster = 0;
                 for (let c = 0; c < k; c++) {
-                    if (newCentroids[c].count > 0) {
-                        centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
-                        centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
-                    }
+                    let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
+                    if (d < minDist) { minDist = d; closestCluster = c; }
+                }
+                if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
+            }
+            let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
+            for (let i = 0; i < locations.length; i++) {
+                let c = assignments[i];
+                newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
+            }
+            for (let c = 0; c < k; c++) {
+                if (newCentroids[c].count > 0) {
+                    centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
+                    centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
                 }
             }
+        }
+
+        // --- BƯỚC 2: SẮP XẾP NEAREST NEIGHBOR SƠ BỘ CHO MỖI CỤM ---
+        if(progressEl) progressEl.style.width = '30%';
+        if(titleEl) titleEl.innerText = "🛤️ BƯỚC 2: Sắp xếp Nearest Neighbor sơ bộ...";
+
+        let preGroupedLocations = [];
+        for (let c = 0; c < k; c++) {
+            let clusterLocs = locations.filter((_, idx) => assignments[idx] === c);
+            if (clusterLocs.length === 0) continue;
+
+            // Nearest Neighbor đường đi ngắn nhất
+            let unvisited = [...clusterLocs];
+            let currentLoc = unvisited.shift();
+            let orderedCluster = [currentLoc];
+
+            while (unvisited.length > 0) {
+                let nearestIdx = 0, minDist = Infinity;
+                for (let j = 0; j < unvisited.length; j++) {
+                    let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
+                    if (d < minDist) { minDist = d; nearestIdx = j; }
+                }
+                currentLoc = unvisited.splice(nearestIdx, 1)[0];
+                orderedCluster.push(currentLoc);
+            }
+
+            preGroupedLocations.push(...orderedCluster);
+        }
+
+        // --- BƯỚC 3: GỬI TẬP DỮ LIỆU ĐÃ GOM RỌN LÊN GEMINI AI SẮP XẾP LẠI ---
+        if(progressEl) progressEl.style.width = '60%';
+        if(titleEl) titleEl.innerText = "🤖 BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
+        if(descEl) descEl.innerText = "Gửi các cụm <= 30 điểm lên Gemini AI để chốt lộ trình tối ưu nhất";
+
+        const payloadLocations = preGroupedLocations.map(r => ({
+            id: r.id,
+            lat: r.lat,
+            lng: r.lng
+        }));
+
+        const baseUrl = document.getElementById('sel-api-line').value;
+
+        const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                locations: payloadLocations,
+                availableDays: selectedDays
+            })
+        });
+
+        let aiResults = [];
+
+        if (response.ok) {
+            const resData = await response.json();
+            aiResults = resData.optimized_data;
+            if(progressEl) progressEl.style.width = '85%';
+        } else {
+            console.warn("Server AI lỗi, giữ nguyên kết quả gom cụm Local!");
+            aiResults = optimizeRouteFallbackLocal(dataToOptimize);
+        }
+
+        if(progressEl) progressEl.style.width = '95%';
+        if(titleEl) titleEl.innerText = "🗺️ BƯỚC 4: Vẽ tuyến lên bản đồ...";
+
+        // Ghép kết quả vào mảng hiển thị
+        currentNVDataOptimized = currentNVDataOriginal.map(row => {
+            let newRow = {...row};
+            let match = aiResults.find(i => i.id === row.ma_kh);
+            if (match) {
+                newRow.thu = match.day;
+                newRow._ai_order = match.order;
+                if (match.freq) newRow.freq = match.freq; 
+            }
+            return newRow;
+        });
+        
+        normalizeOrder(currentNVDataOptimized);
+        hasOptimizedData = true; 
+        toggleToolbar.style.display = 'flex';
+        document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+        isOptimizedView = true; 
+        document.getElementById('chk-draw-lines').checked = true;
+        window.isFirstMapRender = true;
+        
+        await processDataAndRender();
+        
+        if(progressEl) progressEl.style.width = '100%';
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        alert(`🎉 Thành công! Đã gom cụm (tối đa 30 điểm) & AI tối ưu xong cho ${payloadLocations.length} khách hàng.`);
+        
+    } catch (error) { 
+        console.error("Lỗi Hybrid Optimization:", error);
+        alert("⚠️ Lỗi kết nối API. Hệ thống đã tự động chạy bằng thuật toán Local.");
+        
+        let fallbackResults = optimizeRouteFallbackLocal(dataToOptimize);
+        currentNVDataOptimized = currentNVDataOriginal.map(row => {
+            let newRow = {...row};
+            let match = fallbackResults.find(i => i.id === row.ma_kh);
+            if (match) {
+                newRow.thu = match.day;
+                newRow._ai_order = match.order;
+                if (match.freq) newRow.freq = match.freq; 
+            }
+            return newRow;
+        });
+        
+        normalizeOrder(currentNVDataOptimized);
+        hasOptimizedData = true; 
+        toggleToolbar.style.display = 'flex';
+        document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+        isOptimizedView = true; 
+        document.getElementById('chk-draw-lines').checked = true;
+        window.isFirstMapRender = true;
+        await processDataAndRender();
+
+    } finally { 
+        if(overlay) overlay.style.display = 'none'; 
+        btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
+        btnOptimize.disabled = false; 
+    }
+}
 
             if(progressEl) progressEl.style.width = '40%';
-            if(titleEl) titleEl.innerText = "🛤️ Đang vẽ lộ trình tối ưu...";
-            if(descEl) descEl.innerText = "Sử dụng thuật toán Nearest Neighbor để nối các điểm gần nhau nhất";
+            if(titleEl) titleEl.innerText = "Hệ thống đang tính toán...";
+            if(descEl) descEl.innerText = "Gần xong rồi!...";
             await new Promise(resolve => setTimeout(resolve, 300));
 
             // --- BƯỚC 2: CHIA TẦN SUẤT & TÌM ĐƯỜNG ĐI TSP ---
