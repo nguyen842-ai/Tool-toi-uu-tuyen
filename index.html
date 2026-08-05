@@ -1213,11 +1213,12 @@ const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
         // ================= STEP 3: RENDER KẾT QUẢ ĐÃ ĐƯỢC CẢI TIẾN LÊN BẢN ĐỒ =================
         currentNVDataOptimized = currentNVDataOriginal.map(row => {
             let newRow = {...row};
-            // Tìm kiếm trong đống kết quả AI xem khách hàng này thuộc cụm nào, thứ tự bao nhiêu
             let aiMatch = allAiResults.find(i => i.id === row.ma_kh);
             if (aiMatch) {
                 newRow.thu = aiMatch.day;
                 newRow._ai_order = aiMatch.order;
+                // Bổ sung dòng dưới đây để nhận tần suất F2-1/F2-2 từ AI
+                if (aiMatch.freq) newRow.freq = aiMatch.freq; 
             }
             return newRow;
         });
