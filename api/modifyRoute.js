@@ -31,8 +31,8 @@ export default async function handler(req, res) {
         for (let i = 0; i < apiKeys.length; i++) {
             const currentKey = apiKeys[i];
             
-            // [ĐÃ SỬA]: Gọi đúng Model Gemini 1.5 Flash
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+            // gemini 3.5 flash chết thì thay cái mới
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${currentKey}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
