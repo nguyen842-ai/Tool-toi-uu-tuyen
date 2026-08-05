@@ -1090,44 +1090,147 @@
     });
 }
 
-    // ĐÃ GỠ BỎ HOÀN TOÀN THUẬT TOÁN K-MEANS Ở FRONTEND
-    // TẤT CẢ DỮ LIỆU SẼ ĐƯỢC GỬI LÊN AI ĐỂ TỰ ĐỘNG CHIA NGÀY VÀ TẦN SUẤT
+   // ================= THUẬT TOÁN HYBRID: TOÁN HỌC + JAVASCRIPT =================
     async function optimizeRouteWithAI() {
-        const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
-        if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
+        // Vẫn giữ khung loading để hiệu ứng đẹp mắt
+        const overlay = document.getElementById('ai-loading-overlay');
+        const titleEl = document.getElementById('ai-status-title');
+        const descEl = document.getElementById('ai-status-desc');
+        const progressEl = document.getElementById('ai-progress-fill');
         
         let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần AI tối ưu.");
+        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
         
+        overlay.style.display = 'flex';
+        progressEl.style.width = '10%';
+        titleEl.innerText = "🧮 Đang dùng Toán học phân tích dữ liệu...";
+        descEl.innerText = "Sử dụng K-Means để gom cụm địa lý & cân bằng tải";
         btnOptimize.disabled = true;
-        btnOptimize.innerText = "🧠 AI đang phân bổ và xếp tuyến...";
 
         try {
-            // Chỉ lấy các trường dữ liệu cần thiết để gửi đi cho nhẹ (Id, Lat, Lng)
-            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng }));
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const k = selectedDays.length; 
+            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
             
-            // Đọc URL dựa vào Line người dùng đang chọn
-            const baseUrl = document.getElementById('sel-api-line').value;
+            // --- BƯỚC 1: K-MEANS GOM CỤM ĐỊA LÝ ---
+            let centroids = [];
+            let shuffled = [...locations].sort(() => 0.5 - Math.random());
+            for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
+            
+            let assignments = new Array(locations.length);
+            let changed = true, iterations = 0;
+            
+            while (changed && iterations < 100) {
+                changed = false; iterations++;
+                for (let i = 0; i < locations.length; i++) {
+                    let loc = locations[i], minDist = Infinity, closestCluster = 0;
+                    for (let c = 0; c < k; c++) {
+                        let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
+                        if (d < minDist) { minDist = d; closestCluster = c; }
+                    }
+                    if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
+                }
+                
+                let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
+                for (let i = 0; i < locations.length; i++) {
+                    let c = assignments[i];
+                    newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
+                }
+                for (let c = 0; c < k; c++) {
+                    if (newCentroids[c].count > 0) {
+                        centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
+                        centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
+                    }
+                }
+            }
 
-            // BẮN TOÀN BỘ DATA LÊN AI 1 LẦN DUY NHẤT
-            const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    locations: locations, 
-                    availableDays: selectedDays // Gửi tất cả các Thứ đã chọn để AI tự chia
-                })
+            progressEl.style.width = '40%';
+            titleEl.innerText = "🛤️ Đang vẽ lộ trình tối ưu...";
+            descEl.innerText = "Sử dụng thuật toán Nearest Neighbor để nối các điểm gần nhau nhất";
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // --- BƯỚC 2: CHIA TẦN SUẤT & TÌM ĐƯỜNG ĐI TSP (BẰNG JAVASCRIPT) ---
+            let allAiResults = []; 
+            let finalChunks = [];
+
+            for (let c = 0; c < k; c++) {
+                let clusterLocs = [];
+                for (let i = 0; i < locations.length; i++) {
+                    if (assignments[i] === c) clusterLocs.push(locations[i]);
+                }
+                if (clusterLocs.length === 0) continue;
+                
+                let targetDay = selectedDays[c];
+
+                // Cắt tuyến nếu quá 45 khách
+                if (clusterLocs.length <= 45) {
+                    finalChunks.push({ day: targetDay, freq: 'F4', locations: clusterLocs });
+                } else {
+                    clusterLocs.sort((a, b) => a.lat - b.lat);
+                    let half = Math.ceil(clusterLocs.length / 2);
+                    finalChunks.push({ day: targetDay, freq: 'F2-1', locations: clusterLocs.slice(0, half) });
+                    finalChunks.push({ day: targetDay, freq: 'F2-2', locations: clusterLocs.slice(half) });
+                }
+            }
+
+            // Thuật toán Láng giềng gần nhất (Tìm đường ngắn nhất siêu tốc)
+            finalChunks.forEach(chunk => {
+                let unvisited = [...chunk.locations];
+                let currentLoc = unvisited.shift(); // Bắt đầu từ điểm đầu tiên trong cụm
+                let order = 1;
+                
+                allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
+                
+                while (unvisited.length > 0) {
+                    let nearestIdx = 0;
+                    let minDist = Infinity;
+                    
+                    // Quét tìm điểm gần nhất bằng khoảng cách Haversine thực tế
+                    for (let j = 0; j < unvisited.length; j++) {
+                        let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
+                        if (d < minDist) { minDist = d; nearestIdx = j; }
+                    }
+                    
+                    currentLoc = unvisited.splice(nearestIdx, 1)[0];
+                    allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
+                }
+            });
+
+            progressEl.style.width = '80%';
+            titleEl.innerText = "🗺️ Đang ráp số liệu lên bản đồ...";
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // --- BƯỚC 3: LẮP RÁP KẾT QUẢ VÀO BẢNG DỮ LIỆU ---
+            currentNVDataOptimized = currentNVDataOriginal.map(row => {
+                let newRow = {...row};
+                let match = allAiResults.find(i => i.id === row.ma_kh);
+                if (match) {
+                    newRow.thu = match.day;
+                    newRow._ai_order = match.order;
+                    newRow.freq = match.freq;
+                }
+                return newRow;
             });
             
-            if (!response.ok) {
-                if (response.status === 503 || response.status === 504) {
-                    throw new Error("Server AI đang quá tải hoặc hết thời gian chờ (Timeout). Hãy chia nhỏ bớt ngày hoặc dùng Line khác!");
-                }
-                throw new Error("Lỗi API phân tích tuyến.");
-            }
+            normalizeOrder(currentNVDataOptimized);
+            hasOptimizedData = true; 
+            toggleToolbar.style.display = 'flex';
+            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+            isOptimizedView = true; 
+            document.getElementById('chk-draw-lines').checked = true;
+            window.isFirstMapRender = true;
             
-            const resData = await response.json();
-            const allAiResults = resData.optimized_data || [];
+            await processDataAndRender();
+            progressEl.style.width = '100%';
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+        } catch (error) { 
+            alert("⚠️ Lỗi hệ thống: " + error.message); 
+        } finally { 
+            overlay.style.display = 'none'; 
+            btnOptimize.disabled = false; 
+        }
+    }
 
             // ================= RENDER KẾT QUẢ ĐÃ ĐƯỢC AI CẢI TIẾN LÊN BẢN ĐỒ =================
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
