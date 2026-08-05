@@ -16,6 +16,11 @@ export default async function handler(req, res) {
     }
 
     try {
+        // [SỬA LỖI 3]: Xử lý Ping từ hàm checkServerStatus() ở Frontend
+        if (req.body.ping) {
+            return res.status(200).json({ status: 'ok' });
+        }
+
         const { locations, availableDays } = req.body;
         
         if (!locations || locations.length === 0) {
@@ -43,12 +48,12 @@ CÁC QUY TẮC RÀNG BUỘC (TUYỆT ĐỐI TUÂN THỦ):
 4. Sắp xếp thứ tự: Trong cùng một ngày (day) và cùng một tần suất (freq), sắp xếp trường "order" từ 1 đến N sao cho tổng quãng đường di chuyển là ngắn nhất.
 
 ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
-Trả về DUY NHẤT một mảng JSON thuần túy, tuyệt đối không bọc trong markdown ```json, không giải thích thêm.
+Trả về DUY NHẤT một mảng JSON thuần túy, tuyệt đối không bọc trong markdown \`\`\`json, không giải thích thêm.
 Cấu trúc mảng phải chính xác như sau:
 [
   { "id": "Mã KH", "day": "Thứ 2", "order": 1, "freq": "F4" },
   { "id": "Mã KH", "day": "Thứ 2", "order": 2, "freq": "F4" }
-]
+]`; // [SỬA LỖI 1]: Đã thêm dấu đóng backtick (`) và dấu chấm phẩy ở đây
 
         // Lấy danh sách chìa khóa
         const keysString = process.env.GEMINI_API_KEY; 
@@ -64,8 +69,8 @@ Cấu trúc mảng phải chính xác như sau:
         for (let i = 0; i < apiKeys.length; i++) {
             const currentKey = apiKeys[i];
             
-            // ĐÃ CẬP NHẬT MODEL LÊN PHIÊN BẢN 3.5 THEO YÊU CẦU
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${currentKey}`;
+            // [SỬA LỖI 2]: Gọi đúng Model Gemini 1.5 Flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
