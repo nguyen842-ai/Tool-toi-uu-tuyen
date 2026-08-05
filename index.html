@@ -89,6 +89,17 @@
 </head>
 <body>
 
+<!-- KHUNG HIỂN THỊ LOADING AI -->
+<div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%;">
+        <h2 id="ai-status-title" style="margin-top: 0; color: #1e40af; font-size: 18px;">Khởi động AI...</h2>
+        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang chuẩn bị dữ liệu phân tích</p>
+        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+            <div id="ai-progress-fill" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+</div>
+
 <div id="app-container">
     <div id="left-panel">
         <div id="upload-section">
@@ -714,13 +725,12 @@
         processDataAndRender(); 
     };
 
-    // ĐÃ FIX: CHỈ CHO PHÉP 1 NGÀY DUY NHẤT KHI CHỌN LẠI LỘ TRÌNH
     window.toggleRouteDay = function(ma_kh, day) {
         ensureEditMode();
         let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh) || currentNVDataOriginal.find(r => r.ma_kh === ma_kh);
         if (!template) return;
         
-        // 1. Xóa toàn bộ lịch cũ của KH này (để đảm bảo không bị nhân bản thành 2 ngày)
+        // 1. Xóa toàn bộ lịch cũ của KH này
         currentNVDataOptimized = currentNVDataOptimized.filter(r => r.ma_kh !== ma_kh);
         
         // 2. Chèn lại duy nhất 1 lịch của ngày mới
@@ -757,7 +767,6 @@
         processDataAndRender();
     };
 
-    // ĐÃ FIX: THÊM CƠ CHẾ GIỮ NGUYÊN VỊ TRÍ THANH CUỘN BẢNG KHI RENDER
     async function processDataAndRender() {
         let rightPanel = document.getElementById('right-panel');
         let savedScrollTop = rightPanel ? rightPanel.scrollTop : 0;
@@ -775,7 +784,6 @@
         document.getElementById('ai-chat-section').style.display = hasOptimizedData ? 'block' : 'none';
         dashboard.style.display = 'block';
 
-        // Phục hồi lại thanh cuộn
         if (rightPanel) {
             setTimeout(() => { rightPanel.scrollTop = savedScrollTop; }, 0);
         }
@@ -960,313 +968,276 @@
         </tr>`;
     }
 
-  function renderDetailTable(data) {
-    const thead = document.getElementById('table-head'); 
-    const tbody = document.getElementById('table-body');
-    const tfoot = document.getElementById('table-foot');
+    function renderDetailTable(data) {
+        const thead = document.getElementById('table-head'); 
+        const tbody = document.getElementById('table-body');
+        const tfoot = document.getElementById('table-foot');
 
-    thead.innerHTML = `
-    <tr>
-        <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
-        <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
-        <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
-        <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
-        <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
-        <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
-        <!-- Thêm cụm tiêu đề cho các cột kỹ thuật để đồng bộ import/export -->
-        <th class="route-th" colspan="3" style="z-index: 3; background-color: #475569 !important;">Thông tin Tọa độ & Vùng</th>
-    </tr>
-    <tr>
-        <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
-        <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
-        <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
-        <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">CN</th>
-        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
-        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
-        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
-        <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
-        <!-- Tiêu đề cột chi tiết -->
-        <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lat</th>
-        <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lng</th>
-        <th class="route-th" style="width: 90px; top: 36px; z-index: 2; background-color: #64748b !important;">Area</th>
-    </tr>`;
-    
-    tbody.innerHTML = ''; tfoot.innerHTML = '';
-
-    let customerMap = new Map();
-    let uniqueCustomers = [];
-    const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-
-    data.forEach(row => {
-        if (!customerMap.has(row.ma_kh)) {
-            let custInfo = {
-                ma_kh: row.ma_kh, 
-                ten_kh: row.ten_kh, 
-                freq: row.freq,
-                lat: row.lat,      // Lưu lại thông tin tọa độ gốc
-                lng: row.lng,      // Lưu lại thông tin tọa độ gốc
-                area: row.area,    // Lưu lại khu vực gốc
-                days: new Set()
-            };
-            customerMap.set(row.ma_kh, custInfo);
-            uniqueCustomers.push(custInfo);
-        }
-        customerMap.get(row.ma_kh).days.add(row.thu);
-    });
-
-    const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-
-    uniqueCustomers.sort((a, b) => {
-        let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
-        let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
-        if (minDayA !== minDayB) return minDayA - minDayB;
-        
-        let getEarliestOrder = (kh, minDay) => {
-            let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
-            return r ? r._ai_order : 999;
-        };
-        
-        let orderA = getEarliestOrder(a.ma_kh, minDayA);
-        let orderB = getEarliestOrder(b.ma_kh, minDayB);
-
-        let orderDiff = orderA - orderB;
-        if(orderDiff !== 0) return orderDiff;
-
-        return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-    });
-
-    uniqueCustomers.forEach((cust, index) => {
-        const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
-        const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
-        
-        const isF4 = cust.freq === 'F4';
-        const isF21 = cust.freq === 'F2-1';
-        const isF22 = cust.freq === 'F2-2';
-        
-        let minDayNum = Math.min(...Array.from(cust.days).map(d => dayOrderRules[d] || 99));
-        let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
-        let valSTT = firstRecord ? firstRecord._ai_order : 999;
-
-        let dsKH = window.salesDataMap[cust.ma_kh] || {};
-        let dsM5 = formatNum(dsKH['M5'] || 0);
-        let dsM6 = formatNum(dsKH['M6'] || 0);
-        let dsM7 = formatNum(dsKH['M7'] || 0);
-
-        tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
-            <td style="text-align:center;">
-                <input type="number" class="stt-input" value="${valSTT}" onchange="editOrder('${cust.ma_kh}', this.value)">
-            </td>
-            <td style="font-weight:600;">${cust.ma_kh}</td>
-            <td style="white-space: normal;">${cust.ten_kh}</td>
-            
-            <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-            <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
-            <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
-
-            <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
-            <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
-            <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
-            <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 5')">${getX('Thứ 5')}</td>
-            <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 6')">${getX('Thứ 6')}</td>
-            <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 7')">${getX('Thứ 7')}</td>
-            <td class="edit-cell" style="text-align:center; background:#fef2f2;" onclick="toggleRouteDay('${cust.ma_kh}', 'Chủ nhật')">${getX('Chủ nhật')}</td>
-            
-            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
-            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
-            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
-            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-
-            <!-- Điền dữ liệu text trực tiếp vào ô để thư viện thư viện Excel tự động quét trúng khi Export -->
-            <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lat || 0}</td>
-            <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lng || 0}</td>
-            <td style="text-align:center; color:#64748b; background:#f1f5f9;">${cust.area || ''}</td>
+        thead.innerHTML = `
+        <tr>
+            <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
+            <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
+            <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
+            <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
+            <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
+            <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
+            <th class="route-th" colspan="3" style="z-index: 3; background-color: #475569 !important;">Thông tin Tọa độ & Vùng</th>
+        </tr>
+        <tr>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
+            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">CN</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
+            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
+            <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lat</th>
+            <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lng</th>
+            <th class="route-th" style="width: 90px; top: 36px; z-index: 2; background-color: #64748b !important;">Area</th>
         </tr>`;
-    });
-}
-// ================= THUẬT TOÁN HYBRID: TOÁN HỌC + JAVASCRIPT =================
-async function optimizeRouteWithAI() {
-    let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-    if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
-    
-    // Tìm các element DOM
-    const overlay = document.getElementById('ai-loading-overlay');
-    const titleEl = document.getElementById('ai-status-title');
-    const descEl = document.getElementById('ai-status-desc');
-    const progressEl = document.getElementById('ai-progress-fill');
-    
-    // UI Cập nhật trạng thái loading (có check null để tránh lỗi nếu HTML chưa có)
-    if(overlay) overlay.style.display = 'flex';
-    if(progressEl) progressEl.style.width = '10%';
-    if(titleEl) titleEl.innerText = "🧮 Đang dùng Toán học phân tích dữ liệu...";
-    if(descEl) descEl.innerText = "Sử dụng K-Means để gom cụm địa lý & cân bằng tải";
-    
-    btnOptimize.disabled = true;
-    btnOptimize.innerText = "⌛ Đang xử lý...";
-
-    try {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        const k = selectedDays.length; 
-        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
         
-        // --- BƯỚC 1: K-MEANS GOM CỤM ĐỊA LÝ ---
-        let centroids = [];
-        let shuffled = [...locations].sort(() => 0.5 - Math.random());
-        for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
-        
-        let assignments = new Array(locations.length);
-        let changed = true, iterations = 0;
-        
-        while (changed && iterations < 100) {
-            changed = false; iterations++;
-            for (let i = 0; i < locations.length; i++) {
-                let loc = locations[i], minDist = Infinity, closestCluster = 0;
-                for (let c = 0; c < k; c++) {
-                    let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
-                    if (d < minDist) { minDist = d; closestCluster = c; }
-                }
-                if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
-            }
-            
-            let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
-            for (let i = 0; i < locations.length; i++) {
-                let c = assignments[i];
-                newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
-            }
-            for (let c = 0; c < k; c++) {
-                if (newCentroids[c].count > 0) {
-                    centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
-                    centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
-                }
-            }
-        }
+        tbody.innerHTML = ''; tfoot.innerHTML = '';
 
-        if(progressEl) progressEl.style.width = '40%';
-        if(titleEl) titleEl.innerText = "🛤️ Đang vẽ lộ trình tối ưu...";
-        if(descEl) descEl.innerText = "Sử dụng thuật toán Nearest Neighbor để nối các điểm gần nhau nhất";
-        await new Promise(resolve => setTimeout(resolve, 300));
+        let customerMap = new Map();
+        let uniqueCustomers = [];
+        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
 
-        // --- BƯỚC 2: CHIA TẦN SUẤT & TÌM ĐƯỜNG ĐI TSP ---
-        let allAiResults = []; 
-        let finalChunks = [];
-
-        for (let c = 0; c < k; c++) {
-            let clusterLocs = [];
-            for (let i = 0; i < locations.length; i++) {
-                if (assignments[i] === c) clusterLocs.push(locations[i]);
+        data.forEach(row => {
+            if (!customerMap.has(row.ma_kh)) {
+                let custInfo = {
+                    ma_kh: row.ma_kh, 
+                    ten_kh: row.ten_kh, 
+                    freq: row.freq,
+                    lat: row.lat, 
+                    lng: row.lng, 
+                    area: row.area, 
+                    days: new Set()
+                };
+                customerMap.set(row.ma_kh, custInfo);
+                uniqueCustomers.push(custInfo);
             }
-            if (clusterLocs.length === 0) continue;
-            
-            let targetDay = selectedDays[c];
-
-            // Cắt tuyến nếu quá 45 khách
-            if (clusterLocs.length <= 45) {
-                finalChunks.push({ day: targetDay, freq: 'F4', locations: clusterLocs });
-            } else {
-                clusterLocs.sort((a, b) => a.lat - b.lat);
-                let half = Math.ceil(clusterLocs.length / 2);
-                finalChunks.push({ day: targetDay, freq: 'F2-1', locations: clusterLocs.slice(0, half) });
-                finalChunks.push({ day: targetDay, freq: 'F2-2', locations: clusterLocs.slice(half) });
-            }
-        }
-
-        // Thuật toán Láng giềng gần nhất
-        finalChunks.forEach(chunk => {
-            let unvisited = [...chunk.locations];
-            let currentLoc = unvisited.shift();
-            let order = 1;
-            
-            allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
-            
-            while (unvisited.length > 0) {
-                let nearestIdx = 0;
-                let minDist = Infinity;
-                
-                for (let j = 0; j < unvisited.length; j++) {
-                    let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
-                    if (d < minDist) { minDist = d; nearestIdx = j; }
-                }
-                
-                currentLoc = unvisited.splice(nearestIdx, 1)[0];
-                allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
-            }
+            customerMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        if(progressEl) progressEl.style.width = '80%';
-        if(titleEl) titleEl.innerText = "🗺️ Đang ráp số liệu lên bản đồ...";
-        await new Promise(resolve => setTimeout(resolve, 300));
+        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
 
-        // --- BƯỚC 3: LẮP RÁP KẾT QUẢ VÀO BẢNG DỮ LIỆU ---
-        currentNVDataOptimized = currentNVDataOriginal.map(row => {
-            let newRow = {...row};
-            let match = allAiResults.find(i => i.id === row.ma_kh);
-            if (match) {
-                newRow.thu = match.day;
-                newRow._ai_order = match.order;
-                if (match.freq) newRow.freq = match.freq; 
-            }
-            return newRow;
+        uniqueCustomers.sort((a, b) => {
+            let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
+            let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
+            if (minDayA !== minDayB) return minDayA - minDayB;
+            
+            let getEarliestOrder = (kh, minDay) => {
+                let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
+                return r ? r._ai_order : 999;
+            };
+            
+            let orderA = getEarliestOrder(a.ma_kh, minDayA);
+            let orderB = getEarliestOrder(b.ma_kh, minDayB);
+
+            let orderDiff = orderA - orderB;
+            if(orderDiff !== 0) return orderDiff;
+
+            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
-        
-        normalizeOrder(currentNVDataOptimized);
-        hasOptimizedData = true; 
-        toggleToolbar.style.display = 'flex';
-        document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-        isOptimizedView = true; 
-        document.getElementById('chk-draw-lines').checked = true;
-        window.isFirstMapRender = true;
-        
-        await processDataAndRender();
-        
-        if(progressEl) progressEl.style.width = '100%';
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        alert(`🎉 Thành công! AI đã tự động phân bổ cân bằng và tối ưu tuyến cho ${locations.length} khách hàng.`);
-        
-    } catch (error) { 
-        alert("⚠️ Lỗi hệ thống: " + error.message); 
-    } finally { 
-        if(overlay) overlay.style.display = 'none'; 
-        btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
-        btnOptimize.disabled = false; 
+
+        uniqueCustomers.forEach((cust, index) => {
+            const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
+            const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+            
+            const isF4 = cust.freq === 'F4';
+            const isF21 = cust.freq === 'F2-1';
+            const isF22 = cust.freq === 'F2-2';
+            
+            let minDayNum = Math.min(...Array.from(cust.days).map(d => dayOrderRules[d] || 99));
+            let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
+            let valSTT = firstRecord ? firstRecord._ai_order : 999;
+
+            let dsKH = window.salesDataMap[cust.ma_kh] || {};
+            let dsM5 = formatNum(dsKH['M5'] || 0);
+            let dsM6 = formatNum(dsKH['M6'] || 0);
+            let dsM7 = formatNum(dsKH['M7'] || 0);
+
+            tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
+                <td style="text-align:center;">
+                    <input type="number" class="stt-input" value="${valSTT}" onchange="editOrder('${cust.ma_kh}', this.value)">
+                </td>
+                <td style="font-weight:600;">${cust.ma_kh}</td>
+                <td style="white-space: normal;">${cust.ten_kh}</td>
+                
+                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
+
+                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
+                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
+                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
+                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 5')">${getX('Thứ 5')}</td>
+                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 6')">${getX('Thứ 6')}</td>
+                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 7')">${getX('Thứ 7')}</td>
+                <td class="edit-cell" style="text-align:center; background:#fef2f2;" onclick="toggleRouteDay('${cust.ma_kh}', 'Chủ nhật')">${getX('Chủ nhật')}</td>
+                
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
+
+                <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lat || 0}</td>
+                <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lng || 0}</td>
+                <td style="text-align:center; color:#64748b; background:#f1f5f9;">${cust.area || ''}</td>
+            </tr>`;
+        });
     }
-}
 
-            // ================= RENDER KẾT QUẢ ĐÃ ĐƯỢC AI CẢI TIẾN LÊN BẢN ĐỒ =================
+    // ================= THUẬT TOÁN HYBRID: TOÁN HỌC + JAVASCRIPT =================
+    async function optimizeRouteWithAI() {
+        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
+        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
+        
+        // Tìm các element DOM
+        const overlay = document.getElementById('ai-loading-overlay');
+        const titleEl = document.getElementById('ai-status-title');
+        const descEl = document.getElementById('ai-status-desc');
+        const progressEl = document.getElementById('ai-progress-fill');
+        
+        // UI Cập nhật trạng thái loading
+        if(overlay) overlay.style.display = 'flex';
+        if(progressEl) progressEl.style.width = '10%';
+        if(titleEl) titleEl.innerText = "🧮 Đang dùng Toán học phân tích dữ liệu...";
+        if(descEl) descEl.innerText = "Sử dụng K-Means để gom cụm địa lý & cân bằng tải";
+        
+        btnOptimize.disabled = true;
+        btnOptimize.innerText = "⌛ Đang xử lý...";
+
+        try {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const k = selectedDays.length; 
+            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
+            
+            // --- BƯỚC 1: K-MEANS GOM CỤM ĐỊA LÝ ---
+            let centroids = [];
+            let shuffled = [...locations].sort(() => 0.5 - Math.random());
+            for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
+            
+            let assignments = new Array(locations.length);
+            let changed = true, iterations = 0;
+            
+            while (changed && iterations < 100) {
+                changed = false; iterations++;
+                for (let i = 0; i < locations.length; i++) {
+                    let loc = locations[i], minDist = Infinity, closestCluster = 0;
+                    for (let c = 0; c < k; c++) {
+                        let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
+                        if (d < minDist) { minDist = d; closestCluster = c; }
+                    }
+                    if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
+                }
+                
+                let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
+                for (let i = 0; i < locations.length; i++) {
+                    let c = assignments[i];
+                    newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
+                }
+                for (let c = 0; c < k; c++) {
+                    if (newCentroids[c].count > 0) {
+                        centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
+                        centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
+                    }
+                }
+            }
+
+            if(progressEl) progressEl.style.width = '40%';
+            if(titleEl) titleEl.innerText = "🛤️ Đang vẽ lộ trình tối ưu...";
+            if(descEl) descEl.innerText = "Sử dụng thuật toán Nearest Neighbor để nối các điểm gần nhau nhất";
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // --- BƯỚC 2: CHIA TẦN SUẤT & TÌM ĐƯỜNG ĐI TSP ---
+            let allAiResults = []; 
+            let finalChunks = [];
+
+            for (let c = 0; c < k; c++) {
+                let clusterLocs = [];
+                for (let i = 0; i < locations.length; i++) {
+                    if (assignments[i] === c) clusterLocs.push(locations[i]);
+                }
+                if (clusterLocs.length === 0) continue;
+                
+                let targetDay = selectedDays[c];
+
+                // Cắt tuyến nếu quá 45 khách
+                if (clusterLocs.length <= 45) {
+                    finalChunks.push({ day: targetDay, freq: 'F4', locations: clusterLocs });
+                } else {
+                    clusterLocs.sort((a, b) => a.lat - b.lat);
+                    let half = Math.ceil(clusterLocs.length / 2);
+                    finalChunks.push({ day: targetDay, freq: 'F2-1', locations: clusterLocs.slice(0, half) });
+                    finalChunks.push({ day: targetDay, freq: 'F2-2', locations: clusterLocs.slice(half) });
+                }
+            }
+
+            // Thuật toán Láng giềng gần nhất
+            finalChunks.forEach(chunk => {
+                let unvisited = [...chunk.locations];
+                let currentLoc = unvisited.shift();
+                let order = 1;
+                
+                allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
+                
+                while (unvisited.length > 0) {
+                    let nearestIdx = 0;
+                    let minDist = Infinity;
+                    
+                    for (let j = 0; j < unvisited.length; j++) {
+                        let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
+                        if (d < minDist) { minDist = d; nearestIdx = j; }
+                    }
+                    
+                    currentLoc = unvisited.splice(nearestIdx, 1)[0];
+                    allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
+                }
+            });
+
+            if(progressEl) progressEl.style.width = '80%';
+            if(titleEl) titleEl.innerText = "🗺️ Đang ráp số liệu lên bản đồ...";
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // --- BƯỚC 3: LẮP RÁP KẾT QUẢ VÀO BẢNG DỮ LIỆU ---
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
                 let newRow = {...row};
-                // Tìm kiếm trong kết quả AI xem khách hàng này thuộc ngày nào, thứ tự bao nhiêu
-                let aiMatch = allAiResults.find(i => i.id === row.ma_kh);
-                if (aiMatch) {
-                    newRow.thu = aiMatch.day;
-                    newRow._ai_order = aiMatch.order;
-                    // Nhận thêm biến tần suất (F4, F2-1, F2-2) từ AI
-                    if (aiMatch.freq) newRow.freq = aiMatch.freq; 
+                let match = allAiResults.find(i => i.id === row.ma_kh);
+                if (match) {
+                    newRow.thu = match.day;
+                    newRow._ai_order = match.order;
+                    if (match.freq) newRow.freq = match.freq; 
                 }
                 return newRow;
             });
             
             normalizeOrder(currentNVDataOptimized);
-            
             hasOptimizedData = true; 
             toggleToolbar.style.display = 'flex';
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             isOptimizedView = true; 
-            
             document.getElementById('chk-draw-lines').checked = true;
             window.isFirstMapRender = true;
+            
             await processDataAndRender();
+            
+            if(progressEl) progressEl.style.width = '100%';
+            await new Promise(resolve => setTimeout(resolve, 300));
             
             alert(`🎉 Thành công! AI đã tự động phân bổ cân bằng và tối ưu tuyến cho ${locations.length} khách hàng.`);
             
         } catch (error) { 
-            alert("⚠️ Lỗi: " + error.message); 
+            alert("⚠️ Lỗi hệ thống: " + error.message); 
         } finally { 
+            if(overlay) overlay.style.display = 'none'; 
             btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
             btnOptimize.disabled = false; 
         }
@@ -1278,7 +1249,6 @@ async function optimizeRouteWithAI() {
         if (!userCommand) return alert("Vui lòng nhập yêu cầu!");
         btn.innerText = "⌛ Đang xử lý..."; btn.disabled = true;
         try {
-            // Đọc URL dựa vào Line người dùng đang chọn
             const baseUrl = document.getElementById('sel-api-line').value;
 
             const response = await fetch(`${baseUrl}/api/modifyRoute`, {
@@ -1313,200 +1283,173 @@ async function optimizeRouteWithAI() {
     }
     
     function exportDetailToExcel() {
-    let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
-    let activeData = baseData.filter(r => selectedDays.includes(r.thu));
-    
-    if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
-
-    let customerMap = new Map();
-    activeData.forEach(row => {
-        if (!customerMap.has(row.ma_kh)) {
-            customerMap.set(row.ma_kh, {
-                ma_kh: row.ma_kh,
-                ten_kh: row.ten_kh,
-                freq: row.freq,
-                lat: row.lat,
-                lng: row.lng,
-                area: row.area,
-                days: new Set()
-            });
-        }
-        customerMap.get(row.ma_kh).days.add(row.thu);
-    });
-
-    let excelRows = [];
-    
-    // TẠO DÒNG TIÊU ĐỀ (HEADER) CHUẨN THEO CỘT EXCEL
-    let headerRow = [];
-    headerRow[0]  = "STT";             // Cột A
-    headerRow[1]  = "";                // Cột B (Để trống)
-    headerRow[2]  = "NPP";             // Cột C
-    headerRow[3]  = "";                // Cột D (Để trống)
-    headerRow[4]  = "Nhân viên";       // Cột E
-    headerRow[5]  = "Mã KH";           // Cột F (Đã chuẩn F)
-    headerRow[6]  = "Tên Khách Hàng";  // Cột G (Đã chuẩn G)
-    headerRow[7]  = "Địa chỉ";         // Cột H (Tạm đè dữ liệu text để dễ đọc)
-    headerRow[8]  = "DS May";          // Cột I (Doanh số âm thầm chèn)
-    headerRow[9]  = "DS Jun";          // Cột J (Doanh số âm thầm chèn)
-    headerRow[10] = "DS Jul";          // Cột K (Doanh số âm thầm chèn)
-
-    // Lộ trình (Cột L đến R ứng với chỉ số 11 đến 17)
-    DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
-    
-    // Tần suất (Cột S đến V ứng với chỉ số 18 đến 21)
-    headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
-    
-    // Kỹ thuật (Cột W, X, Y ứng với chỉ số 22, 23, 24)
-    headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
-    
-    excelRows.push(headerRow);
-
-    // ĐIỀN DỮ LIỆU TỪNG KHÁCH HÀNG VÀO ĐÚNG CỘT
-    let sttCounter = 1;
-    customerMap.forEach((cust) => {
-        let row = [];
-        let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
+        let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
+        let activeData = baseData.filter(r => selectedDays.includes(r.thu));
         
-        row[0] = sttCounter++;
-        row[1] = ""; 
-        row[2] = rawRef.npp || "";
-        row[3] = "";
-        row[4] = rawRef.nv || "";
-        
-        // --- ĐÂY RỒI: ÉP ĐÚNG CỘT F VÀ G ---
-        row[5] = cust.ma_kh;           // Cột F (Chỉ số 5)
-        row[6] = cust.ten_kh;          // Cột G (Chỉ số 6)
-        
-        row[7] = rawRef.dia_chi || ""; // Cột H
-        
-        // Điền doanh số (Cột I, J, K)
-        let dsKH = window.salesDataMap[cust.ma_kh] || {};
-        row[8] = dsKH['M5'] || 0;
-        row[9] = dsKH['M6'] || 0;
-        row[10] = dsKH['M7'] || 0;
+        if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
 
-        // Điền dấu lộ trình 'x' (Cột L đến R)
-        DAYS_TEXT.forEach((day, idx) => {
-            row[11 + idx] = cust.days.has(day) ? "x" : "";
+        let customerMap = new Map();
+        activeData.forEach(row => {
+            if (!customerMap.has(row.ma_kh)) {
+                customerMap.set(row.ma_kh, {
+                    ma_kh: row.ma_kh,
+                    ten_kh: row.ten_kh,
+                    freq: row.freq,
+                    lat: row.lat,
+                    lng: row.lng,
+                    area: row.area,
+                    days: new Set()
+                });
+            }
+            customerMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        // Điền dấu tần suất 'x' (Cột S đến V)
-        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        let excelRows = [];
+        
+        let headerRow = [];
+        headerRow[0]  = "STT";             
+        headerRow[1]  = "";                
+        headerRow[2]  = "NPP";             
+        headerRow[3]  = "";                
+        headerRow[4]  = "Nhân viên";       
+        headerRow[5]  = "Mã KH";           
+        headerRow[6]  = "Tên Khách Hàng";  
+        headerRow[7]  = "Địa chỉ";         
+        headerRow[8]  = "DS May";          
+        headerRow[9]  = "DS Jun";          
+        headerRow[10] = "DS Jul";          
 
-        // Điền tọa độ & khu vực (Cột W, X, Y)
-        row[22] = cust.lat || 0;
-        row[23] = cust.lng || 0;
-        row[24] = cust.area || "Khác";
+        DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
+        
+        headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
+        
+        headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
+        
+        excelRows.push(headerRow);
 
-        excelRows.push(row);
-    });
+        let sttCounter = 1;
+        customerMap.forEach((cust) => {
+            let row = [];
+            let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
+            
+            row[0] = sttCounter++;
+            row[1] = ""; 
+            row[2] = rawRef.npp || "";
+            row[3] = "";
+            row[4] = rawRef.nv || "";
+            
+            row[5] = cust.ma_kh;           
+            row[6] = cust.ten_kh;          
+            
+            row[7] = rawRef.dia_chi || ""; 
+            
+            let dsKH = window.salesDataMap[cust.ma_kh] || {};
+            row[8] = dsKH['M5'] || 0;
+            row[9] = dsKH['M6'] || 0;
+            row[10] = dsKH['M7'] || 0;
 
-    let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
-    let workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
-    XLSX.writeFile(workbook, `Tuyen_Quy_Hoach_Xuong_Excel.xlsx`);
-}
-    // ĐẢM BẢO HÀM HAVERSINE ĐƯỢC ĐỊNH NGHĨA TOÀN CỤC (GLOBAL)
-window.getHaversine14 = function(lat1, lon1, lat2, lon2) {
-    if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
-    const dLat = (lat2 - lat1) * (Math.PI / 180); 
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + 
-              Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; 
-};
+            DAYS_TEXT.forEach((day, idx) => {
+                row[11 + idx] = cust.days.has(day) ? "x" : "";
+            });
 
-// Hàm bọc an toàn để sửa lỗi gọi hàm getHaversine14 ở scope khác nếu có
-if (typeof getHaversine14 === 'undefined') {
-    var getHaversine14 = window.getHaversine14;
-}
+            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+            row[22] = cust.lat || 0;
+            row[23] = cust.lng || 0;
+            row[24] = cust.area || "Khác";
+
+            excelRows.push(row);
+        });
+
+        let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+        let workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
+        XLSX.writeFile(workbook, `Tuyen_Quy_Hoach_Xuong_Excel.xlsx`);
+    }
+    
+    window.getHaversine14 = function(lat1, lon1, lat2, lon2) {
+        if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
+        const dLat = (lat2 - lat1) * (Math.PI / 180); 
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + 
+                  Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; 
+    };
+
+    if (typeof getHaversine14 === 'undefined') {
+        var getHaversine14 = window.getHaversine14;
+    }
+    
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
     
-    // ================= HÀM XUẤT ẢNH BẢN ĐỒ =================
-window.downloadWeeklyMap = function() {
-    const btn = document.getElementById('btn-dl-map-week');
-    const originalText = btn.innerHTML;
-    
-    // Đổi trạng thái nút để báo hiệu đang xử lý
-    btn.innerHTML = '⌛ Đang xuất ảnh...';
-    btn.disabled = true;
-
-    // Chọn vùng cần chụp ảnh (khung chứa bản đồ)
-    const mapContainer = document.getElementById('map-container');
-
-    // Cấu hình html2canvas
-    html2canvas(mapContainer, {
-        useCORS: true,       // Bắt buộc: Cho phép tải ảnh chéo miền (cross-origin) từ CartoCDN
-        allowTaint: false,
-        backgroundColor: null // Giữ nền trong suốt/mặc định của bản đồ
-    }).then(canvas => {
-        // Tạo thẻ <a> ảo để kích hoạt tải file xuống
-        const link = document.createElement('a');
+    window.downloadWeeklyMap = function() {
+        const btn = document.getElementById('btn-dl-map-week');
+        const originalText = btn.innerHTML;
         
-        // Tạo tên file có chứa tên nhân viên (nếu có)
-        const nvName = document.getElementById('sel-nv').value || 'NhanVien';
-        link.download = `BanDo_LoTrinh_${nvName}.png`;
-        
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        btn.innerHTML = '⌛ Đang xuất ảnh...';
+        btn.disabled = true;
 
-        // Khôi phục lại trạng thái nút
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }).catch(err => {
-        console.error("Lỗi khi xuất ảnh bản đồ:", err);
-        alert("Có lỗi xảy ra khi chụp ảnh bản đồ. Vui lòng thử lại!");
-        
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    });
-};
+        const mapContainer = document.getElementById('map-container');
 
-    // ================= HÀM KIỂM TRA TRẠNG THÁI SERVER =================
+        html2canvas(mapContainer, {
+            useCORS: true,       
+            allowTaint: false,
+            backgroundColor: null 
+        }).then(canvas => {
+            const link = document.createElement('a');
+            const nvName = document.getElementById('sel-nv').value || 'NhanVien';
+            link.download = `BanDo_LoTrinh_${nvName}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }).catch(err => {
+            console.error("Lỗi khi xuất ảnh bản đồ:", err);
+            alert("Có lỗi xảy ra khi chụp ảnh bản đồ. Vui lòng thử lại!");
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    };
+
     async function checkServerStatus() {
         const badge = document.getElementById('server-status-badge');
         const baseUrl = document.getElementById('sel-api-line').value;
         
-        // Đổi trạng thái UI sang Đang kiểm tra
         badge.innerHTML = "⏳ Đang ping...";
         badge.style.color = "#d97706";
         badge.style.background = "#fef3c7";
         badge.style.borderColor = "#fde68a";
 
         try {
-            // Cài đặt timeout 5 giây. Nếu 5 giây server không trả lời -> Quá tải
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            // Bắn 1 request rỗng lên hàm optimizeRoute
             const response = await fetch(`${baseUrl}/api/optimizeRoute`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ping: true }), // Gửi data giả
+                body: JSON.stringify({ ping: true }), 
                 signal: controller.signal 
             });
             
             clearTimeout(timeoutId);
 
-            // Nếu server trả về các mã lỗi hệ thống (Quá tải, Timeout, Sập)
             if (response.status === 503 || response.status === 504 || response.status === 500) {
                 badge.innerHTML = "🔴 Server Đang Bận / Lỗi";
                 badge.style.color = "#dc2626";
                 badge.style.background = "#fee2e2";
                 badge.style.borderColor = "#fca5a5";
             } else {
-                // Các mã khác (200, hoặc 400 Bad Request do sai định dạng) đều chứng tỏ server đang SỐNG
                 badge.innerHTML = "🟢 Server Đang Rảnh";
                 badge.style.color = "#059669";
                 badge.style.background = "#d1fae5";
                 badge.style.borderColor = "#6ee7b7";
             }
         } catch (error) {
-            // Lỗi mạng hoặc bị Vercel ngắt kết nối do Timeout
             badge.innerHTML = "🔴 Mất Kết Nối";
             badge.style.color = "#dc2626";
             badge.style.background = "#fee2e2";
@@ -1514,20 +1457,9 @@ window.downloadWeeklyMap = function() {
         }
     }
 
-    // Tự động chạy check status lần đầu tiên khi vừa load trang xong
     window.addEventListener('DOMContentLoaded', () => {
         setTimeout(checkServerStatus, 1500); 
     });
 </script>
-    <!-- KHUNG HIỂN THỊ LOADING AI -->
-<div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%;">
-        <h2 id="ai-status-title" style="margin-top: 0; color: #1e40af; font-size: 18px;">Khởi động AI...</h2>
-        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang chuẩn bị dữ liệu phân tích</p>
-        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-            <div id="ai-progress-fill" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s ease;"></div>
-        </div>
-    </div>
-</div>
 </body>
 </html>
