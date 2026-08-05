@@ -174,8 +174,8 @@
                         </span>
                     </label>
                     <select id="sel-api-line" style="border-color: #3b82f6; font-weight: bold; color: #1e40af; background-color: #eff6ff;" onchange="checkServerStatus()">
-                        <option value="https://tool-toi-uu-tuyen.vercel.app">🔴 Line 1 (Mặc định)</option>
-                        <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2 (Dự phòng)</option>
+                        <option value="https://tool-toi-uu-tuyen.vercel.app">🔴 Line 1</option>
+                        <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2</option>
                     </select>
                 </div>
                 <div class="action-buttons-container" style="flex: 2; margin: 0;">
@@ -209,7 +209,7 @@
 
         <div class="summary-card" id="dashboard-section" style="display: none;">
             <div class="header-title-row">
-                <h2>📊 Bảng So Sánh Khoảng Cách</h2>
+                <h2>📊 Tổng quan tuyến</h2>
             </div>
             <div class="data-table-container">
                 <table id="comparison-table">
@@ -221,7 +221,7 @@
 
             <div id="ai-chat-section" style="display: none; margin-top: 25px; margin-bottom: 25px;">
                 <div class="header-title-row">
-                    <h3>✨ Trợ Lý AI Tinh Chỉnh Lộ Trình</h3>
+                    <h3> Trợ Lý AI Tinh Chỉnh Lộ Trình</h3>
                 </div>
                 <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
                     <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; font-style: italic;">
@@ -236,10 +236,10 @@
 
             <div class="header-title-row" style="margin-top: 30px;">
                 <div style="display: flex; align-items: baseline; gap: 15px;">
-                    <h2>📋 Bảng Chi Tiết Ghé Thăm</h2>
+                    <h2>Chi tiết tuyến</h2>
                     <span style="font-size: 13px; color: #059669; font-weight: 500;">(Click các ô Tần suất / Thứ hoặc nhập số STT để Sửa Live Bản đồ)</span>
                 </div>
-                <button class="btn-primary btn-green" onclick="exportDetailToExcel()">📥 Tải Bảng Excel</button>
+                <button class="btn-primary btn-green" onclick="exportDetailToExcel()">📥 Tải file tuyến Excel</button>
             </div>
             <div class="data-table-container">
                 <table id="detail-table">
@@ -461,9 +461,9 @@
                     let dayName = DAYS_TEXT[i];
                     let warnings = [];
                     
-                    if (!isValidCoord) warnings.push("Trống / Sai Tọa độ");
+                    if (!isValidCoord) warnings.push("Không có tọa độ");
                     if (dayName === 'Chủ nhật') warnings.push("Tuyến rơi vào Chủ nhật");
-                    if (freqType === "Lỗi Tần Suất") warnings.push("Sai chuẩn tần suất (Không phải F4, F2-1, F2-2)");
+                    if (freqType === "Lỗi Tần Suất") warnings.push("Sai chuẩn tần suất (Bắt buộc kiểm tra và trả về F4, F2-1, F2-2)");
 
                     if (warnings.length > 0 && !addedToWarning) {
                         allWarningData.push({ area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, errors: warnings });
@@ -906,9 +906,9 @@
         thead.innerHTML = `<tr>
             <th class="route-th">Thứ</th>
             <th class="route-th">Nhóm Tuyến</th>
-            <th class="route-th">Khách (Gốc)</th>
-            <th class="route-th">Khách (Mới)</th>
-            <th class="route-th num-right">Km (Mới)</th>
+            <th class="route-th">Khách ( tuyến Gốc)</th>
+            <th class="route-th">Khách (tuyến Mới)</th>
+            <th class="route-th num-right">Km (tuyến Mới)</th>
         </tr>`;
         tbody.innerHTML = '';
         let tOldCount=0, tNewCount=0, tNewDist=0;
@@ -1177,7 +1177,7 @@
         
         if(overlay) overlay.style.display = 'flex';
         if(progressEl) progressEl.style.width = '10%';
-        if(titleEl) titleEl.innerText = "🧮 BƯỚC 1: Gom cụm địa lý K-Means (<= 30 điểm)...";
+        if(titleEl) titleEl.innerText = "BƯỚC 1: Gom cụm khách hàng theo tọa độ...";
         if(descEl) descEl.innerText = "Chia nhỏ dữ liệu theo cụm không gian chuẩn trước khi đẩy lên AI";
         
         btnOptimize.disabled = true;
@@ -1226,7 +1226,7 @@
 
             // 3. Sắp xếp Nearest Neighbor sơ bộ trong từng cụm
             if(progressEl) progressEl.style.width = '35%';
-            if(titleEl) titleEl.innerText = "🛤️ BƯỚC 2: Sắp xếp Nearest Neighbor sơ bộ...";
+            if(titleEl) titleEl.innerText = "BƯỚC 2: Sắp xếp thứ tự sơ bộ...";
 
             let preGroupedLocations = [];
             for (let c = 0; c < k; c++) {
@@ -1252,8 +1252,8 @@
 
             // 4. Gửi danh sách gọn gàng đã được gom cụm lên API Gemini AI
             if(progressEl) progressEl.style.width = '60%';
-            if(titleEl) titleEl.innerText = "🤖 BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
-            if(descEl) descEl.innerText = "Truyền tập dữ liệu đã gom lên Server Gemini AI để tối ưu TSP cuối cùng";
+            if(titleEl) titleEl.innerText = "BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
+            if(descEl) descEl.innerText = "Tiến hành phân lộ trình và tần suất";
 
             const payloadLocations = preGroupedLocations.map(r => ({
                 id: r.id,
@@ -1284,7 +1284,7 @@
             }
 
             if(progressEl) progressEl.style.width = '95%';
-            if(titleEl) titleEl.innerText = "🗺️ BƯỚC 4: Ráp dữ liệu & Vẽ bản đồ...";
+            if(titleEl) titleEl.innerText = "BƯỚC 4: Ráp dữ liệu & Vẽ bản đồ...";
 
             // 5. Cập nhật dữ liệu đã tối ưu lên ứng dụng
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
@@ -1311,11 +1311,11 @@
             if(progressEl) progressEl.style.width = '100%';
             await new Promise(resolve => setTimeout(resolve, 200));
             
-            alert(`🎉 Thành công! Đã gom cụm (tối đa 30 điểm) & AI tối ưu xong cho ${payloadLocations.length} khách hàng.`);
+            alert(`🎉 Thành công! Đã tối ưu xong cho ${payloadLocations.length} khách hàng.`);
             
         } catch (error) { 
             console.error("Lỗi Hybrid Optimization:", error);
-            alert("⚠️ Lỗi kết nối API. Hệ thống đã tự động chạy bằng thuật toán Local.");
+            alert("⚠️ Lỗi kết nối AI. Hệ thống đang chuyển sang thuật toán tọa độ không gian tự động.");
             
             let fallbackResults = optimizeRouteFallbackLocal(dataToOptimize);
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
