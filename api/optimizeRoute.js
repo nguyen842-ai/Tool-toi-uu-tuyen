@@ -23,22 +23,32 @@ export default async function handler(req, res) {
         }
 
         // Tạo Prompt cho bài toán Phân tuyến theo Tuần
-        const prompt = `Bạn là hệ thống AI điều phối kho vận (Logistics).
+        const prompt = `Bạn là một chuyên gia AI điều phối lộ trình kho vận (Logistics Routing Optimization).
 Dưới đây là danh sách khách hàng cần viếng thăm:
 ${JSON.stringify(locations)}
 
-Danh sách các tuyến hiện có: ${availableDays.join(', ')}
+Danh sách các ngày làm việc cho phép: ${availableDays.join(', ')}
 
-NHIỆM VỤ CỦA BẠN:
-1. Gom cụm: Gom toàn bộ khách hàng được gửi vào một rổ, sau đó nhặt những khách hàng gần nhau thành 1 cụm. Nếu số lượng khách hàng dưới 30 khách, dồn vào 1 tuyến cho 1 ngày làm việc. Nếu số lượng khách hàng trong ngày từ 30 trở lên, hãy tách thành 2 tuyến riêng biệt cho 1 ngày làm việc
-2. Phân bổ đều: Cố gắng chia đều số lượng khách hàng cho các tuyến. một ngày được tối đa 2 tuyến, 1 tuần được tối đa 9 tuyến
-3. Sắp xếp: Trong mỗi tuyến, sắp xếp thứ tự viếng thăm sao cho quãng đường đi ngắn nhất.
-4. Ràng buộc Output: TRẢ VỀ DUY NHẤT 1 mảng JSON thuần túy (không bọc trong markdown \`\`\`json, không giải thích). 
+MỤC TIÊU: Gom cụm địa lý, cân bằng tải và tối ưu TSP (Traveling Salesperson Problem).
 
-Cấu trúc JSON bắt buộc:
+CÁC QUY TẮC RÀNG BUỘC (TUYỆT ĐỐI TUÂN THỦ):
+1. Giới hạn năng lực: Mỗi tuyến đường (1 ngày đi 1 vòng) KHÔNG ĐƯỢC VƯỢT QUÁ 40 khách hàng.
+2. Cơ chế tách tuyến (Phân tần suất): 
+   - Nếu số lượng khách hàng gửi vào lớn hơn 40 khách, BẮT BUỘC phải chia đôi tập khách hàng này thành 2 nhóm đi luân phiên:
+     + Nhóm 1: Gán trường "freq" là "F2-1" (Đi tuần 1 & 3).
+     + Nhóm 2: Gán trường "freq" là "F2-2" (Đi tuần 2 & 4).
+   - Đảm bảo 2 nhóm này đan xen nhau trên tuyến đường để tránh chạy rỗng.
+   - Nếu số lượng khách hàng <= 40, gán trường "freq" là "F4" (Đi mỗi tuần).
+3. Phân bổ ngày làm việc: Nếu availableDays có nhiều hơn 1 ngày, hãy chia đều số lượng khách vào các ngày dựa theo cụm địa lý gần nhau.
+4. Sắp xếp thứ tự: Trong cùng một ngày (day) và cùng một tần suất (freq), sắp xếp trường "order" từ 1 đến N sao cho tổng quãng đường di chuyển là ngắn nhất.
+
+ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
+Trả về DUY NHẤT một mảng JSON thuần túy, tuyệt đối không bọc trong markdown ```json, không giải thích thêm.
+Cấu trúc mảng phải chính xác như sau:
 [
-  { "id": "Mã khách hàng", "day": "Tên ngày mới được phân bổ", "order": thứ tự viếng thăm trong ngày }
-]`;
+  { "id": "Mã KH", "day": "Thứ 2", "order": 1, "freq": "F4" },
+  { "id": "Mã KH", "day": "Thứ 2", "order": 2, "freq": "F4" }
+]
 
         // Lấy danh sách chìa khóa
         const keysString = process.env.GEMINI_API_KEY; 
