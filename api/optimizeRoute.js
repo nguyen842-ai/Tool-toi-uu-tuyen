@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        // [SỬA LỖI 3]: Xử lý Ping từ hàm checkServerStatus() ở Frontend
+        // Xử lý Ping từ hàm checkServerStatus() ở Frontend
         if (req.body.ping) {
             return res.status(200).json({ status: 'ok' });
         }
@@ -53,7 +53,7 @@ Cấu trúc mảng phải chính xác như sau:
 [
   { "id": "Mã KH", "day": "Thứ 2", "order": 1, "freq": "F4" },
   { "id": "Mã KH", "day": "Thứ 2", "order": 2, "freq": "F4" }
-]`; // [SỬA LỖI 1]: Đã thêm dấu đóng backtick (`) và dấu chấm phẩy ở đây
+]`;
 
         // Lấy danh sách chìa khóa
         const keysString = process.env.GEMINI_API_KEY; 
@@ -69,7 +69,7 @@ Cấu trúc mảng phải chính xác như sau:
         for (let i = 0; i < apiKeys.length; i++) {
             const currentKey = apiKeys[i];
             
-            // [SỬA LỖI 2]: Gọi đúng Model Gemini 1.5 Flash
+            // Gọi đúng Model Gemini 1.5 Flash
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
             
             const response = await fetch(apiUrl, {
