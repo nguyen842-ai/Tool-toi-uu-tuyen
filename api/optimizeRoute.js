@@ -69,8 +69,8 @@ Cấu trúc mảng phải chính xác như sau:
         for (let i = 0; i < apiKeys.length; i++) {
             const currentKey = apiKeys[i];
             
-            // Gọi đúng Model Gemini 1.5 Flash
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+            // Tới lúc 3.5 flash chết thì đổi phiên bản khác
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${currentKey}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
