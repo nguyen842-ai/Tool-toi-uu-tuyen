@@ -1089,148 +1089,153 @@
         </tr>`;
     });
 }
+// ================= THUẬT TOÁN HYBRID: TOÁN HỌC + JAVASCRIPT =================
+async function optimizeRouteWithAI() {
+    let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
+    if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
+    
+    // Tìm các element DOM
+    const overlay = document.getElementById('ai-loading-overlay');
+    const titleEl = document.getElementById('ai-status-title');
+    const descEl = document.getElementById('ai-status-desc');
+    const progressEl = document.getElementById('ai-progress-fill');
+    
+    // UI Cập nhật trạng thái loading (có check null để tránh lỗi nếu HTML chưa có)
+    if(overlay) overlay.style.display = 'flex';
+    if(progressEl) progressEl.style.width = '10%';
+    if(titleEl) titleEl.innerText = "🧮 Đang dùng Toán học phân tích dữ liệu...";
+    if(descEl) descEl.innerText = "Sử dụng K-Means để gom cụm địa lý & cân bằng tải";
+    
+    btnOptimize.disabled = true;
+    btnOptimize.innerText = "⌛ Đang xử lý...";
 
-   // ================= THUẬT TOÁN HYBRID: TOÁN HỌC + JAVASCRIPT =================
-    async function optimizeRouteWithAI() {
-        // Vẫn giữ khung loading để hiệu ứng đẹp mắt
-        const overlay = document.getElementById('ai-loading-overlay');
-        const titleEl = document.getElementById('ai-status-title');
-        const descEl = document.getElementById('ai-status-desc');
-        const progressEl = document.getElementById('ai-progress-fill');
+    try {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const k = selectedDays.length; 
+        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
         
-        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
+        // --- BƯỚC 1: K-MEANS GOM CỤM ĐỊA LÝ ---
+        let centroids = [];
+        let shuffled = [...locations].sort(() => 0.5 - Math.random());
+        for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
         
-        overlay.style.display = 'flex';
-        progressEl.style.width = '10%';
-        titleEl.innerText = "🧮 Đang dùng Toán học phân tích dữ liệu...";
-        descEl.innerText = "Sử dụng K-Means để gom cụm địa lý & cân bằng tải";
-        btnOptimize.disabled = true;
-
-        try {
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const k = selectedDays.length; 
-            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-            
-            // --- BƯỚC 1: K-MEANS GOM CỤM ĐỊA LÝ ---
-            let centroids = [];
-            let shuffled = [...locations].sort(() => 0.5 - Math.random());
-            for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
-            
-            let assignments = new Array(locations.length);
-            let changed = true, iterations = 0;
-            
-            while (changed && iterations < 100) {
-                changed = false; iterations++;
-                for (let i = 0; i < locations.length; i++) {
-                    let loc = locations[i], minDist = Infinity, closestCluster = 0;
-                    for (let c = 0; c < k; c++) {
-                        let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
-                        if (d < minDist) { minDist = d; closestCluster = c; }
-                    }
-                    if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
-                }
-                
-                let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
-                for (let i = 0; i < locations.length; i++) {
-                    let c = assignments[i];
-                    newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
-                }
+        let assignments = new Array(locations.length);
+        let changed = true, iterations = 0;
+        
+        while (changed && iterations < 100) {
+            changed = false; iterations++;
+            for (let i = 0; i < locations.length; i++) {
+                let loc = locations[i], minDist = Infinity, closestCluster = 0;
                 for (let c = 0; c < k; c++) {
-                    if (newCentroids[c].count > 0) {
-                        centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
-                        centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
-                    }
+                    let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
+                    if (d < minDist) { minDist = d; closestCluster = c; }
                 }
+                if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
             }
-
-            progressEl.style.width = '40%';
-            titleEl.innerText = "🛤️ Đang vẽ lộ trình tối ưu...";
-            descEl.innerText = "Sử dụng thuật toán Nearest Neighbor để nối các điểm gần nhau nhất";
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            // --- BƯỚC 2: CHIA TẦN SUẤT & TÌM ĐƯỜNG ĐI TSP (BẰNG JAVASCRIPT) ---
-            let allAiResults = []; 
-            let finalChunks = [];
-
+            
+            let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
+            for (let i = 0; i < locations.length; i++) {
+                let c = assignments[i];
+                newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
+            }
             for (let c = 0; c < k; c++) {
-                let clusterLocs = [];
-                for (let i = 0; i < locations.length; i++) {
-                    if (assignments[i] === c) clusterLocs.push(locations[i]);
-                }
-                if (clusterLocs.length === 0) continue;
-                
-                let targetDay = selectedDays[c];
-
-                // Cắt tuyến nếu quá 45 khách
-                if (clusterLocs.length <= 45) {
-                    finalChunks.push({ day: targetDay, freq: 'F4', locations: clusterLocs });
-                } else {
-                    clusterLocs.sort((a, b) => a.lat - b.lat);
-                    let half = Math.ceil(clusterLocs.length / 2);
-                    finalChunks.push({ day: targetDay, freq: 'F2-1', locations: clusterLocs.slice(0, half) });
-                    finalChunks.push({ day: targetDay, freq: 'F2-2', locations: clusterLocs.slice(half) });
+                if (newCentroids[c].count > 0) {
+                    centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
+                    centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
                 }
             }
-
-            // Thuật toán Láng giềng gần nhất (Tìm đường ngắn nhất siêu tốc)
-            finalChunks.forEach(chunk => {
-                let unvisited = [...chunk.locations];
-                let currentLoc = unvisited.shift(); // Bắt đầu từ điểm đầu tiên trong cụm
-                let order = 1;
-                
-                allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
-                
-                while (unvisited.length > 0) {
-                    let nearestIdx = 0;
-                    let minDist = Infinity;
-                    
-                    // Quét tìm điểm gần nhất bằng khoảng cách Haversine thực tế
-                    for (let j = 0; j < unvisited.length; j++) {
-                        let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
-                        if (d < minDist) { minDist = d; nearestIdx = j; }
-                    }
-                    
-                    currentLoc = unvisited.splice(nearestIdx, 1)[0];
-                    allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
-                }
-            });
-
-            progressEl.style.width = '80%';
-            titleEl.innerText = "🗺️ Đang ráp số liệu lên bản đồ...";
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            // --- BƯỚC 3: LẮP RÁP KẾT QUẢ VÀO BẢNG DỮ LIỆU ---
-            currentNVDataOptimized = currentNVDataOriginal.map(row => {
-                let newRow = {...row};
-                let match = allAiResults.find(i => i.id === row.ma_kh);
-                if (match) {
-                    newRow.thu = match.day;
-                    newRow._ai_order = match.order;
-                    newRow.freq = match.freq;
-                }
-                return newRow;
-            });
-            
-            normalizeOrder(currentNVDataOptimized);
-            hasOptimizedData = true; 
-            toggleToolbar.style.display = 'flex';
-            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            isOptimizedView = true; 
-            document.getElementById('chk-draw-lines').checked = true;
-            window.isFirstMapRender = true;
-            
-            await processDataAndRender();
-            progressEl.style.width = '100%';
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-        } catch (error) { 
-            alert("⚠️ Lỗi hệ thống: " + error.message); 
-        } finally { 
-            overlay.style.display = 'none'; 
-            btnOptimize.disabled = false; 
         }
+
+        if(progressEl) progressEl.style.width = '40%';
+        if(titleEl) titleEl.innerText = "🛤️ Đang vẽ lộ trình tối ưu...";
+        if(descEl) descEl.innerText = "Sử dụng thuật toán Nearest Neighbor để nối các điểm gần nhau nhất";
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // --- BƯỚC 2: CHIA TẦN SUẤT & TÌM ĐƯỜNG ĐI TSP ---
+        let allAiResults = []; 
+        let finalChunks = [];
+
+        for (let c = 0; c < k; c++) {
+            let clusterLocs = [];
+            for (let i = 0; i < locations.length; i++) {
+                if (assignments[i] === c) clusterLocs.push(locations[i]);
+            }
+            if (clusterLocs.length === 0) continue;
+            
+            let targetDay = selectedDays[c];
+
+            // Cắt tuyến nếu quá 45 khách
+            if (clusterLocs.length <= 45) {
+                finalChunks.push({ day: targetDay, freq: 'F4', locations: clusterLocs });
+            } else {
+                clusterLocs.sort((a, b) => a.lat - b.lat);
+                let half = Math.ceil(clusterLocs.length / 2);
+                finalChunks.push({ day: targetDay, freq: 'F2-1', locations: clusterLocs.slice(0, half) });
+                finalChunks.push({ day: targetDay, freq: 'F2-2', locations: clusterLocs.slice(half) });
+            }
+        }
+
+        // Thuật toán Láng giềng gần nhất
+        finalChunks.forEach(chunk => {
+            let unvisited = [...chunk.locations];
+            let currentLoc = unvisited.shift();
+            let order = 1;
+            
+            allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
+            
+            while (unvisited.length > 0) {
+                let nearestIdx = 0;
+                let minDist = Infinity;
+                
+                for (let j = 0; j < unvisited.length; j++) {
+                    let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
+                    if (d < minDist) { minDist = d; nearestIdx = j; }
+                }
+                
+                currentLoc = unvisited.splice(nearestIdx, 1)[0];
+                allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
+            }
+        });
+
+        if(progressEl) progressEl.style.width = '80%';
+        if(titleEl) titleEl.innerText = "🗺️ Đang ráp số liệu lên bản đồ...";
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // --- BƯỚC 3: LẮP RÁP KẾT QUẢ VÀO BẢNG DỮ LIỆU ---
+        currentNVDataOptimized = currentNVDataOriginal.map(row => {
+            let newRow = {...row};
+            let match = allAiResults.find(i => i.id === row.ma_kh);
+            if (match) {
+                newRow.thu = match.day;
+                newRow._ai_order = match.order;
+                if (match.freq) newRow.freq = match.freq; 
+            }
+            return newRow;
+        });
+        
+        normalizeOrder(currentNVDataOptimized);
+        hasOptimizedData = true; 
+        toggleToolbar.style.display = 'flex';
+        document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+        isOptimizedView = true; 
+        document.getElementById('chk-draw-lines').checked = true;
+        window.isFirstMapRender = true;
+        
+        await processDataAndRender();
+        
+        if(progressEl) progressEl.style.width = '100%';
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        alert(`🎉 Thành công! AI đã tự động phân bổ cân bằng và tối ưu tuyến cho ${locations.length} khách hàng.`);
+        
+    } catch (error) { 
+        alert("⚠️ Lỗi hệ thống: " + error.message); 
+    } finally { 
+        if(overlay) overlay.style.display = 'none'; 
+        btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
+        btnOptimize.disabled = false; 
     }
+}
 
             // ================= RENDER KẾT QUẢ ĐÃ ĐƯỢC AI CẢI TIẾN LÊN BẢN ĐỒ =================
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
