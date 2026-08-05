@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Quy Hoạch Lộ Trình Di Chuyển</title>
+    <title id="page-title">Quy Hoạch Tuyến Bán Hàng</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -90,7 +90,7 @@
 <div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
     <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 420px; width: 90%;">
         <h2 id="ai-status-title" style="margin-top: 0; color: #1e40af; font-size: 18px;">Khởi động AI Hybrid...</h2>
-        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang gom cụm địa lý K-Means trước khi gửi Gemini AI</p>
+        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang xử lí bản đồ không gian</p>
         <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
             <div id="ai-progress-fill" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s ease;"></div>
         </div>
@@ -1243,8 +1243,8 @@
 
             // 4. Gửi danh sách gọn gàng đã được gom cụm lên API Gemini AI
             if(progressEl) progressEl.style.width = '60%';
-            if(titleEl) titleEl.innerText = "🤖 BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
-            if(descEl) descEl.innerText = "Truyền tập dữ liệu đã gom lên Server Gemini AI để tối ưu TSP cuối cùng";
+            if(titleEl) titleEl.innerText = "Đang tính toán...";
+            if(descEl) descEl.innerText = "Truyền tập dữ liệu đã gom lên Server để tối ưu...";
 
             const payloadLocations = preGroupedLocations.map(r => ({
                 id: r.id,
@@ -1375,104 +1375,107 @@
         processDataAndRender();
     }
     
-    function exportDetailToExcel() {
-        let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
-        let activeData = baseData.filter(r => selectedDays.includes(r.thu));
-        
-        if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
-
-        let customerMap = new Map();
-        activeData.forEach(row => {
-            if (!customerMap.has(row.ma_kh)) {
-                customerMap.set(row.ma_kh, {
-                    ma_kh: row.ma_kh,
-                    ten_kh: row.ten_kh,
-                    freq: row.freq,
-                    lat: row.lat,
-                    lng: row.lng,
-                    area: row.area,
-                    days: new Set()
-                });
-            }
-            customerMap.get(row.ma_kh).days.add(row.thu);
-        });
-
-        let excelRows = [];
-        
-        let headerRow = [];
-        headerRow[0]  = "STT";             
-        headerRow[1]  = "";                
-        headerRow[2]  = "NPP";             
-        headerRow[3]  = "";                
-        headerRow[4]  = "Nhân viên";       
-        headerRow[5]  = "Mã KH";           
-        headerRow[6]  = "Tên Khách Hàng";  
-        headerRow[7]  = "Địa chỉ";         
-        headerRow[8]  = "DS May";          
-        headerRow[9]  = "DS Jun";          
-        headerRow[10] = "DS Jul";          
-
-        DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
-        headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
-        headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
-        
-        excelRows.push(headerRow);
-
-        let sttCounter = 1;
-        customerMap.forEach((cust) => {
-            let row = [];
-            let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
-            
-            row[0] = sttCounter++;
-            row[1] = ""; 
-            row[2] = rawRef.npp || "";
-            row[3] = "";
-            row[4] = rawRef.nv || "";
-            
-            row[5] = cust.ma_kh;           
-            row[6] = cust.ten_kh;          
-            row[7] = rawRef.dia_chi || ""; 
-            
-            let dsKH = window.salesDataMap[cust.ma_kh] || {};
-            row[8] = dsKH['M5'] || 0;
-            row[9] = dsKH['M6'] || 0;
-            row[10] = dsKH['M7'] || 0;
-
-            DAYS_TEXT.forEach((day, idx) => {
-                row[11 + idx] = cust.days.has(day) ? "x" : "";
-            });
-
-            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-
-            row[22] = cust.lat || 0;
-            row[23] = cust.lng || 0;
-            row[24] = cust.area || "Khác";
-
-            excelRows.push(row);
-        });
-
-        let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
-        let workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
-        XLSX.writeFile(workbook, `Tuyen_Quy_Hoach_Xuong_Excel.xlsx`);
-    }
+  function exportDetailToExcel() {
+    let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
+    let activeData = baseData.filter(r => selectedDays.includes(r.thu));
     
-    window.getHaversine14 = function(lat1, lon1, lat2, lon2) {
-        if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
-        const dLat = (lat2 - lat1) * (Math.PI / 180); 
-        const dLon = (lon2 - lon1) * (Math.PI / 180);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + 
-                  Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; 
-    };
+    if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
 
-    if (typeof getHaversine14 === 'undefined') {
-        var getHaversine14 = window.getHaversine14;
+    let customerMap = new Map();
+    activeData.forEach(row => {
+        if (!customerMap.has(row.ma_kh)) {
+            customerMap.set(row.ma_kh, {
+                ma_kh: row.ma_kh,
+                ten_kh: row.ten_kh,
+                freq: row.freq,
+                lat: row.lat,
+                lng: row.lng,
+                area: row.area,
+                days: new Set()
+            });
+        }
+        customerMap.get(row.ma_kh).days.add(row.thu);
+    });
+
+    let excelRows = [];
+    
+    let headerRow = [];
+    headerRow[0]  = "STT";             
+    headerRow[1]  = "";                
+    headerRow[2]  = "NPP";             
+    headerRow[3]  = "";                
+    headerRow[4]  = "Nhân viên";       
+    headerRow[5]  = "Mã KH";           
+    headerRow[6]  = "Tên Khách Hàng";  
+    headerRow[7]  = "Địa chỉ";         
+    headerRow[8]  = "DS May";          
+    headerRow[9]  = "DS Jun";          
+    headerRow[10] = "DS Jul";          
+
+    DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
+    headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
+    headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
+    
+    excelRows.push(headerRow);
+
+    let sttCounter = 1;
+    customerMap.forEach((cust) => {
+        let row = [];
+        let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
+        
+        row[0] = sttCounter++;
+        row[1] = ""; 
+        row[2] = rawRef.npp || "";
+        row[3] = "";
+        row[4] = rawRef.nv || "";
+        
+        row[5] = cust.ma_kh;           
+        row[6] = cust.ten_kh;          
+        row[7] = rawRef.dia_chi || ""; 
+        
+        let dsKH = window.salesDataMap[cust.ma_kh] || {};
+        row[8] = dsKH['M5'] || 0;
+        row[9] = dsKH['M6'] || 0;
+        row[10] = dsKH['M7'] || 0;
+
+        DAYS_TEXT.forEach((day, idx) => {
+            row[11 + idx] = cust.days.has(day) ? "x" : "";
+        });
+
+        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+        row[22] = cust.lat || 0;
+        row[23] = cust.lng || 0;
+        row[24] = cust.area || "Khác";
+
+        excelRows.push(row);
+    });
+
+    // Lấy thông tin NV và NPP linh hoạt từ Dropdown hoặc Dữ liệu dòng đầu tiên
+    let nvName = (document.getElementById('sel-nv').value || '').trim();
+    let nppName = (document.getElementById('sel-npp').value || '').trim();
+
+    if ((!nvName || nvName.includes('Local')) && activeData.length > 0) {
+        nvName = activeData[0].nv || 'NhanVien';
     }
+    if ((!nppName || nppName.includes('Local')) && activeData.length > 0) {
+        nppName = activeData[0].npp || 'NPP';
+    }
+
+    // Làm sạch ký tự không hợp lệ trong tên file Windows/Mac
+    let safeNv = nvName.replace(/[\\/:\*\?"<>\|]/g, '_');
+    let safeNpp = nppName.replace(/[\\/:\*\?"<>\|]/g, '_');
+
+    let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+    let workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
+    
+    // Xuất file theo đúng cú pháp yêu cầu
+    XLSX.writeFile(workbook, `Tuyến ${safeNv}-${safeNpp}.xlsx`);
+}
     
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
     
