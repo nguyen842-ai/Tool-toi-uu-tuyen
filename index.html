@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Quy Hoạch Tuyến Bán Hàng</title>
+    <title id="page-title">Quy Hoạch Lộ Trình Di Chuyển</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -90,7 +90,7 @@
 <div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
     <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 420px; width: 90%;">
         <h2 id="ai-status-title" style="margin-top: 0; color: #1e40af; font-size: 18px;">Khởi động AI Hybrid...</h2>
-        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang xử lí bản đồ không gian</p>
+        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang gom cụm địa lý K-Means trước khi gửi Gemini AI</p>
         <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
             <div id="ai-progress-fill" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s ease;"></div>
         </div>
@@ -397,19 +397,23 @@
         }
     }
 
+    // === SẮP XẾP CHUẨN: THỨ -> TẦN SUẤT (F4 -> F2-1 -> F2-2) -> THỨ TỰ LỘ TRÌNH ===
     function normalizeOrder(targetData) {
         let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
         const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
         
         targetData.sort((a, b) => {
+            // 1. So sánh Thứ
             let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
             if (dayDiff !== 0) return dayDiff;
             
-            let orderDiff = (a._ai_order || 999) - (b._ai_order || 999);
-            if (orderDiff !== 0) return orderDiff;
-            
-            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+            // 2. So sánh Tần suất (F4 -> F2-1 -> F2-2)
+            let freqDiff = (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+            if (freqDiff !== 0) return freqDiff;
+
+            // 3. So sánh STT trên lộ trình
+            return (a._ai_order || 999) - (b._ai_order || 999);
         });
         
         targetData.forEach(r => {
@@ -952,6 +956,7 @@
         </tr>`;
     }
 
+    // === HÀM RENDER BẢNG CHI TIẾT: ĐÃ CẬP NHẬT SẮP XẾP CHUẨN F4 -> F2-1 -> F2-2 ===
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
@@ -1012,11 +1017,18 @@
 
         const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
 
+        // Quy tắc Sắp xếp Bảng Chi Tiết: THỨ -> TẦN SUẤT -> STT
         uniqueCustomers.sort((a, b) => {
+            // 1. So sánh Thứ nhỏ nhất
             let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
             let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
             if (minDayA !== minDayB) return minDayA - minDayB;
             
+            // 2. So sánh Tần suất: F4 (1) -> F2-1 (2) -> F2-2 (3)
+            let freqDiff = (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+            if (freqDiff !== 0) return freqDiff;
+
+            // 3. So sánh STT lộ trình
             let getEarliestOrder = (kh, minDay) => {
                 let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
                 return r ? r._ai_order : 999;
@@ -1025,10 +1037,7 @@
             let orderA = getEarliestOrder(a.ma_kh, minDayA);
             let orderB = getEarliestOrder(b.ma_kh, minDayB);
 
-            let orderDiff = orderA - orderB;
-            if(orderDiff !== 0) return orderDiff;
-
-            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
+            return orderA - orderB;
         });
 
         uniqueCustomers.forEach((cust, index) => {
@@ -1243,8 +1252,8 @@
 
             // 4. Gửi danh sách gọn gàng đã được gom cụm lên API Gemini AI
             if(progressEl) progressEl.style.width = '60%';
-            if(titleEl) titleEl.innerText = "Đang tính toán...";
-            if(descEl) descEl.innerText = "Truyền tập dữ liệu đã gom lên Server để tối ưu...";
+            if(titleEl) titleEl.innerText = "🤖 BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
+            if(descEl) descEl.innerText = "Truyền tập dữ liệu đã gom lên Server Gemini AI để tối ưu TSP cuối cùng";
 
             const payloadLocations = preGroupedLocations.map(r => ({
                 id: r.id,
@@ -1375,107 +1384,122 @@
         processDataAndRender();
     }
     
-  function exportDetailToExcel() {
-    let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
-    let activeData = baseData.filter(r => selectedDays.includes(r.thu));
-    
-    if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
-
-    let customerMap = new Map();
-    activeData.forEach(row => {
-        if (!customerMap.has(row.ma_kh)) {
-            customerMap.set(row.ma_kh, {
-                ma_kh: row.ma_kh,
-                ten_kh: row.ten_kh,
-                freq: row.freq,
-                lat: row.lat,
-                lng: row.lng,
-                area: row.area,
-                days: new Set()
-            });
-        }
-        customerMap.get(row.ma_kh).days.add(row.thu);
-    });
-
-    let excelRows = [];
-    
-    let headerRow = [];
-    headerRow[0]  = "STT";             
-    headerRow[1]  = "";                
-    headerRow[2]  = "NPP";             
-    headerRow[3]  = "";                
-    headerRow[4]  = "Nhân viên";       
-    headerRow[5]  = "Mã KH";           
-    headerRow[6]  = "Tên Khách Hàng";  
-    headerRow[7]  = "Địa chỉ";         
-    headerRow[8]  = "DS May";          
-    headerRow[9]  = "DS Jun";          
-    headerRow[10] = "DS Jul";          
-
-    DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
-    headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
-    headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
-    
-    excelRows.push(headerRow);
-
-    let sttCounter = 1;
-    customerMap.forEach((cust) => {
-        let row = [];
-        let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
+    // === ĐÃ ĐỔI TÊN FILE TẢI VỀ THEO CÚ PHÁP: Tuyến <Tên Nhân Viên>-<Tên NPP>.xlsx ===
+    function exportDetailToExcel() {
+        let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
+        let activeData = baseData.filter(r => selectedDays.includes(r.thu));
         
-        row[0] = sttCounter++;
-        row[1] = ""; 
-        row[2] = rawRef.npp || "";
-        row[3] = "";
-        row[4] = rawRef.nv || "";
-        
-        row[5] = cust.ma_kh;           
-        row[6] = cust.ten_kh;          
-        row[7] = rawRef.dia_chi || ""; 
-        
-        let dsKH = window.salesDataMap[cust.ma_kh] || {};
-        row[8] = dsKH['M5'] || 0;
-        row[9] = dsKH['M6'] || 0;
-        row[10] = dsKH['M7'] || 0;
+        if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
 
-        DAYS_TEXT.forEach((day, idx) => {
-            row[11 + idx] = cust.days.has(day) ? "x" : "";
+        let customerMap = new Map();
+        activeData.forEach(row => {
+            if (!customerMap.has(row.ma_kh)) {
+                customerMap.set(row.ma_kh, {
+                    ma_kh: row.ma_kh,
+                    ten_kh: row.ten_kh,
+                    freq: row.freq,
+                    lat: row.lat,
+                    lng: row.lng,
+                    area: row.area,
+                    days: new Set()
+                });
+            }
+            customerMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        let excelRows = [];
+        
+        let headerRow = [];
+        headerRow[0]  = "STT";             
+        headerRow[1]  = "";                
+        headerRow[2]  = "NPP";             
+        headerRow[3]  = "";                
+        headerRow[4]  = "Nhân viên";       
+        headerRow[5]  = "Mã KH";           
+        headerRow[6]  = "Tên Khách Hàng";  
+        headerRow[7]  = "Địa chỉ";         
+        headerRow[8]  = "DS May";          
+        headerRow[9]  = "DS Jun";          
+        headerRow[10] = "DS Jul";          
 
-        row[22] = cust.lat || 0;
-        row[23] = cust.lng || 0;
-        row[24] = cust.area || "Khác";
+        DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
+        headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
+        headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
+        
+        excelRows.push(headerRow);
 
-        excelRows.push(row);
-    });
+        let sttCounter = 1;
+        customerMap.forEach((cust) => {
+            let row = [];
+            let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
+            
+            row[0] = sttCounter++;
+            row[1] = ""; 
+            row[2] = rawRef.npp || "";
+            row[3] = "";
+            row[4] = rawRef.nv || "";
+            
+            row[5] = cust.ma_kh;           
+            row[6] = cust.ten_kh;          
+            row[7] = rawRef.dia_chi || ""; 
+            
+            let dsKH = window.salesDataMap[cust.ma_kh] || {};
+            row[8] = dsKH['M5'] || 0;
+            row[9] = dsKH['M6'] || 0;
+            row[10] = dsKH['M7'] || 0;
 
-    // Lấy thông tin NV và NPP linh hoạt từ Dropdown hoặc Dữ liệu dòng đầu tiên
-    let nvName = (document.getElementById('sel-nv').value || '').trim();
-    let nppName = (document.getElementById('sel-npp').value || '').trim();
+            DAYS_TEXT.forEach((day, idx) => {
+                row[11 + idx] = cust.days.has(day) ? "x" : "";
+            });
 
-    if ((!nvName || nvName.includes('Local')) && activeData.length > 0) {
-        nvName = activeData[0].nv || 'NhanVien';
+            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+            row[22] = cust.lat || 0;
+            row[23] = cust.lng || 0;
+            row[24] = cust.area || "Khác";
+
+            excelRows.push(row);
+        });
+
+        // Lấy tên Nhân viên và Nhà phân phối hiện tại
+        let nvName = (document.getElementById('sel-nv').value || '').trim();
+        let nppName = (document.getElementById('sel-npp').value || '').trim();
+
+        if ((!nvName || nvName.includes('Local')) && activeData.length > 0) {
+            nvName = activeData[0].nv || 'NhanVien';
+        }
+        if ((!nppName || nppName.includes('Local')) && activeData.length > 0) {
+            nppName = activeData[0].npp || 'NPP';
+        }
+
+        // Xóa ký tự đặc biệt để tránh lỗi tên file Windows/Mac
+        let safeNv = nvName.replace(/[\\/:\*\?"<>\|]/g, '_');
+        let safeNpp = nppName.replace(/[\\/:\*\?"<>\|]/g, '_');
+
+        let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+        let workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
+        
+        // Xuất tên file theo định dạng: Tuyến <Tên Nhân Viên>-<Tên NPP>.xlsx
+        XLSX.writeFile(workbook, `Tuyến ${safeNv}-${safeNpp}.xlsx`);
     }
-    if ((!nppName || nppName.includes('Local')) && activeData.length > 0) {
-        nppName = activeData[0].npp || 'NPP';
-    }
-
-    // Làm sạch ký tự không hợp lệ trong tên file Windows/Mac
-    let safeNv = nvName.replace(/[\\/:\*\?"<>\|]/g, '_');
-    let safeNpp = nppName.replace(/[\\/:\*\?"<>\|]/g, '_');
-
-    let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
-    let workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
     
-    // Xuất file theo đúng cú pháp yêu cầu
-    XLSX.writeFile(workbook, `Tuyến ${safeNv}-${safeNpp}.xlsx`);
-}
+    window.getHaversine14 = function(lat1, lon1, lat2, lon2) {
+        if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
+        const dLat = (lat2 - lat1) * (Math.PI / 180); 
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + 
+                  Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; 
+    };
+
+    if (typeof getHaversine14 === 'undefined') {
+        var getHaversine14 = window.getHaversine14;
+    }
     
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
     
