@@ -164,9 +164,14 @@
             
             <!-- HÀNG 3: Server + Nút chức năng AI/Map -->
             <div class="filter-row-horizontal" style="margin-top: 5px;">
-                <div class="filter-item" style="flex: 1;">
-                    <label>Kênh xử lý dữ liệu</label>
-                    <select id="sel-api-line" style="border-color: #3b82f6; font-weight: bold; color: #1e40af; background-color: #eff6ff;">
+                <div class="filter-item" style="flex: 1; position: relative;">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        Kênh xử lý dữ liệu
+                        <span id="server-status-badge" style="font-size: 11px; cursor: pointer; color: #3b82f6; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; border: 1px solid #bae6fd;" onclick="checkServerStatus()">
+                            🔄 Kiểm tra Server
+                        </span>
+                    </label>
+                    <select id="sel-api-line" style="border-color: #3b82f6; font-weight: bold; color: #1e40af; background-color: #eff6ff;" onchange="checkServerStatus()">
                         <option value="https://tool-toi-uu-tuyen.vercel.app">🔴 Line 1 (Mặc định)</option>
                         <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2 (Dự phòng)</option>
                     </select>
@@ -1085,7 +1090,9 @@
     });
 }
 
- async function optimizeRouteWithAI() {
+    // ĐÃ GỠ BỎ HOÀN TOÀN THUẬT TOÁN K-MEANS Ở FRONTEND
+    // TẤT CẢ DỮ LIỆU SẼ ĐƯỢC GỬI LÊN AI ĐỂ TỰ ĐỘNG CHIA NGÀY VÀ TẦN SUẤT
+    async function optimizeRouteWithAI() {
         const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
         if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
         
@@ -1102,7 +1109,7 @@
             // Đọc URL dựa vào Line người dùng đang chọn
             const baseUrl = document.getElementById('sel-api-line').value;
 
-            // BẮN TOÀN BỘ DATA LÊN AI 1 LẦN DUY NHẤT (Không qua K-Means)
+            // BẮN TOÀN BỘ DATA LÊN AI 1 LẦN DUY NHẤT
             const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
@@ -1114,7 +1121,7 @@
             
             if (!response.ok) {
                 if (response.status === 503 || response.status === 504) {
-                    throw new Error("Server AI đang quá tải hoặc hết thời gian chờ, vui lòng thử lại!");
+                    throw new Error("Server AI đang quá tải hoặc hết thời gian chờ (Timeout). Hãy chia nhỏ bớt ngày hoặc dùng Line khác!");
                 }
                 throw new Error("Lỗi API phân tích tuyến.");
             }
@@ -1157,84 +1164,6 @@
         }
     }
 
-        // ================= STEP 2: GỬI TỪNG CỤM ĐỊA LÝ LÊN AI ĐỂ XẾP LỘ TRÌNH CHI TIẾT =================
-        let allAiResults = [];
-        
-        for (let c = 0; c < k; c++) {
-            let dayData = clusteredData[c];
-            let currentDay = selectedDays[c];
-            
-            if (dayData.length === 0) continue;
-            
-            // Chia nhỏ nhỏ tiếp nếu cụm địa lý đó quá tải (> 45 KH) để đảm bảo không dính 503
-            const SUB_CHUNK = 45;
-            for (let j = 0; j < dayData.length; j += SUB_CHUNK) {
-                let subChunk = dayData.slice(j, j + SUB_CHUNK);
-                
-                btnOptimize.innerText = `✨ AI đang lập lộ trình: ${currentDay} (${Math.min(j + SUB_CHUNK, dayData.length)}/${dayData.length} KH)...`;
-                
-                const payload = subChunk.map(row => ({ id: row.ma_kh, lat: row.lat, lng: row.lng }));
-                
-                // Đọc URL dựa vào Line người dùng đang chọn
-const baseUrl = document.getElementById('sel-api-line').value;
-
-const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ locations: payload, availableDays: [currentDay] })
-                });
-                
-                if (!response.ok) {
-                    // Nếu lỗi API, giữ nguyên dữ liệu đã phân cụm và gán STT tịnh tiến mặc định
-                    subChunk.forEach((row, idx) => {
-                        allAiResults.push({ id: row.ma_kh, day: currentDay, order: j + idx + 1 });
-                    });
-                    continue; 
-                }
-                
-                const resData = await response.json();
-                if (resData && resData.optimized_data) {
-                    allAiResults = allAiResults.concat(resData.optimized_data);
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 200)); // Tránh spam api liên tục
-            }
-        }
-
-        // ================= STEP 3: RENDER KẾT QUẢ ĐÃ ĐƯỢC CẢI TIẾN LÊN BẢN ĐỒ =================
-        currentNVDataOptimized = currentNVDataOriginal.map(row => {
-            let newRow = {...row};
-            let aiMatch = allAiResults.find(i => i.id === row.ma_kh);
-            if (aiMatch) {
-                newRow.thu = aiMatch.day;
-                newRow._ai_order = aiMatch.order;
-                // Bổ sung dòng dưới đây để nhận tần suất F2-1/F2-2 từ AI
-                if (aiMatch.freq) newRow.freq = aiMatch.freq; 
-            }
-            return newRow;
-        });
-        
-        normalizeOrder(currentNVDataOptimized);
-        
-        hasOptimizedData = true; 
-        toggleToolbar.style.display = 'flex';
-        document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-        isOptimizedView = true; 
-        
-        document.getElementById('chk-draw-lines').checked = true;
-        window.isFirstMapRender = true;
-        await processDataAndRender();
-        
-        alert(`🎉 Thành công tốt đẹp! 200 KH đã được gom cụm địa lý tự động sang ${k} ngày và tối ưu thứ tự di chuyển.`);
-        
-    } catch (error) { 
-        alert("⚠️ Không thể chạy thuật toán phân cụm: " + error.message); 
-    } finally { 
-        btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
-        btnOptimize.disabled = false; 
-    }
-}
-
     async function sendCustomRequestToAI() {
         const inputEl = document.getElementById('ai-chat-input');
         const userCommand = inputEl.value.trim(); const btn = document.getElementById('btn-send-ai-chat');
@@ -1242,9 +1171,9 @@ const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
         btn.innerText = "⌛ Đang xử lý..."; btn.disabled = true;
         try {
             // Đọc URL dựa vào Line người dùng đang chọn
-const baseUrl = document.getElementById('sel-api-line').value;
+            const baseUrl = document.getElementById('sel-api-line').value;
 
-const response = await fetch(`${baseUrl}/api/modifyRoute`, {
+            const response = await fetch(`${baseUrl}/api/modifyRoute`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     currentData: currentNVDataOptimized.map(r => ({ id: r.ma_kh, day: r.thu, lat: r.lat, lng: r.lng })),
@@ -1388,6 +1317,7 @@ if (typeof getHaversine14 === 'undefined') {
     var getHaversine14 = window.getHaversine14;
 }
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
+    
     // ================= HÀM XUẤT ẢNH BẢN ĐỒ =================
 window.downloadWeeklyMap = function() {
     const btn = document.getElementById('btn-dl-map-week');
@@ -1427,6 +1357,59 @@ window.downloadWeeklyMap = function() {
         btn.disabled = false;
     });
 };
+
+    // ================= HÀM KIỂM TRA TRẠNG THÁI SERVER =================
+    async function checkServerStatus() {
+        const badge = document.getElementById('server-status-badge');
+        const baseUrl = document.getElementById('sel-api-line').value;
+        
+        // Đổi trạng thái UI sang Đang kiểm tra
+        badge.innerHTML = "⏳ Đang ping...";
+        badge.style.color = "#d97706";
+        badge.style.background = "#fef3c7";
+        badge.style.borderColor = "#fde68a";
+
+        try {
+            // Cài đặt timeout 5 giây. Nếu 5 giây server không trả lời -> Quá tải
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            // Bắn 1 request rỗng lên hàm optimizeRoute
+            const response = await fetch(`${baseUrl}/api/optimizeRoute`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ping: true }), // Gửi data giả
+                signal: controller.signal 
+            });
+            
+            clearTimeout(timeoutId);
+
+            // Nếu server trả về các mã lỗi hệ thống (Quá tải, Timeout, Sập)
+            if (response.status === 503 || response.status === 504 || response.status === 500) {
+                badge.innerHTML = "🔴 Server Đang Bận / Lỗi";
+                badge.style.color = "#dc2626";
+                badge.style.background = "#fee2e2";
+                badge.style.borderColor = "#fca5a5";
+            } else {
+                // Các mã khác (200, hoặc 400 Bad Request do sai định dạng) đều chứng tỏ server đang SỐNG
+                badge.innerHTML = "🟢 Server Đang Rảnh";
+                badge.style.color = "#059669";
+                badge.style.background = "#d1fae5";
+                badge.style.borderColor = "#6ee7b7";
+            }
+        } catch (error) {
+            // Lỗi mạng hoặc bị Vercel ngắt kết nối do Timeout
+            badge.innerHTML = "🔴 Mất Kết Nối";
+            badge.style.color = "#dc2626";
+            badge.style.background = "#fee2e2";
+            badge.style.borderColor = "#fca5a5";
+        }
+    }
+
+    // Tự động chạy check status lần đầu tiên khi vừa load trang xong
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(checkServerStatus, 1500); 
+    });
 </script>
 </body>
 </html>
