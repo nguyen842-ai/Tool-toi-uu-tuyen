@@ -27,12 +27,12 @@ export default async function handler(req, res) {
 Dưới đây là danh sách khách hàng cần viếng thăm:
 ${JSON.stringify(locations)}
 
-Danh sách các ca làm việc (Ngày) hiện có: ${availableDays.join(', ')}
+Danh sách các tuyến hiện có: ${availableDays.join(', ')}
 
 NHIỆM VỤ CỦA BẠN:
-1. Gom cụm: Gom toàn bộ khách hàng được gửi vào một rổ, sau đó nhặt những khách hàng gần nhau thành 1 cụm. Nếu số lượng khách hàng dưới 30 khách, dồn vào 1 ngày làm việc. Nếu số lượng khách hàng từ 30 trở lên, hãy tách thành 2 ngày làm việc
-2. Phân bổ đều: Cố gắng chia đều số lượng khách hàng cho các ngày trong danh sách ca làm việc.
-3. Sắp xếp: Trong mỗi ngày, sắp xếp thứ tự viếng thăm sao cho quãng đường đi ngắn nhất.
+1. Gom cụm: Gom toàn bộ khách hàng được gửi vào một rổ, sau đó nhặt những khách hàng gần nhau thành 1 cụm. Nếu số lượng khách hàng dưới 30 khách, dồn vào 1 tuyến cho 1 ngày làm việc. Nếu số lượng khách hàng trong ngày từ 30 trở lên, hãy tách thành 2 tuyến riêng biệt cho 1 ngày làm việc
+2. Phân bổ đều: Cố gắng chia đều số lượng khách hàng cho các tuyến. một ngày được tối đa 2 tuyến, 1 tuần được tối đa 9 tuyến
+3. Sắp xếp: Trong mỗi tuyến, sắp xếp thứ tự viếng thăm sao cho quãng đường đi ngắn nhất.
 4. Ràng buộc Output: TRẢ VỀ DUY NHẤT 1 mảng JSON thuần túy (không bọc trong markdown \`\`\`json, không giải thích). 
 
 Cấu trúc JSON bắt buộc:
