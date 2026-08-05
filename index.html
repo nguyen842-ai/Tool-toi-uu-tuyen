@@ -397,7 +397,7 @@
         }
     }
 
-    // === SẮP XẾP CHUẨN: THỨ -> TẦN SUẤT (F4 -> F2-1 -> F2-2) -> THỨ TỰ LỘ TRÌNH ===
+    // === PHIÊN BẢN CŨ: SẮP XẾP ƯU TIÊN THEO THỨ -> STT LỘ TRÌNH (KHÔNG ÉP TẦN SUẤT TRƯỚC) ===
     function normalizeOrder(targetData) {
         let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
@@ -408,12 +408,12 @@
             let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
             if (dayDiff !== 0) return dayDiff;
             
-            // 2. So sánh Tần suất (F4 -> F2-1 -> F2-2)
-            let freqDiff = (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-            if (freqDiff !== 0) return freqDiff;
+            // 2. So sánh STT trên lộ trình
+            let orderDiff = (a._ai_order || 999) - (b._ai_order || 999);
+            if (orderDiff !== 0) return orderDiff;
 
-            // 3. So sánh STT trên lộ trình
-            return (a._ai_order || 999) - (b._ai_order || 999);
+            // 3. Cuối cùng mới tính tần suất
+            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
         
         targetData.forEach(r => {
@@ -956,7 +956,7 @@
         </tr>`;
     }
 
-    // === HÀM RENDER BẢNG CHI TIẾT: ĐÃ CẬP NHẬT SẮP XẾP CHUẨN F4 -> F2-1 -> F2-2 ===
+    // === PHIÊN BẢN CŨ: SẮP XẾP ƯU TIÊN THEO THỨ -> STT LỘ TRÌNH (KHÔNG ÉP TẦN SUẤT TRƯỚC) ===
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
@@ -1017,18 +1017,11 @@
 
         const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
 
-        // Quy tắc Sắp xếp Bảng Chi Tiết: THỨ -> TẦN SUẤT -> STT
         uniqueCustomers.sort((a, b) => {
-            // 1. So sánh Thứ nhỏ nhất
             let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
             let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
             if (minDayA !== minDayB) return minDayA - minDayB;
             
-            // 2. So sánh Tần suất: F4 (1) -> F2-1 (2) -> F2-2 (3)
-            let freqDiff = (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-            if (freqDiff !== 0) return freqDiff;
-
-            // 3. So sánh STT lộ trình
             let getEarliestOrder = (kh, minDay) => {
                 let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
                 return r ? r._ai_order : 999;
@@ -1037,7 +1030,10 @@
             let orderA = getEarliestOrder(a.ma_kh, minDayA);
             let orderB = getEarliestOrder(b.ma_kh, minDayB);
 
-            return orderA - orderB;
+            let orderDiff = orderA - orderB;
+            if(orderDiff !== 0) return orderDiff;
+
+            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
 
         uniqueCustomers.forEach((cust, index) => {
