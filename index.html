@@ -1086,85 +1086,76 @@
 }
 
  async function optimizeRouteWithAI() {
-    const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
-    if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
-    
-    let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-    if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần AI tối ưu.");
-    
-    btnOptimize.disabled = true;
-    btnOptimize.innerText = "🧠 Đang phân cụm địa lý...";
+        const passcode = prompt("Vui lòng liên hệ RTMs để lấy mật khẩu sử dụng tính năng AI:");
+        if (passcode !== "admin!2345@") return alert("Mật khẩu không đúng! Không thể chạy AI.");
+        
+        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
+        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần AI tối ưu.");
+        
+        btnOptimize.disabled = true;
+        btnOptimize.innerText = "🧠 AI đang phân bổ và xếp tuyến...";
 
-    try {
-        const k = selectedDays.length; // Số lượng cụm cần chia tương ứng với số Thứ đã chọn
-        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-        
-        // ================= STEP 1: THUẬT TOÁN K-MEANS PHÂN CỤM ĐỊA LÝ KHÔNG QUA SERVER =================
-        // 1. Khởi tạo các tâm cụm ngẫu nhiên ban đầu từ danh sách khách hàng
-        let centroids = [];
-        let shuffled = [...locations].sort(() => 0.5 - Math.random());
-        for (let i = 0; i < k; i++) {
-            centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
-        }
-        
-        let assignments = new Array(locations.length);
-        let changed = true;
-        let iterations = 0;
-        
-        // Vòng lặp tối ưu hóa vị trí cụm địa lý (Tối đa 100 lần lặp, chạy mất ~10-20ms)
-        while (changed && iterations < 100) {
-            changed = false;
-            iterations++;
+        try {
+            // Chỉ lấy các trường dữ liệu cần thiết để gửi đi cho nhẹ (Id, Lat, Lng)
+            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng }));
             
-            // Gán từng khách hàng vào tâm cụm gần nhất dựa trên khoảng cách hình học đơn giản
-            for (let i = 0; i < locations.length; i++) {
-                let loc = locations[i];
-                let minDist = Infinity;
-                let closestCluster = 0;
-                
-                for (let c = 0; c < k; c++) {
-                    // Tính khoảng cách Euclidean phẳng (đủ nhanh và chính xác cho phân cụm khu vực nhỏ)
-                    let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
-                    if (d < minDist) {
-                        minDist = d;
-                        closestCluster = c;
-                    }
+            // Đọc URL dựa vào Line người dùng đang chọn
+            const baseUrl = document.getElementById('sel-api-line').value;
+
+            // BẮN TOÀN BỘ DATA LÊN AI 1 LẦN DUY NHẤT (Không qua K-Means)
+            const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    locations: locations, 
+                    availableDays: selectedDays // Gửi tất cả các Thứ đã chọn để AI tự chia
+                })
+            });
+            
+            if (!response.ok) {
+                if (response.status === 503 || response.status === 504) {
+                    throw new Error("Server AI đang quá tải hoặc hết thời gian chờ, vui lòng thử lại!");
                 }
-                
-                if (assignments[i] !== closestCluster) {
-                    assignments[i] = closestCluster;
-                    changed = true;
-                }
+                throw new Error("Lỗi API phân tích tuyến.");
             }
             
-            // Cập nhật lại tọa độ trọng tâm mới cho các cụm ngày
-            let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
-            for (let i = 0; i < locations.length; i++) {
-                let c = assignments[i];
-                newCentroids[c].lat += locations[i].lat;
-                newCentroids[c].lng += locations[i].lng;
-                newCentroids[c].count++;
-            }
-            
-            for (let c = 0; c < k; c++) {
-                if (newCentroids[c].count > 0) {
-                    centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
-                    centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
+            const resData = await response.json();
+            const allAiResults = resData.optimized_data || [];
+
+            // ================= RENDER KẾT QUẢ ĐÃ ĐƯỢC AI CẢI TIẾN LÊN BẢN ĐỒ =================
+            currentNVDataOptimized = currentNVDataOriginal.map(row => {
+                let newRow = {...row};
+                // Tìm kiếm trong kết quả AI xem khách hàng này thuộc ngày nào, thứ tự bao nhiêu
+                let aiMatch = allAiResults.find(i => i.id === row.ma_kh);
+                if (aiMatch) {
+                    newRow.thu = aiMatch.day;
+                    newRow._ai_order = aiMatch.order;
+                    // Nhận thêm biến tần suất (F4, F2-1, F2-2) từ AI
+                    if (aiMatch.freq) newRow.freq = aiMatch.freq; 
                 }
-            }
-        }
-        
-        // Ánh xạ các cụm số (0, 1, 2...) sang các Thứ cụ thể được chọn (Thứ 2, Thứ 3...)
-        // Đồng thời gom nhóm dữ liệu để chuẩn bị gửi lên AI xếp thứ tự
-        let clusteredData = Array.from({ length: k }, () => []);
-        for (let i = 0; i < locations.length; i++) {
-            let clusterIdx = assignments[i];
-            let targetDay = selectedDays[clusterIdx];
+                return newRow;
+            });
             
-            let rowData = {...locations[i].original};
-            rowData.thu = targetDay; // Cập nhật ngày mới theo phân cụm địa lý
-            clusteredData[clusterIdx].push(rowData);
+            normalizeOrder(currentNVDataOptimized);
+            
+            hasOptimizedData = true; 
+            toggleToolbar.style.display = 'flex';
+            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+            isOptimizedView = true; 
+            
+            document.getElementById('chk-draw-lines').checked = true;
+            window.isFirstMapRender = true;
+            await processDataAndRender();
+            
+            alert(`🎉 Thành công! AI đã tự động phân bổ cân bằng và tối ưu tuyến cho ${locations.length} khách hàng.`);
+            
+        } catch (error) { 
+            alert("⚠️ Lỗi: " + error.message); 
+        } finally { 
+            btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
+            btnOptimize.disabled = false; 
         }
+    }
 
         // ================= STEP 2: GỬI TỪNG CỤM ĐỊA LÝ LÊN AI ĐỂ XẾP LỘ TRÌNH CHI TIẾT =================
         let allAiResults = [];
