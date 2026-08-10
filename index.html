@@ -419,14 +419,22 @@
         });
     }
 
-    function processRawExcelData(jsonRoute) {
+   function processRawExcelData(jsonRoute) {
         allValidData = [];
         allWarningData = [];
+
+        // 1. Lưu lại chính xác Tiêu đề gốc của Cột B (index 1) và Cột D (index 3) từ file nguồn
+        if (jsonRoute && jsonRoute.length > 0 && jsonRoute[0]) {
+            window.colB_header = jsonRoute[0][1] !== undefined ? jsonRoute[0][1] : "";
+            window.colD_header = jsonRoute[0][3] !== undefined ? jsonRoute[0][3] : "";
+        }
 
         jsonRoute.forEach((row, rowIndex) => {
             if (rowIndex === 0 || !row[0]) return;
 
+            let colB = row[1] !== undefined ? row[1] : ""; // <-- LẤY DỮ LIỆU CỘT B GỐC
             let npp = row[2];
+            let colD = row[3] !== undefined ? row[3] : ""; // <-- LẤY DỮ LIỆU CỘT D GỐC
             let nv = row[4];
             let ma_kh = row[5];
             let ten_kh = row[6];
@@ -469,7 +477,8 @@
                     if (isValidCoord) {
                         allValidData.push({
                             area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, dia_chi: dia_chi, 
-                            thu: dayName, lat: lat, lng: lng, freq: freqType, _ai_order: 999
+                            thu: dayName, lat: lat, lng: lng, freq: freqType, _ai_order: 999,
+                            colB: colB, colD: colD // <-- LƯU CỘT B VÀ CỘT D VÀO DATA
                         });
                     }
                 }
@@ -1388,9 +1397,9 @@
         
         let headerRow = [];
         headerRow[0]  = "STT";             
-        headerRow[1]  = "";                
+        headerRow[1]  = window.colB_header || ""; // <-- TRẢ LẠI ĐÚNG TIÊU ĐỀ GỐC CỘT B              
         headerRow[2]  = "NPP";             
-        headerRow[3]  = "";                
+        headerRow[3]  = window.colD_header || ""; // <-- TRẢ LẠI ĐÚNG TIÊU ĐỀ GỐC CỘT D               
         headerRow[4]  = "Nhân viên";       
         headerRow[5]  = "Mã KH";           
         headerRow[6]  = "Tên Khách Hàng";  
@@ -1411,9 +1420,9 @@
             let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
             
             row[0] = sttCounter++;
-            row[1] = ""; 
+            row[1] = rawRef.colB !== undefined ? rawRef.colB : "";
             row[2] = rawRef.npp || "";
-            row[3] = "";
+            row[3] = rawRef.colD !== undefined ? rawRef.colD : "";
             row[4] = rawRef.nv || "";
             
             row[5] = cust.ma_kh;           
