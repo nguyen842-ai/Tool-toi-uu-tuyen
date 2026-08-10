@@ -260,7 +260,7 @@
     let currentNVDataOriginal = [];  
     let currentNVDataOptimized = []; 
     let hasOptimizedData = false;    
-    let isOptimizedView = false;    
+    let isOptimizedView = false;     
     
     window.salesDataMap = {}; 
 
@@ -397,22 +397,18 @@
         }
     }
 
-    // === PHIÊN BẢN CŨ: SẮP XẾP ƯU TIÊN THEO THỨ -> STT LỘ TRÌNH (KHÔNG ÉP TẦN SUẤT TRƯỚC) ===
     function normalizeOrder(targetData) {
         let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
         const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
         
         targetData.sort((a, b) => {
-            // 1. So sánh Thứ
             let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
             if (dayDiff !== 0) return dayDiff;
             
-            // 2. So sánh STT trên lộ trình
             let orderDiff = (a._ai_order || 999) - (b._ai_order || 999);
             if (orderDiff !== 0) return orderDiff;
 
-            // 3. Cuối cùng mới tính tần suất
             return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
         
@@ -956,7 +952,7 @@
         </tr>`;
     }
 
-    // === PHIÊN BẢN CŨ: SẮP XẾP ƯU TIÊN THEO THỨ -> STT LỘ TRÌNH (KHÔNG ÉP TẦN SUẤT TRƯỚC) ===
+    // === ĐÃ ĐƯỢC CHỈNH SỬA: ẨN PHẦN THÔNG TIN TỌA ĐỘ VÀ VÙNG TRÊN WEB ===
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
@@ -970,7 +966,6 @@
             <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
             <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
             <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
-            <th class="route-th" colspan="3" style="z-index: 3; background-color: #475569 !important;">Thông tin Tọa độ & Vùng</th>
         </tr>
         <tr>
             <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
@@ -987,9 +982,6 @@
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
-            <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lat</th>
-            <th class="route-th" style="width: 80px; top: 36px; z-index: 2; background-color: #64748b !important;">Lng</th>
-            <th class="route-th" style="width: 90px; top: 36px; z-index: 2; background-color: #64748b !important;">Area</th>
         </tr>`;
         
         tbody.innerHTML = ''; tfoot.innerHTML = '';
@@ -1076,15 +1068,10 @@
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-
-                <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lat || 0}</td>
-                <td style="text-align:right; color:#64748b; background:#f1f5f9;">${cust.lng || 0}</td>
-                <td style="text-align:center; color:#64748b; background:#f1f5f9;">${cust.area || ''}</td>
             </tr>`;
         });
     }
 
-    // ================= THUẬT TOÁN LOCAL DỰ PHÒNG (FALLBACK) =================
     function optimizeRouteFallbackLocal(dataToOptimize) {
         const k = selectedDays.length;
         const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
@@ -1161,7 +1148,6 @@
         return allAiResults;
     }
 
-    // ================= HÀM HYBRID: K-MEANS TỐI ĐA 30 ĐIỂM + API GEMINI AI SẮP XẾP =================
     async function optimizeRouteWithAI() {
         let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
         if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
@@ -1182,14 +1168,12 @@
         try {
             await new Promise(resolve => setTimeout(resolve, 200));
 
-            // 1. Tính toán K sao cho mỗi cụm có tối đa 30 điểm
             const MAX_PER_CLUSTER = 30;
             const totalCustomers = dataToOptimize.length;
             let k = Math.max(selectedDays.length, Math.ceil(totalCustomers / MAX_PER_CLUSTER));
 
             const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
             
-            // 2. Chạy thuật toán K-Means gom cụm ở Client
             let centroids = [];
             let shuffled = [...locations].sort(() => 0.5 - Math.random());
             for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
@@ -1220,7 +1204,6 @@
                 }
             }
 
-            // 3. Sắp xếp Nearest Neighbor sơ bộ trong từng cụm
             if(progressEl) progressEl.style.width = '35%';
             if(titleEl) titleEl.innerText = "BƯỚC 2: Sắp xếp thứ tự sơ bộ...";
 
@@ -1246,7 +1229,6 @@
                 preGroupedLocations.push(...orderedCluster);
             }
 
-            // 4. Gửi danh sách gọn gàng đã được gom cụm lên API Gemini AI
             if(progressEl) progressEl.style.width = '60%';
             if(titleEl) titleEl.innerText = "BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
             if(descEl) descEl.innerText = "Tiến hành phân lộ trình và tần suất";
@@ -1282,7 +1264,6 @@
             if(progressEl) progressEl.style.width = '95%';
             if(titleEl) titleEl.innerText = "BƯỚC 4: Ráp dữ liệu & Vẽ bản đồ...";
 
-            // 5. Cập nhật dữ liệu đã tối ưu lên ứng dụng
             currentNVDataOptimized = currentNVDataOriginal.map(row => {
                 let newRow = {...row};
                 let match = aiResults.find(i => i.id === row.ma_kh);
@@ -1380,7 +1361,7 @@
         processDataAndRender();
     }
     
-    // === ĐÃ ĐỔI TÊN FILE TẢI VỀ THEO CÚ PHÁP: Tuyến <Tên Nhân Viên>-<Tên NPP>.xlsx ===
+    // === VẪN GIỮ NGUYÊN ĐẦY ĐỦ CÁC CỘT (TỰ ĐỘNG GÁN ROW[22], [23], [24]) KHI TẢI EXCEL ===
     function exportDetailToExcel() {
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r.thu));
@@ -1460,7 +1441,6 @@
             excelRows.push(row);
         });
 
-        // Lấy tên Nhân viên và Nhà phân phối hiện tại
         let nvName = (document.getElementById('sel-nv').value || '').trim();
         let nppName = (document.getElementById('sel-npp').value || '').trim();
 
@@ -1471,7 +1451,6 @@
             nppName = activeData[0].npp || 'NPP';
         }
 
-        // Xóa ký tự đặc biệt để tránh lỗi tên file Windows/Mac
         let safeNv = nvName.replace(/[\\/:\*\?"<>\|]/g, '_');
         let safeNpp = nppName.replace(/[\\/:\*\?"<>\|]/g, '_');
 
@@ -1479,7 +1458,6 @@
         let workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
         
-        // Xuất tên file theo định dạng: Tuyến <Tên Nhân Viên>-<Tên NPP>.xlsx
         XLSX.writeFile(workbook, `Tuyến ${safeNv}-${safeNpp}.xlsx`);
     }
     
