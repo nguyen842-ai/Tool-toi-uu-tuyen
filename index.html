@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Quy Hoạch Lộ Trình Di Chuyển</title>
+    <title id="page-title">Quy Hoạch Lộ Trình Di Chuyển - Master Optimized</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- SỬ DỤNG XLSX-JS-STYLE ĐỂ HỖ TRỢ BÔI MÀU & ĐỊNH DẠNG FILE EXCEL -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -62,7 +63,7 @@
 
         .data-table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 25px;}
         
-        /* GHIM THANH CUỘN NGANG & DỌC TẠI CHỖ CHO BẢNG CHI TIẾT TUYẾN */
+        /* GHIM THANH CUỘN NGANG & TIÊU ĐỀ BẢNG CHI TIẾT TUYẾN */
         .data-table-container:has(#detail-table) {
             max-height: calc(100vh - 180px);
             overflow: auto;
@@ -428,7 +429,7 @@
         });
     }
 
-    // ĐÃ BỔ SUNG: Đọc đầy đủ cột B và cột D gốc
+    // ĐỌC VÀ LƯU TRỮ ĐẦY ĐỦ CỘT B & CỘT D NGUYÊN BẢN
     function processRawExcelData(jsonRoute) {
         allValidData = [];
         allWarningData = [];
@@ -565,14 +566,18 @@
                 document.getElementById('chk-draw-lines').checked = false;
                 window.isFirstMapRender = true; 
 
+                // TỐI ƯU GOM HTML CHO BẢNG CẢNH BÁO
+                let tbody = document.getElementById('warning-body');
                 if (allWarningData.length > 0) {
-                    let tbody = document.getElementById('warning-body'); tbody.innerHTML = '';
+                    let warningHtml = [];
                     allWarningData.forEach(row => {
                         let tagsHTML = row.errors.map(err => `<span class="warning-tag">⚠️ ${err}</span>`).join('');
-                        tbody.innerHTML += `<tr><td style="font-weight:bold; color:#dc2626;">${row.ma_kh}</td><td style="white-space: normal;">${row.ten_kh}</td><td style="white-space: normal;">${tagsHTML}</td></tr>`;
+                        warningHtml.push(`<tr><td style="font-weight:bold; color:#dc2626;">${row.ma_kh}</td><td style="white-space: normal;">${row.ten_kh}</td><td style="white-space: normal;">${tagsHTML}</td></tr>`);
                     });
+                    tbody.innerHTML = warningHtml.join('');
                     warningSection.style.display = 'block';
                 } else {
+                    tbody.innerHTML = '';
                     warningSection.style.display = 'none';
                 }
 
@@ -649,13 +654,18 @@
         if (!nv) { clearDayChips(); return; }
         
         let myWarning = allWarningData.filter(r => r.area === area && r.npp === npp && r.nv === nv);
+        let tbody = document.getElementById('warning-body');
         if (myWarning.length > 0) {
-            let tbody = document.getElementById('warning-body'); tbody.innerHTML = '';
+            let warningHtml = [];
             myWarning.forEach(row => {
                 let tagsHTML = row.errors.map(err => `<span class="warning-tag">⚠️ ${err}</span>`).join('');
-                tbody.innerHTML += `<tr><td style="font-weight:bold; color:#dc2626;">${row.ma_kh}</td><td style="white-space: normal;">${row.ten_kh}</td><td style="white-space: normal;">${tagsHTML}</td></tr>`;
+                warningHtml.push(`<tr><td style="font-weight:bold; color:#dc2626;">${row.ma_kh}</td><td style="white-space: normal;">${row.ten_kh}</td><td style="white-space: normal;">${tagsHTML}</td></tr>`);
             });
+            tbody.innerHTML = warningHtml.join('');
             warningSection.style.display = 'block';
+        } else {
+            tbody.innerHTML = '';
+            warningSection.style.display = 'none';
         }
 
         currentNVDataOriginal = allValidData.filter(r => r.area === area && r.npp === npp && r.nv === nv);
@@ -912,6 +922,7 @@
         return { count: groupData.length, dist: dist };
     }
 
+    // TỐI ƯU HIỆU NĂNG: GOM HTML BẢNG SO SÁNH BẰNG MẢNG
     function renderComparisonTable() {
         const thead = document.getElementById('comp-head'); 
         const tbody = document.getElementById('comp-body'); 
@@ -924,8 +935,9 @@
             <th class="route-th">Khách (tuyến Mới)</th>
             <th class="route-th num-right">Km (tuyến Mới)</th>
         </tr>`;
-        tbody.innerHTML = '';
+        
         let tOldCount=0, tNewCount=0, tNewDist=0;
+        let htmlRows = [];
 
         selectedDays.forEach(day => {
             let origDayData = currentNVDataOriginal.filter(r => r.thu === day);
@@ -952,15 +964,17 @@
                 if (hasOptimizedData) tNewCount += newStats.count; 
                 if (hasOptimizedData) tNewDist += newStats.dist;
 
-                tbody.innerHTML += `<tr>
+                htmlRows.push(`<tr>
                     <td style="font-weight:bold; color: ${palettes[day].base}; text-align: center;">${day}</td>
                     <td style="text-align:center; font-weight:bold; color:#0f766e; background:#f0fdfa;">${g.label}</td>
                     <td style="text-align:center;">${oldStats.count}</td>
                     <td style="text-align:center; font-weight:bold; color:#f59e0b;">${hasOptimizedData ? newStats.count : '--'}</td>
                     <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? formatNum(newStats.dist) : '--'}</td>
-                </tr>`;
+                </tr>`);
             });
         });
+        
+        tbody.innerHTML = htmlRows.join('');
         
         tfoot.innerHTML = `<tr>
             <td colspan="2" style="font-weight:bold; text-align:right;">TỔNG CÁC NHÓM</td>
@@ -970,7 +984,7 @@
         </tr>`;
     }
 
-    // ĐÃ ẨN CỘT LAT, LNG, AREA TRÊN BẢNG WEB
+    // TỐI ƯU HIỆU NĂNG GẤP NHIỀU LẦN: HẠN CHẾ VÒNG LẶP LỒNG NHAU & GOM HTML TRONG BẢNG CHI TIẾT
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
@@ -1002,12 +1016,14 @@
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
         </tr>`;
         
-        tbody.innerHTML = ''; tfoot.innerHTML = '';
+        tfoot.innerHTML = '';
 
         let customerMap = new Map();
         let uniqueCustomers = [];
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
+        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
 
+        // BƯỚC 1: TÍNH TOÁN TRƯỚC ORDER MIN & DAY MIN NGAY TRONG LẦN DUYỆT ĐẦU TIÊN
         data.forEach(row => {
             if (!customerMap.has(row.ma_kh)) {
                 let custInfo = {
@@ -1017,55 +1033,51 @@
                     lat: row.lat, 
                     lng: row.lng, 
                     area: row.area, 
-                    days: new Set()
+                    days: new Set(),
+                    minDayNum: 99,
+                    earliestOrder: 999
                 };
                 customerMap.set(row.ma_kh, custInfo);
                 uniqueCustomers.push(custInfo);
             }
-            customerMap.get(row.ma_kh).days.add(row.thu);
+            let cust = customerMap.get(row.ma_kh);
+            cust.days.add(row.thu);
+            
+            let currentDayNum = dayOrderRules[row.thu] || 99;
+            if (currentDayNum < cust.minDayNum) {
+                cust.minDayNum = currentDayNum;
+                cust.earliestOrder = row._ai_order || 999;
+            } else if (currentDayNum === cust.minDayNum) {
+                cust.earliestOrder = Math.min(cust.earliestOrder, row._ai_order || 999);
+            }
         });
 
-        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-
+        // BƯỚC 2: SẮP XẾP SIÊU NHANH O(N log N) VÌ KHÔNG CÒN GỌI HÀM FIND BÊN TRONG
         uniqueCustomers.sort((a, b) => {
-            let minDayA = Math.min(...Array.from(a.days).map(d => dayOrderRules[d] || 99));
-            let minDayB = Math.min(...Array.from(b.days).map(d => dayOrderRules[d] || 99));
-            if (minDayA !== minDayB) return minDayA - minDayB;
-            
-            let getEarliestOrder = (kh, minDay) => {
-                let r = data.find(x => x.ma_kh === kh && (dayOrderRules[x.thu] || 99) === minDay);
-                return r ? r._ai_order : 999;
-            };
-            
-            let orderA = getEarliestOrder(a.ma_kh, minDayA);
-            let orderB = getEarliestOrder(b.ma_kh, minDayB);
-
-            let orderDiff = orderA - orderB;
-            if(orderDiff !== 0) return orderDiff;
-
+            if (a.minDayNum !== b.minDayNum) return a.minDayNum - b.minDayNum;
+            let orderDiff = a.earliestOrder - b.earliestOrder;
+            if (orderDiff !== 0) return orderDiff;
             return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
 
-        uniqueCustomers.forEach((cust, index) => {
+        // BƯỚC 3: RENDER HTML GOM VÀO MẢNG
+        let htmlRows = [];
+        uniqueCustomers.forEach((cust) => {
             const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
             const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
             
             const isF4 = cust.freq === 'F4';
             const isF21 = cust.freq === 'F2-1';
             const isF22 = cust.freq === 'F2-2';
-            
-            let minDayNum = Math.min(...Array.from(cust.days).map(d => dayOrderRules[d] || 99));
-            let firstRecord = data.find(r => r.ma_kh === cust.ma_kh && (dayOrderRules[r.thu]||99) === minDayNum);
-            let valSTT = firstRecord ? firstRecord._ai_order : 999;
 
             let dsKH = window.salesDataMap[cust.ma_kh] || {};
             let dsM5 = formatNum(dsKH['M5'] || 0);
             let dsM6 = formatNum(dsKH['M6'] || 0);
             let dsM7 = formatNum(dsKH['M7'] || 0);
 
-            tbody.innerHTML += `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
+            htmlRows.push(`<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
                 <td style="text-align:center;">
-                    <input type="number" class="stt-input" value="${valSTT}" onchange="editOrder('${cust.ma_kh}', this.value)">
+                    <input type="number" class="stt-input" value="${cust.earliestOrder}" onchange="editOrder('${cust.ma_kh}', this.value)">
                 </td>
                 <td style="font-weight:600;">${cust.ma_kh}</td>
                 <td style="white-space: normal;">${cust.ten_kh}</td>
@@ -1086,14 +1098,14 @@
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-            </tr>`;
+            </tr>`);
         });
+
+        tbody.innerHTML = htmlRows.join('');
     }
 
-    function optimizeRouteFallbackLocal(dataToOptimize) {
-        const k = selectedDays.length;
-        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-        
+    // TÁCH HÀM K-MEANS CHUẨN ĐỂ TÁI SỬ DỤNG
+    function runKMeansClustering(locations, k, maxIterations = 100) {
         let centroids = [];
         let shuffled = [...locations].sort(() => 0.5 - Math.random());
         for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
@@ -1101,7 +1113,7 @@
         let assignments = new Array(locations.length);
         let changed = true, iterations = 0;
         
-        while (changed && iterations < 100) {
+        while (changed && iterations < maxIterations) {
             changed = false; iterations++;
             for (let i = 0; i < locations.length; i++) {
                 let loc = locations[i], minDist = Infinity, closestCluster = 0;
@@ -1123,15 +1135,19 @@
                 }
             }
         }
+        return assignments;
+    }
+
+    function optimizeRouteFallbackLocal(dataToOptimize) {
+        const k = selectedDays.length;
+        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
+        const assignments = runKMeansClustering(locations, k);
 
         let allAiResults = []; 
         let finalChunks = [];
 
         for (let c = 0; c < k; c++) {
-            let clusterLocs = [];
-            for (let i = 0; i < locations.length; i++) {
-                if (assignments[i] === c) clusterLocs.push(locations[i]);
-            }
+            let clusterLocs = locations.filter((_, idx) => assignments[idx] === c);
             if (clusterLocs.length === 0) continue;
             
             let targetDay = selectedDays[c];
@@ -1191,36 +1207,7 @@
             let k = Math.max(selectedDays.length, Math.ceil(totalCustomers / MAX_PER_CLUSTER));
 
             const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-            
-            let centroids = [];
-            let shuffled = [...locations].sort(() => 0.5 - Math.random());
-            for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
-            
-            let assignments = new Array(locations.length);
-            let changed = true, iterations = 0;
-            
-            while (changed && iterations < 100) {
-                changed = false; iterations++;
-                for (let i = 0; i < locations.length; i++) {
-                    let loc = locations[i], minDist = Infinity, closestCluster = 0;
-                    for (let c = 0; c < k; c++) {
-                        let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
-                        if (d < minDist) { minDist = d; closestCluster = c; }
-                    }
-                    if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
-                }
-                let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
-                for (let i = 0; i < locations.length; i++) {
-                    let c = assignments[i];
-                    newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
-                }
-                for (let c = 0; c < k; c++) {
-                    if (newCentroids[c].count > 0) {
-                        centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
-                        centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
-                    }
-                }
-            }
+            const assignments = runKMeansClustering(locations, k);
 
             if(progressEl) progressEl.style.width = '35%';
             if(titleEl) titleEl.innerText = "BƯỚC 2: Sắp xếp thứ tự sơ bộ...";
@@ -1379,7 +1366,7 @@
         processDataAndRender();
     }
     
-    // ĐÃ BỔ SUNG: Xuất Excel có đầy đủ cột B và D như file nguồn
+    // XUẤT EXCEL TỐI ƯU CÓ BÔI MÀU TIÊU ĐỀ, ĐỦ 25 CỘT & TỰ CHỈNH ĐỘ RỘNG CỘT
     function exportDetailToExcel() {
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r.thu));
@@ -1459,23 +1446,53 @@
             excelRows.push(row);
         });
 
+        let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+
+        // THÊM STYLE CHO DÒNG TIÊU ĐỀ (ROW 1 TRONG EXCEL - CELL A1->Y1)
+        const colsLetters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y'];
+        colsLetters.forEach((colChar, index) => {
+            let cellAddress = colChar + '1';
+            if (worksheet[cellAddress]) {
+                let bgColor = "1E40AF"; // Mặc định xanh dương đậm cho Thông tin chung
+                if (index >= 8 && index <= 10) bgColor = "D97706";      // Cam cho Doanh số
+                else if (index >= 11 && index <= 17) bgColor = "2563EB"; // Xanh dương tươi cho Ngày
+                else if (index >= 18 && index <= 21) bgColor = "7C3AED"; // Tím cho Tần suất
+                else if (index >= 22 && index <= 24) bgColor = "475569"; // Xám cho Tọa độ & Vùng
+
+                worksheet[cellAddress].s = {
+                    fill: { fgColor: { rgb: bgColor } },
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
+                };
+            }
+        });
+
+        // THIẾT LẬP ĐỘ RỘNG CỘT TỰ ĐỘNG CHUYÊN NGHIỆP
+        worksheet['!cols'] = [
+            { wch: 6 },  { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 18 },
+            { wch: 15 }, { wch: 32 }, { wch: 35 }, { wch: 14 }, { wch: 14 },
+            { wch: 14 }, { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 8 },
+            { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 6 },  { wch: 6 },
+            { wch: 6 },  { wch: 6 },  { wch: 12 }, { wch: 12 }, { wch: 16 }
+        ];
+
+        let workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
+        
         let nvName = (document.getElementById('sel-nv').value || '').trim();
         let nppName = (document.getElementById('sel-npp').value || '').trim();
-
-        if ((!nvName || nvName.includes('Local')) && activeData.length > 0) {
-            nvName = activeData[0].nv || 'NhanVien';
-        }
-        if ((!nppName || nppName.includes('Local')) && activeData.length > 0) {
-            nppName = activeData[0].npp || 'NPP';
-        }
+        if ((!nvName || nvName.includes('Local')) && activeData.length > 0) nvName = activeData[0].nv || 'NhanVien';
+        if ((!nppName || nppName.includes('Local')) && activeData.length > 0) nppName = activeData[0].npp || 'NPP';
 
         let safeNv = nvName.replace(/[\\/:\*\?"<>\|]/g, '_');
         let safeNpp = nppName.replace(/[\\/:\*\?"<>\|]/g, '_');
 
-        let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
-        let workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
-        
         XLSX.writeFile(workbook, `Tuyến ${safeNv}-${safeNpp}.xlsx`);
     }
     
