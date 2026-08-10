@@ -11,24 +11,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-   <style>
-        /* 1. THU NHỎ TOÀN BỘ GIAO DIỆN XUỐNG 67% & TĂNG SIZE CHỮ MẶC ĐỊNH LÊN 16PX */
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #f1f5f9; 
-            font-size: 16px; /* Cũ: 13px -> Tăng lên 16px */
-        }
-        
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; font-size: 16px; }
         #app-container { display: flex; height: 100vh; width: 100%; position: relative;}
         
         #left-panel { width: 40%; height: 100%; display: flex; flex-direction: column; border-right: 2px solid #cbd5e1; background: #fff; }
         #upload-section { padding: 15px; background: #e2e8f0; border-bottom: 2px solid #cbd5e1; }
-        .upload-warning { color: #1e40af; font-weight: bold; font-size: 17px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
-        
-        /* 2. TĂNG KÍCH CỠ CHỮ CÁC NÚT BẤM */
+        .upload-warning { color: #1e40af; font-weight: bold; font-size: 16px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
         .btn-primary { width: 100%; padding: 10px; background-color: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; transition: background 0.3s; margin-bottom: 10px; }
         .btn-primary:hover { background-color: #2563eb; }
         .btn-primary:disabled { background-color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
@@ -38,7 +27,6 @@
         .btn-purple:hover { background-color: #7c3aed; }
         .btn-green { background-color: #10b981; width: auto; margin: 0; padding: 8px 15px; }
         .btn-green:hover { background-color: #059669; }
-        
         .file-status-box { margin-bottom: 8px; display: flex; justify-content: space-between; font-weight: bold; font-size: 15px;}
         .status-badge { font-weight: normal; font-size: 14px; }
         
@@ -50,7 +38,6 @@
 
         #right-panel { width: 60%; height: 100%; padding: 20px; box-sizing: border-box; overflow-y: auto; background-color: #ffffff; position: relative; }
         
-        /* 3. TĂNG KÍCH CỠ CHỮ KHU VỰC BỘ LỌC */
         .filter-header-section { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
         .filter-row-horizontal { display: flex; gap: 15px; width: 100%; align-items: flex-end;}
         .filter-item { display: flex; flex-direction: column; flex: 1; }
@@ -73,9 +60,16 @@
         .warning-title { color: #dc2626; font-size: 18px; font-weight: bold; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;}
         .warning-tag { background: #fee2e2; color: #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; border: 1px solid #fca5a5; display: inline-block; margin-bottom: 4px; margin-right: 4px;}
 
-        /* 4. TĂNG KÍCH CỠ CHỮ TRONG BẢNG DỮ LIỆU (TABLE) */
         .data-table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 25px;}
-        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 15px; } /* Cũ: 13px -> Tăng lên 15px */
+        
+        /* GHIM THANH CUỘN NGANG & DỌC TẠI CHỖ CHO BẢNG CHI TIẾT TUYẾN */
+        .data-table-container:has(#detail-table) {
+            max-height: calc(100vh - 180px);
+            overflow: auto;
+            position: relative;
+        }
+
+        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 15px; }
         th, td { padding: 9px 12px; text-align: left; border: 1px solid #e2e8f0; }
         th.route-th { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; white-space: normal !important; word-wrap: break-word; font-size: 15px; }
         th.danger-th { background-color: #dc2626 !important; color: white !important; }
@@ -434,11 +428,11 @@
         });
     }
 
-   function processRawExcelData(jsonRoute) {
+    // ĐÃ BỔ SUNG: Đọc đầy đủ cột B và cột D gốc
+    function processRawExcelData(jsonRoute) {
         allValidData = [];
         allWarningData = [];
 
-        // 1. Lưu lại chính xác Tiêu đề gốc của Cột B (index 1) và Cột D (index 3) từ file nguồn
         if (jsonRoute && jsonRoute.length > 0 && jsonRoute[0]) {
             window.colB_header = jsonRoute[0][1] !== undefined ? jsonRoute[0][1] : "";
             window.colD_header = jsonRoute[0][3] !== undefined ? jsonRoute[0][3] : "";
@@ -447,9 +441,9 @@
         jsonRoute.forEach((row, rowIndex) => {
             if (rowIndex === 0 || !row[0]) return;
 
-            let colB = row[1] !== undefined ? row[1] : ""; // <-- LẤY DỮ LIỆU CỘT B GỐC
+            let colB = row[1] !== undefined ? row[1] : "";
             let npp = row[2];
-            let colD = row[3] !== undefined ? row[3] : ""; // <-- LẤY DỮ LIỆU CỘT D GỐC
+            let colD = row[3] !== undefined ? row[3] : "";
             let nv = row[4];
             let ma_kh = row[5];
             let ten_kh = row[6];
@@ -493,7 +487,7 @@
                         allValidData.push({
                             area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, dia_chi: dia_chi, 
                             thu: dayName, lat: lat, lng: lng, freq: freqType, _ai_order: 999,
-                            colB: colB, colD: colD // <-- LƯU CỘT B VÀ CỘT D VÀO DATA
+                            colB: colB, colD: colD
                         });
                     }
                 }
@@ -976,7 +970,7 @@
         </tr>`;
     }
 
-    // === ĐÃ ĐƯỢC CHỈNH SỬA: ẨN PHẦN THÔNG TIN TỌA ĐỘ VÀ VÙNG TRÊN WEB ===
+    // ĐÃ ẨN CỘT LAT, LNG, AREA TRÊN BẢNG WEB
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
@@ -1385,7 +1379,7 @@
         processDataAndRender();
     }
     
-    // === VẪN GIỮ NGUYÊN ĐẦY ĐỦ CÁC CỘT (TỰ ĐỘNG GÁN ROW[22], [23], [24]) KHI TẢI EXCEL ===
+    // ĐÃ BỔ SUNG: Xuất Excel có đầy đủ cột B và D như file nguồn
     function exportDetailToExcel() {
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r.thu));
@@ -1412,9 +1406,9 @@
         
         let headerRow = [];
         headerRow[0]  = "STT";             
-        headerRow[1]  = window.colB_header || ""; // <-- TRẢ LẠI ĐÚNG TIÊU ĐỀ GỐC CỘT B              
+        headerRow[1]  = window.colB_header || "";                
         headerRow[2]  = "NPP";             
-        headerRow[3]  = window.colD_header || ""; // <-- TRẢ LẠI ĐÚNG TIÊU ĐỀ GỐC CỘT D               
+        headerRow[3]  = window.colD_header || "";                
         headerRow[4]  = "Nhân viên";       
         headerRow[5]  = "Mã KH";           
         headerRow[6]  = "Tên Khách Hàng";  
@@ -1435,7 +1429,7 @@
             let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
             
             row[0] = sttCounter++;
-            row[1] = rawRef.colB !== undefined ? rawRef.colB : "";
+            row[1] = rawRef.colB !== undefined ? rawRef.colB : ""; 
             row[2] = rawRef.npp || "";
             row[3] = rawRef.colD !== undefined ? rawRef.colD : "";
             row[4] = rawRef.nv || "";
