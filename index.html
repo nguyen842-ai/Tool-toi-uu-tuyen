@@ -335,7 +335,7 @@
                 return; 
             }
 
-            const months = ['M5', 'M6', 'M7']; 
+            const months = ['M5', 'M6', 'M7', 'M8']; 
             let { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
             
             if (error || !signedUrls || signedUrls.length === 0 || signedUrls[0].error) {
@@ -922,7 +922,6 @@
         return { count: groupData.length, dist: dist };
     }
 
-    // TỐI ƯU HIỆU NĂNG: GOM HTML BẢNG SO SÁNH BẰNG MẢNG
     function renderComparisonTable() {
         const thead = document.getElementById('comp-head'); 
         const tbody = document.getElementById('comp-body'); 
@@ -984,7 +983,6 @@
         </tr>`;
     }
 
-    // TỐI ƯU HIỆU NĂNG GẤP NHIỀU LẦN: HẠN CHẾ VÒNG LẶP LỒNG NHAU & GOM HTML TRONG BẢNG CHI TIẾT
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
@@ -995,14 +993,11 @@
             <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
             <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
             <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
-            <th class="route-th ds-col" colspan="3" style="z-index: 3;">Doanh Số (đ)</th>
             <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
             <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
+            <th class="route-th ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
         </tr>
         <tr>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
             <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
@@ -1014,6 +1009,10 @@
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
             <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
+            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Aug</th>
         </tr>`;
         
         tfoot.innerHTML = '';
@@ -1023,7 +1022,6 @@
         const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
         const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
 
-        // BƯỚC 1: TÍNH TOÁN TRƯỚC ORDER MIN & DAY MIN NGAY TRONG LẦN DUYỆT ĐẦU TIÊN
         data.forEach(row => {
             if (!customerMap.has(row.ma_kh)) {
                 let custInfo = {
@@ -1052,7 +1050,6 @@
             }
         });
 
-        // BƯỚC 2: SẮP XẾP SIÊU NHANH O(N log N) VÌ KHÔNG CÒN GỌI HÀM FIND BÊN TRONG
         uniqueCustomers.sort((a, b) => {
             if (a.minDayNum !== b.minDayNum) return a.minDayNum - b.minDayNum;
             let orderDiff = a.earliestOrder - b.earliestOrder;
@@ -1060,7 +1057,6 @@
             return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
         });
 
-        // BƯỚC 3: RENDER HTML GOM VÀO MẢNG
         let htmlRows = [];
         uniqueCustomers.forEach((cust) => {
             const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
@@ -1074,6 +1070,7 @@
             let dsM5 = formatNum(dsKH['M5'] || 0);
             let dsM6 = formatNum(dsKH['M6'] || 0);
             let dsM7 = formatNum(dsKH['M7'] || 0);
+            let dsM8 = formatNum(dsKH['M8'] || 0);
 
             htmlRows.push(`<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
                 <td style="text-align:center;">
@@ -1082,10 +1079,6 @@
                 <td style="font-weight:600;">${cust.ma_kh}</td>
                 <td style="white-space: normal;">${cust.ten_kh}</td>
                 
-                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
-                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
-
                 <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
                 <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
                 <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
@@ -1098,13 +1091,17 @@
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
                 <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
+                
+                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
+                <td class="num-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
             </tr>`);
         });
 
         tbody.innerHTML = htmlRows.join('');
     }
 
-    // TÁCH HÀM K-MEANS CHUẨN ĐỂ TÁI SỬ DỤNG
     function runKMeansClustering(locations, k, maxIterations = 100) {
         let centroids = [];
         let shuffled = [...locations].sort(() => 0.5 - Math.random());
@@ -1366,7 +1363,6 @@
         processDataAndRender();
     }
     
-    // XUẤT EXCEL TỐI ƯU CÓ BÔI MÀU TIÊU ĐỀ, ĐỦ 25 CỘT & TỰ CHỈNH ĐỘ RỘNG CỘT
     function exportDetailToExcel() {
         let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
         let activeData = baseData.filter(r => selectedDays.includes(r.thu));
@@ -1400,13 +1396,15 @@
         headerRow[5]  = "Mã KH";           
         headerRow[6]  = "Tên Khách Hàng";  
         headerRow[7]  = "Địa chỉ";         
-        headerRow[8]  = "DS May";          
-        headerRow[9]  = "DS Jun";          
-        headerRow[10] = "DS Jul";          
-
+        
         DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
         headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
         headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
+        
+        headerRow[25] = "DS May"; 
+        headerRow[26] = "DS Jun"; 
+        headerRow[27] = "DS Jul"; 
+        headerRow[28] = "DS Aug";
         
         excelRows.push(headerRow);
 
@@ -1421,15 +1419,10 @@
             row[3] = rawRef.colD !== undefined ? rawRef.colD : "";
             row[4] = rawRef.nv || "";
             
-            row[5] = cust.ma_kh;           
+            row[5] = cust.ma_kh;            
             row[6] = cust.ten_kh;          
             row[7] = rawRef.dia_chi || ""; 
             
-            let dsKH = window.salesDataMap[cust.ma_kh] || {};
-            row[8] = dsKH['M5'] || 0;
-            row[9] = dsKH['M6'] || 0;
-            row[10] = dsKH['M7'] || 0;
-
             DAYS_TEXT.forEach((day, idx) => {
                 row[11 + idx] = cust.days.has(day) ? "x" : "";
             });
@@ -1442,22 +1435,27 @@
             row[22] = cust.lat || 0;
             row[23] = cust.lng || 0;
             row[24] = cust.area || "Khác";
+            
+            let dsKH = window.salesDataMap[cust.ma_kh] || {};
+            row[25] = dsKH['M5'] || 0;
+            row[26] = dsKH['M6'] || 0;
+            row[27] = dsKH['M7'] || 0;
+            row[28] = dsKH['M8'] || 0;
 
             excelRows.push(row);
         });
 
         let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
 
-        // THÊM STYLE CHO DÒNG TIÊU ĐỀ (ROW 1 TRONG EXCEL - CELL A1->Y1)
-        const colsLetters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y'];
+        const colsLetters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC'];
         colsLetters.forEach((colChar, index) => {
             let cellAddress = colChar + '1';
             if (worksheet[cellAddress]) {
-                let bgColor = "1E40AF"; // Mặc định xanh dương đậm cho Thông tin chung
-                if (index >= 8 && index <= 10) bgColor = "D97706";      // Cam cho Doanh số
-                else if (index >= 11 && index <= 17) bgColor = "2563EB"; // Xanh dương tươi cho Ngày
-                else if (index >= 18 && index <= 21) bgColor = "7C3AED"; // Tím cho Tần suất
-                else if (index >= 22 && index <= 24) bgColor = "475569"; // Xám cho Tọa độ & Vùng
+                let bgColor = "1E40AF"; 
+                if (index >= 25 && index <= 28) bgColor = "D97706";      
+                else if (index >= 11 && index <= 17) bgColor = "2563EB"; 
+                else if (index >= 18 && index <= 21) bgColor = "7C3AED"; 
+                else if (index >= 22 && index <= 24) bgColor = "475569"; 
 
                 worksheet[cellAddress].s = {
                     fill: { fgColor: { rgb: bgColor } },
@@ -1473,13 +1471,13 @@
             }
         });
 
-        // THIẾT LẬP ĐỘ RỘNG CỘT TỰ ĐỘNG CHUYÊN NGHIỆP
         worksheet['!cols'] = [
             { wch: 6 },  { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 18 },
-            { wch: 15 }, { wch: 32 }, { wch: 35 }, { wch: 14 }, { wch: 14 },
-            { wch: 14 }, { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 8 },
-            { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 6 },  { wch: 6 },
-            { wch: 6 },  { wch: 6 },  { wch: 12 }, { wch: 12 }, { wch: 16 }
+            { wch: 15 }, { wch: 32 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, 
+            { wch: 10 }, { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 8 },  
+            { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 6 },  { wch: 6 },  
+            { wch: 6 },  { wch: 6 },  { wch: 12 }, { wch: 12 }, { wch: 16 }, 
+            { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }               
         ];
 
         let workbook = XLSX.utils.book_new();
