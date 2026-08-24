@@ -1,589 +1,86 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quy Hoạch Lộ Trình Di Chuyển - Master Optimized</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+export default async function handler(req, res) {
+    // 1. GẮN GIẤY THÔNG HÀNH CORS (Chuẩn hóa)
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    <style>
-        /* CSS VARIABLES & COMPACT MODE */
-        :root { --primary: #3b82f6; --primary-hover: #2563eb; --danger: #ef4444; --warning: #f59e0b; --success: #10b981; --bg-gray: #f1f5f9; --text-main: #334155; --text-muted: #64748b; }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-gray); font-size: 13px; color: var(--text-main); }
+    // Phản hồi ngay Preflight Request của trình duyệt
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Chỉ chấp nhận phương thức POST' });
+
+    try {
+        const { currentData, command, availableDays } = req.body;
         
-        /* CÁC CLASS HỖ TRỢ DÀN TRANG (Đã được bổ sung flex-1 và w-full) */
-        .flex { display: flex; } .flex-col { display: flex; flex-direction: column; } .items-center { align-items: center; } .justify-between { justify-content: space-between; }
-        .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .mt-2 { margin-top: 8px; } .mb-2 { margin-bottom: 8px; } .mb-1 { margin-bottom: 4px; }
-        .font-bold { font-weight: bold; } .hidden { display: none !important; }
-        .flex-1 { flex: 1; } .w-full { width: 100%; }
-        
-        #app-container { display: flex; height: 100vh; width: 100%; position: relative; }
-        #left-panel { width: 35%; height: 100%; border-right: 2px solid #cbd5e1; background: #fff; display: flex; flex-direction: column; }
-        #right-panel { width: 65%; height: 100%; padding: 12px 16px; overflow-y: auto; background-color: #ffffff; position: relative; }
-        
-        #upload-section { padding: 10px; background: #e2e8f0; border-bottom: 2px solid #cbd5e1; }
-        .upload-warning { color: #1e40af; font-weight: bold; font-size: 14px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 8px; border-radius: 6px; margin-bottom: 8px; }
-        
-        .btn { padding: 8px 12px; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-        .btn-primary { background-color: var(--primary); } .btn-primary:hover { background-color: var(--primary-hover); }
-        .btn-warning { background-color: var(--warning); color: #fff; } .btn-warning:hover { background-color: #d97706; }
-        .btn-purple { background-color: #8b5cf6; } .btn-purple:hover { background-color: #7c3aed; }
-        .btn-success { background-color: var(--success); } .btn-success:hover { background-color: #059669; }
-        .btn-danger { background-color: var(--danger); } .btn-danger:hover { background-color: #dc2626; }
-        .btn:disabled { background-color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
-
-        /* BẢN ĐỒ & THANH CÔNG CỤ */
-        #map-container { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; }
-        #map { flex-grow: 1; background: #e2e8f0; z-index: 1; }
-        .map-toolbar-wrapper { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; display: none; align-items: center; gap: 8px; }
-        .map-toolbar { background: white; padding: 6px 12px; border-radius: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; border: 2px solid var(--primary); }
-        .toggle-option { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px; font-weight: bold; color: #1e293b;}
-        .icon-btn { background: white; border: 2px solid var(--primary); border-radius: 20px; width: 32px; height: 32px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 14px; }
-        .icon-btn:hover { background: #eff6ff; }
-
-        /* BỘ LỌC VÀ BẢNG */
-        .filter-section { background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
-        .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
-        .form-control[multiple] { min-height: 48px; padding: 2px; }
-        .day-chip { padding: 4px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; user-select: none; }
-        .day-chip:hover { background: #e2e8f0; } .day-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
-
-        .table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 15px; max-height: calc(100vh - 180px); }
-        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 12px; }
-        th, td { padding: 6px 8px; text-align: left; border: 1px solid #e2e8f0; white-space: nowrap; }
-        th.sticky-header { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; position: sticky; top: 0; z-index: 2; }
-        .ds-col { background-color: #fef3c7 !important; color: #065f46 !important; font-weight: bold; }
-        .hover-row:hover td { background-color: #bfdbfe !important; }
-        .edit-cell { cursor: pointer; user-select: none; text-align: center; } .edit-cell:hover { background-color: #93c5fd !important; }
-        .stt-input { width: 40px; text-align: center; font-weight: bold; padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; }
-        
-        .btn-remove { background-color: var(--danger); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-remove:hover { background-color: #b91c1c; transform: scale(1.1); }
-        
-        .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 11px; box-sizing: border-box; }
-        .marker-circle { border-radius: 50%; } .marker-square { border-radius: 4px; }
-        
-        /* CHÚ THÍCH MÀU SẮC */
-        .legend-box { width: 12px; height: 12px; display: inline-block; border-radius: 3px; border: 1px solid #94a3b8; }
-        .legend-circle { border-radius: 50%; }
-
-        /* TOAST NOTIFICATION */
-        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: #334155; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
-        .toast.show { opacity: 1; transform: translateY(0); }
-        .toast.success { border-left: 4px solid var(--success); } .toast.error { border-left: 4px solid var(--danger); } .toast.warning { border-left: 4px solid var(--warning); }
-    </style>
-</head>
-<body>
-
-<div id="ai-loading-overlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%;">
-        <h2 class="mt-0" style="color: #1e40af; font-size: 16px;">Đang thiết lập phương án AI...</h2>
-        <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 15px;">
-            <div id="ai-progress-fill" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
-        </div>
-    </div>
-</div>
-
-<div id="toast-container" aria-live="polite"></div>
-
-<div id="app-container">
-    <div id="left-panel">
-        <div id="upload-section">
-            <div class="upload-warning">BẢN ĐỒ QUY HOẠCH TUYẾN MASTER</div>
-            <div class="flex gap-2 mb-2 w-full">
-                <button id="btnLoadData" class="btn btn-primary flex-1" onclick="loadDataFromSupabase()">📥 Tải Dữ Liệu DB</button>
-                <input type="file" id="localFileInput" accept=".xlsx, .xls" class="hidden" onchange="handleLocalFileUpload(event)" multiple>
-                <button class="btn btn-purple flex-1" onclick="document.getElementById('localFileInput').click()">📁 Tải File Mới</button>
-            </div>
-            <div class="flex justify-between font-bold text-sm mb-2"><span>1. Tuyến:</span><span id="statusRoute" class="font-normal">(Chưa tải)</span></div>
-            <div class="flex justify-between font-bold text-sm mb-2"><span>2. Doanh số:</span><span id="statusSales" class="font-normal">(Chưa tải)</span></div>
-            
-            <!-- KHUNG GHI CHÚ MÀU (LEGEND) VẪN GIỮ NGUYÊN -->
-            <div id="legend-container" class="hidden mt-2 p-2 bg-white rounded border border-slate-300 text-xs"></div>
-        </div>
-        
-        <div id="map-container">
-            <!-- THANH CÔNG CỤ BẢN ĐỒ VẪN GIỮ NGUYÊN -->
-            <div id="map-toolbar-wrapper" class="map-toolbar-wrapper">
-                <div id="route-toggle-toolbar" class="map-toolbar">
-                    <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Gốc</span></label>
-                    <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Nháp</span></label>
-                    <div style="width: 1px; height: 12px; background: #cbd5e1;"></div>
-                    <label class="toggle-option"><input type="checkbox" id="chk-draw-lines" onchange="processDataAndRender()"><span style="color:var(--success);">🔗 Nối tuyến</span></label>
-                </div>
-                <button class="icon-btn" onclick="toggleRouteToolbarVisibility()" title="Ẩn/Hiện Menu" aria-label="Ẩn hiện">⚙️</button>
-                <button class="icon-btn" onclick="fitMapBounds()" title="Góc nhìn toàn cảnh" aria-label="Toàn cảnh">🌍</button>
-            </div>
-            <div id="map"></div>
-        </div>
-    </div>
-
-    <div id="right-panel">
-        <div class="filter-section flex-col gap-2">
-            <div class="flex gap-3 w-full items-end">
-                <div class="flex-1 flex-col"><label class="mb-1 font-bold">Khu vực</label><select id="sel-area" class="form-control" disabled><option value="">-- Chọn Khu vực --</option></select></div>
-                <div class="flex-1 flex-col"><label class="mb-1 font-bold">NPP</label><select id="sel-npp" class="form-control" disabled><option value="">-- Chọn NPP --</option></select></div>
-                <div style="flex: 2;" class="flex-col"><label class="mb-1 font-bold">Nhân viên (Max 2)</label><select id="sel-nv" class="form-control" multiple disabled><option value="">-- Chọn Nhân viên --</option></select></div>
-            </div>
-            
-            <div class="flex-col w-full mt-2">
-                <label class="mb-1 font-bold">Thứ (Day) - Có thể chọn nhiều</label>
-                <div id="day-chips-container" class="flex flex-wrap gap-2 items-center" style="min-height: 28px;"><span class="text-muted text-xs">-- Chọn Thứ --</span></div>
-            </div>
-            
-            <!-- HÀNG NÚT BẤM DÀN ĐỀU 100% CHIỀU RỘNG -->
-            <div class="flex gap-3 w-full items-end mt-2">
-                <div class="flex-col relative" style="flex: 0 0 25%;">
-                    <label class="flex justify-between items-center mb-1 font-bold">Kênh AI <span id="server-status-badge" class="cursor-pointer text-blue-600 bg-blue-100 border border-blue-200 px-1 rounded text-xs" onclick="checkServerStatus()">🔄 Ping</span></label>
-                    <select id="sel-api-line" class="form-control font-bold text-blue-800 bg-blue-50 border-blue-500" onchange="checkServerStatus()">
-                        <option value="https://tool-toi-uu-tuyen.vercel.app">🔴 Line 1</option>
-                        <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2</option>
-                    </select>
-                </div>
-                <!-- VÙNG NÚT BẤM CÓ CLASS flex-1 ĐỂ CO GIÃN THEO CHIỀU NGANG -->
-                <div class="flex gap-2 m-0" style="flex: 1;">
-                    <button id="btn-ai-optimize" class="btn btn-warning flex-1" onclick="optimizeRouteWithAI()" disabled>✨ AI Gợi Ý</button>
-                    <button id="btn-undo" class="btn btn-danger flex-1" onclick="undo()" disabled style="background-color: #64748b;">↩ Hoàn Tác</button>
-                    <button id="btn-dl-map-week" class="btn btn-purple flex-1" onclick="downloadWeeklyMap()" disabled>🗺️ Lưu Ảnh</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="dashboard-section" class="hidden">
-            <div class="flex justify-between items-center border-b-2 border-slate-100 pb-2 mb-3">
-                <div class="flex items-baseline gap-3">
-                    <h2 class="m-0 text-base font-bold text-slate-900">Chi tiết tuyến (Bản Nháp)</h2>
-                    <span class="text-xs text-emerald-600 font-medium">(Mọi thay đổi tự động lưu vào bản nháp)</span>
-                </div>
-                <button class="btn btn-success" onclick="exportDetailToExcel()">📥 Xuất Excel Đề Xuất</button>
-            </div>
-            <div class="table-container">
-                <table id="detail-table">
-                    <thead id="table-head"></thead>
-                    <tbody id="table-body"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    /* =========================================
-       1. STATE MANAGEMENT (CORE ARCHITECTURE)
-       ========================================= */
-    const AppState = {
-        sourceData: [],    // Bất biến: Dữ liệu chuẩn từ file/DB
-        workingData: [],   // Động: Dữ liệu đang nháp
-        historyStack: [],  // Ngăn xếp để Undo (Ctrl+Z)
-        salesData: {},     
-        selectedEmployees: [], selectedDays: [],
-        isOptimizedView: false, isFirstMapRender: true, isToolbarExpanded: true
-    };
-
-    const CONSTANTS = {
-        SUPABASE_URL: 'https://mrqldgycwovpbmzdeuyz.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p', BUCKET: 'mappingdata',
-        DAYS_TEXT: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'], DAY_COLS: [11, 12, 13, 14, 15, 16, 17]
-    };
-
-    const palettes_single = { 'Thứ 2':{base:'#22c55e',light:'#bbf7d0',txt:'#000'}, 'Thứ 3':{base:'#ef4444',light:'#fecaca',txt:'#fff'}, 'Thứ 4':{base:'#a855f7',light:'#e9d5ff',txt:'#fff'}, 'Thứ 5':{base:'#eab308',light:'#fef08a',txt:'#000'}, 'Thứ 6':{base:'#000000',light:'#cbd5e1',txt:'#fff'}, 'Thứ 7':{base:'#3b82f6',light:'#bfdbfe',txt:'#fff'}, 'Chủ nhật':{base:'#f97316',light:'#fed7aa',txt:'#fff'} };
-    const palettes_emp1 = { 'Thứ 2':{base:'#0d2b47',light:'#3d5b77',txt:'#fff'}, 'Thứ 3':{base:'#1155cc',light:'#76a5af',txt:'#fff'}, 'Thứ 4':{base:'#9fc5e8',light:'#cfe2f3',txt:'#000'}, 'Thứ 5':{base:'#8e7cc3',light:'#d9d2e9',txt:'#000'}, 'Thứ 6':{base:'#d9d2e9',light:'#f4f0f9',txt:'#000'}, 'Thứ 7':{base:'#ead1dc',light:'#f8eef2',txt:'#000'}, 'Chủ nhật':{base:'#2b2b2b',light:'#777777',txt:'#fff'} };
-    const palettes_emp2 = { 'Thứ 2':{base:'#5b0f00',light:'#8b3f30',txt:'#fff'}, 'Thứ 3':{base:'#cc4125',light:'#e6b8af',txt:'#fff'}, 'Thứ 4':{base:'#ea9999',light:'#f4cccc',txt:'#000'}, 'Thứ 5':{base:'#f4cccc',light:'#fce5cd',txt:'#000'}, 'Thứ 6':{base:'#f9cb9c',light:'#fef0d9',txt:'#000'}, 'Thứ 7':{base:'#ffe599',light:'#fff2cc',txt:'#000'}, 'Chủ nhật':{base:'#b45f06',light:'#f6b26b',txt:'#fff'} };
-
-    /* =========================================
-       2. UTILS (SECURITY & UI)
-       ========================================= */
-    const supabaseClient = window.supabase.createClient(CONSTANTS.SUPABASE_URL, CONSTANTS.SUPABASE_ANON_KEY);
-    const map = L.map('map').setView([10.8231, 106.6297], 10);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-    let routeLayer = L.layerGroup().addTo(map); let lineLayer = L.layerGroup().addTo(map); window.currentMarkers = {};
-
-    function escapeHTML(str) { return !str ? '' : String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
-    function showToast(message, type = 'success') {
-        const c = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = `toast ${type}`;
-        t.innerHTML = `<span>${type === 'success'?'✅':type === 'error'?'❌':'⚠️'}</span><span>${escapeHTML(message)}</span>`;
-        c.appendChild(t); setTimeout(() => t.classList.add('show'), 10);
-        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
-    }
-    function renderStatus(id, text, color) { document.getElementById(id).innerHTML = `<span style="color:${color};font-weight:bold;">${text}</span>`; }
-
-    /* --- UNDO LOGIC --- */
-    function saveHistory() {
-        AppState.historyStack.push(structuredClone(AppState.workingData));
-        if (AppState.historyStack.length > 20) AppState.historyStack.shift(); // Max 20 steps
-        updateUndoButton();
-    }
-    window.undo = function() {
-        if (AppState.historyStack.length === 0) return;
-        AppState.workingData = AppState.historyStack.pop();
-        updateUndoButton();
-        processDataAndRender();
-        showToast("Đã hoàn tác thao tác vừa rồi", "warning");
-    }
-    function updateUndoButton() {
-        const btn = document.getElementById('btn-undo');
-        if (AppState.historyStack.length > 0) { btn.disabled = false; btn.style.backgroundColor = '#ef4444'; } 
-        else { btn.disabled = true; btn.style.backgroundColor = '#64748b'; }
-    }
-
-    function executeMutation(action) {
-        if (!AppState.isOptimizedView) {
-            AppState.isOptimizedView = true;
-            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            document.getElementById('map-toolbar-wrapper').style.display = 'flex';
-            showToast("Chuyển sang chế độ Phương Án Nháp", 'warning');
+        if (!currentData || !command || !availableDays) {
+            return res.status(400).json({ error: 'Thiếu dữ liệu đầu vào để tinh chỉnh tuyến.' });
         }
-        saveHistory();
-        action();
-        processDataAndRender();
-    }
 
-    /* =========================================
-       3. DATA LOADING (SAFE PARSING)
-       ========================================= */
-    async function loadSalesData() {
-        renderStatus('statusSales', '⌛ Đang tải...', '#ea580c');
-        try {
-            let { data: urls } = await supabaseClient.storage.from('data').createSignedUrls(['dataM5.js','dataM6.js','dataM7.js','dataM8.js'], 60);
-            if (!urls || urls[0].error) urls = (await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls(['data/dataM5.js','data/dataM6.js','data/dataM7.js','data/dataM8.js'], 60)).data;
-            if (urls && urls.length > 0) {
-                for (let item of urls) {
-                    if (!item.error) {
-                        try {
-                            let text = await (await fetch(item.signedUrl)).text();
-                            let mName = (item.path.match(/M\d+/) || ['M5'])[0];
-                            let match = text.match(/\[[\s\S]*\]/);
-                            if (match) {
-                                let arr = new Function('return ' + match[0])(); 
-                                arr.forEach(row => {
-                                    let id = String(row['cusCode']||row['Mã KH']||row['ma_kh']).trim();
-                                    if (id && row['sales']) {
-                                        if (!AppState.salesData[id]) AppState.salesData[id] = {};
-                                        AppState.salesData[id][mName] = parseFloat(String(row['sales']).replace(/,/g, '')) || 0;
-                                    }
-                                });
-                            }
-                        } catch(e) {}
+        const prompt = `Bạn là Trợ lý tinh chỉnh lộ trình. 
+Lộ trình hiện tại: ${JSON.stringify(currentData)}. 
+Yêu cầu quản lý: "${command}". 
+Ngày hợp lệ: ${availableDays.join(', ')}.
+
+NHIỆM VỤ: 
+1. Thực hiện đúng yêu cầu điều chỉnh ngày/thứ tự của quản lý. Điểm không bị ảnh hưởng thì giữ nguyên ngày cũ. 
+2. Sau đó, tự sắp xếp lại "order" từ 1 cho các điểm trong từng ngày sao cho đường đi ngắn nhất. 
+3. Tuyệt đối giữ nguyên giá trị "freq" của từng mã KH.
+4. Trả về DUY NHẤT một mảng JSON các object với cấu trúc: [{"id": "Mã KH", "day": "Tên ngày", "order": thứ tự bắt đầu từ 1, "freq": "Giữ nguyên freq cũ"}]`;
+
+        const keysString = process.env.GEMINI_API_KEY;
+        if (!keysString) {
+            return res.status(500).json({ error: 'Chưa cấu hình GEMINI_API_KEY trên hệ thống Vercel.' });
+        }
+
+        const apiKeys = keysString.split(',').map(key => key.trim()).filter(Boolean);
+        let lastErrorData = null; 
+        let lastStatus = 500;
+
+        // Vòng lặp xoay vòng API Key thông minh
+        for (let i = 0; i < apiKeys.length; i++) {
+            const currentKey = apiKeys[i];
+            
+            // Sử dụng gemini-1.5-flash (Model chuẩn, tốc độ siêu tốc hiện tại)
+            const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){currentKey}`;
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        response_mime_type: "application/json", // Ép Gemini trả về JSON thuần
+                        temperature: 0.1 // Nhiệt độ thấp để trả lời mang tính logic chính xác nhất
                     }
-                }
-                renderStatus('statusSales', '✅ Tải thành công', '#16a34a');
+                })
+            });
+            
+            const data = await response.json();
+
+            // Nếu thành công -> Parse và trả về luôn
+            if (response.ok) {
+                const textResponse = data.candidates[0].content.parts[0].text;
+                return res.status(200).json({ modified_data: JSON.parse(textResponse) });
             }
-        } catch (e) { renderStatus('statusSales', '❌ Lỗi', '#dc2626'); }
-    }
-
-    function processRawExcelData(jsonRouteList) {
-        let rawValid = [];
-        jsonRouteList.forEach((row, idx) => {
-            if (idx === 0 || !row[0] || row[0] === 'STT') return;
-            // XSS PROTECTION
-            let npp = escapeHTML(row[2]), nv = escapeHTML(row[4]), ma_kh = escapeHTML(row[5]);
-            let ten_kh = escapeHTML(row[6]), dia_chi = escapeHTML(row[7] || 'N/A'), area = escapeHTML(row[24] || "Khác");
-            let lat = parseFloat(row[22]), lng = parseFloat(row[23]);
-            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
             
-            let w1 = (row[18]||'').toString().toLowerCase().trim()==='x', w2 = (row[19]||'').toString().toLowerCase().trim()==='x';
-            let w3 = (row[20]||'').toString().toLowerCase().trim()==='x', w4 = (row[21]||'').toString().toLowerCase().trim()==='x';
-            let freqType = (w1&&w2&&w3&&w4) ? "F4" : (w1&&!w2&&w3&&!w4) ? "F2-1" : (!w1&&w2&&!w3&&w4) ? "F2-2" : "Lỗi Tần Suất";
-
-            CONSTANTS.DAY_COLS.forEach((col, i) => {
-                if ((row[col]||'').toString().toLowerCase().trim() === 'x')
-                    rawValid.push({ area, npp, nv, ma_kh, ten_kh, dia_chi, thu: CONSTANTS.DAYS_TEXT[i], lat, lng, freq: freqType, _ai_order: 999 });
-            });
-        });
-        AppState.sourceData = rawValid;
-    }
-
-    async function handleLocalFileUpload(event) {
-        const files = event.target.files;
-        if (!files || files.length === 0) return;
-        if (files.length > 2) return showToast("Tối đa 2 file một lúc!", 'warning');
-        
-        renderStatus('statusRoute', '⌛ Đang đọc...', '#ea580c'); await loadSalesData(); 
-        let allJson = [];
-        try {
-            for(let i=0; i<files.length; i++) {
-                let ws = XLSX.read(await files[i].arrayBuffer(), {type: 'array'});
-                let json = XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1});
-                if (i > 0 && json.length > 0) json.shift();
-                allJson = allJson.concat(json);
+            lastErrorData = data; 
+            lastStatus = response.status;
+            
+            // Nếu lỗi do hết Quota (429) -> Bỏ qua và thử Key tiếp theo
+            const isQuotaError = response.status === 429 || (data.error && data.error.status === "RESOURCE_EXHAUSTED");
+            if (isQuotaError) {
+                console.log(`Key ${i+1} hết hạn mức, đang đổi sang key tiếp theo...`);
+                continue; 
+            } else {
+                // Nếu lỗi khác (ví dụ sai API key, lỗi nội dung) -> Dừng vòng lặp và báo lỗi
+                return res.status(response.status).json(data);
             }
-            processRawExcelData(allJson); renderStatus('statusRoute', '✅ Đã tải file', '#16a34a'); setupFilters(true);
-        } catch (err) { renderStatus('statusRoute', '❌ Lỗi đọc', '#dc2626'); showToast('Lỗi cấu trúc Excel', 'error'); }
-    }
-
-    async function loadDataFromSupabase() {
-        document.getElementById('btnLoadData').disabled = true; renderStatus('statusRoute', '⌛ Đang tải...', '#ea580c'); await loadSalesData();
-        try {
-            let resRoute = await fetch((await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls([CONSTANTS.FILE_ROUTE], 60)).data[0].signedUrl);
-            let ws = XLSX.read(await resRoute.arrayBuffer(), {type: 'array'});
-            processRawExcelData(XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1}));
-            renderStatus('statusRoute', '✅ Đã tải DB', '#16a34a'); setupFilters(false);
-        } catch (err) { renderStatus('statusRoute', '❌ Lỗi DB', '#dc2626'); showToast('Lỗi tải từ DB', 'error'); } 
-        finally { document.getElementById('btnLoadData').disabled = false; }
-    }
-
-    /* =========================================
-       4. UI FILTERS & LEGEND
-       ========================================= */
-    function setupFilters(isLocal) {
-        const selArea = document.getElementById('sel-area'); const selNPP = document.getElementById('sel-npp'); const selNV = document.getElementById('sel-nv');
-        if (isLocal) {
-            selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`; selArea.disabled = true;
-            selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`; selNPP.disabled = true;
-            selNV.innerHTML = [...new Set(AppState.sourceData.map(r=>r.nv))].map(nv => `<option value="${nv}">${nv}</option>`).join('');
-            selNV.disabled = false;
-        } else {
-            selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>` + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => `<option value="${a}">${a}</option>`).join('');
-            selArea.disabled = false;
         }
-        clearWorkspace();
-    }
-
-    document.getElementById('sel-area').addEventListener('change', (e) => {
-        clearWorkspace(); if (!e.target.value) { document.getElementById('sel-npp').disabled = true; document.getElementById('sel-nv').disabled = true; return; }
-        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${n}">${n}</option>`).join('');
-        document.getElementById('sel-npp').disabled = false; document.getElementById('sel-nv').disabled = true;
-    });
-
-    document.getElementById('sel-npp').addEventListener('change', (e) => {
-        clearWorkspace(); if (!e.target.value) { document.getElementById('sel-nv').disabled = true; return; }
-        document.getElementById('sel-nv').innerHTML = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(nv => `<option value="${nv}">${nv}</option>`).join('');
-        document.getElementById('sel-nv').disabled = false;
-    });
-
-    document.getElementById('sel-nv').addEventListener('change', (e) => {
-        let opts = Array.from(e.target.selectedOptions);
-        if (opts.length > 2) { showToast("Chọn tối đa 2 nhân viên!", 'warning'); opts[opts.length - 1].selected = false; opts = Array.from(e.target.selectedOptions); }
-        AppState.selectedEmployees = opts.map(o => o.value);
-        clearWorkspace();
-        if (AppState.selectedEmployees.length === 0) return;
-
-        AppState.workingData = structuredClone(AppState.sourceData.filter(r => AppState.selectedEmployees.includes(r.nv)));
-        AppState.workingData.sort((a,b) => (a.nv > b.nv) ? 1 : -1); 
-        AppState.historyStack = []; updateUndoButton();
         
-        let thus = [...new Set(AppState.workingData.map(r => r.thu))];
-        document.getElementById('day-chips-container').innerHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>` + thus.map(thu => `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`).join('');
+        // Nếu chạy hết vòng lặp mà vẫn không thành công
+        return res.status(lastStatus).json(lastErrorData || { error: 'Tất cả các API key đều bị lỗi hoặc hết hạn mức.' });
         
-        updateLegendUI(AppState.selectedEmployees.length);
-        AppState.isFirstMapRender = true;
-    });
-
-    function updateLegendUI(count) {
-        const container = document.getElementById('legend-container'); container.classList.remove('hidden');
-        if (count <= 1) {
-            container.innerHTML = `<div class="flex gap-2 flex-wrap items-center">
-                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4</span>
-                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2</span>
-                <div style="width:1px;height:12px;background:#cbd5e1;"></div>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#22c55e;"></span> T2</span>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#ef4444;"></span> T3</span>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#a855f7;"></span> T4</span>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#eab308;"></span> T5</span>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#000000;"></span> T6</span>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#3b82f6;"></span> T7</span>
-                <span class="flex items-center gap-1"><span class="legend-box" style="background:#f97316;"></span> CN</span>
-            </div>`;
-        } else {
-            container.innerHTML = `<div class="flex gap-3 flex-wrap mb-1">
-                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4</span>
-                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2</span>
-            </div>
-            <div class="border-t border-slate-200 pt-1 flex-col gap-1">
-                <div class="flex gap-2 items-center"><span style="width:35px;font-weight:600;">NV 1:</span><span class="legend-box" style="background:#0d2b47;" title="T2"></span><span class="legend-box" style="background:#1155cc;" title="T3"></span><span class="legend-box" style="background:#9fc5e8;" title="T4"></span><span class="legend-box" style="background:#8e7cc3;" title="T5"></span><span class="legend-box" style="background:#d9d2e9;" title="T6"></span><span class="legend-box" style="background:#ead1dc;" title="T7"></span></div>
-                <div class="flex gap-2 items-center"><span style="width:35px;font-weight:600;">NV 2:</span><span class="legend-box" style="background:#5b0f00;" title="T2"></span><span class="legend-box" style="background:#cc4125;" title="T3"></span><span class="legend-box" style="background:#ea9999;" title="T4"></span><span class="legend-box" style="background:#f4cccc;" title="T5"></span><span class="legend-box" style="background:#f9cb9c;" title="T6"></span><span class="legend-box" style="background:#ffe599;" title="T7"></span></div>
-            </div>`;
-        }
+    } catch (error) {
+        console.error("Lỗi Server Modify:", error);
+        return res.status(500).json({ error: 'Lỗi hệ thống nội bộ Server.' });
     }
-
-    function clearWorkspace() {
-        document.getElementById('dashboard-section').classList.add('hidden');
-        document.getElementById('map-toolbar-wrapper').style.display = 'none';
-        document.getElementById('day-chips-container').innerHTML = `<span class="text-muted text-xs">-- Chọn Thứ --</span>`;
-        AppState.selectedDays = []; routeLayer.clearLayers(); lineLayer.clearLayers();
-    }
-
-    window.toggleDay = function(day) { let idx = AppState.selectedDays.indexOf(day); if(idx > -1) AppState.selectedDays.splice(idx, 1); else AppState.selectedDays.push(day); updateDaySelection(); };
-    window.toggleAllDays = function() { let els = Array.from(document.querySelectorAll('.chip-day')); if(AppState.selectedDays.length === els.length) AppState.selectedDays = []; else AppState.selectedDays = els.map(e => e.getAttribute('data-day')); updateDaySelection(); };
-    
-    function updateDaySelection() {
-        document.querySelectorAll('.chip-day').forEach(el => el.classList.toggle('active', AppState.selectedDays.includes(el.getAttribute('data-day'))));
-        let active = AppState.selectedDays.length > 0;
-        document.getElementById('btn-dl-map-week').disabled = !active; document.getElementById('btn-ai-optimize').disabled = !active;
-        if (active) processDataAndRender(); else clearWorkspace();
-    }
-
-    /* =========================================
-       5. USER MUTATIONS (LIVE SYNC)
-       ========================================= */
-    window.handleRouteToggle = function() {
-        AppState.isOptimizedView = document.querySelector('input[name="routeType"]:checked').value === 'optimized';
-        AppState.isFirstMapRender = true; processDataAndRender();
-    };
-    window.updateOrder = function(id, v) { executeMutation(() => { let t = AppState.workingData.find(r => r.ma_kh === id); if(t) t._ai_order = parseInt(v)||999; }); };
-    window.toggleRouteDay = function(id, d) { executeMutation(() => { let t = AppState.workingData.find(r => r.ma_kh === id); if(t) t.thu = d; }); };
-    window.toggleFreq = function(id, w) { 
-        executeMutation(() => {
-            let t = AppState.workingData.find(r => r.ma_kh === id); if(!t) return;
-            let w13 = ['F4', 'F2-1'].includes(t.freq), w24 = ['F4', 'F2-2'].includes(t.freq);
-            if(w === 'W1' || w === 'W3') w13 = !w13; else w24 = !w24;
-            if(!w13 && !w24) { if(w === 'W1' || w === 'W3') w24 = true; else w13 = true; }
-            t.freq = (w13 && w24) ? 'F4' : (w13 ? 'F2-1' : 'F2-2');
-        }); 
-    };
-    window.removeCustomer = function(id) { executeMutation(() => { AppState.workingData = AppState.workingData.filter(r => r.ma_kh !== id); }); };
-
-    /* =========================================
-       6. RENDER LOGIC
-       ========================================= */
-    function processDataAndRender() {
-        let activeData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
-        activeData = activeData.filter(r => AppState.selectedEmployees.includes(r.nv) && AppState.selectedDays.includes(r.thu));
-
-        renderMapOptimized(activeData); renderDetailTable(activeData);
-        document.getElementById('dashboard-section').classList.remove('hidden');
-        document.getElementById('map-toolbar-wrapper').style.display = 'flex'; // Hiển thị Menu chuyển đổi khi có dữ liệu
-    }
-
-    function renderMapOptimized(data) {
-        let seenIds = new Set(); lineLayer.clearLayers(); let allLatLngs = []; let chkLines = document.getElementById('chk-draw-lines');
-        AppState.selectedEmployees.forEach((emp, empIdx) => {
-            let empData = data.filter(r => r.nv === emp);
-            let empPalette = AppState.selectedEmployees.length <= 1 ? palettes_single : (empIdx === 0 ? palettes_emp1 : palettes_emp2);
-            
-            AppState.selectedDays.forEach(day => {
-                let dayData = empData.filter(r => r.thu === day); if(dayData.length === 0) return;
-                let p = empPalette[day] || empPalette['Thứ 2'];
-                
-                const processGroup = (group, shape, bg, txt, dash) => {
-                    if(group.length === 0) return; let coords = [];
-                    group.forEach((row, i) => {
-                        coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
-                        let stt = row._ai_order !== 999 ? row._ai_order : i + 1;
-                        let iconHtml = shape === 'marker-triangle' 
-                            ? `<div aria-label="Tuyến ${day}" style="position:relative; width: 26px; height: 26px; display:flex; align-items:center; justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;"><path fill="${bg}" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg><span style="position:relative; z-index: 2; color:${txt}; font-size:11px; font-weight:bold; margin-top: 4px;">${stt}</span></div>`
-                            : `<div aria-label="Tuyến ${day}" class="route-marker ${shape}" style="background-color: ${bg}; color: ${txt};">${stt}</div>`;
-                        
-                        let markerId = `${row.ma_kh}_${day}_${empIdx}`; seenIds.add(markerId);
-                        let m = window.currentMarkers[markerId] || L.marker([row.lat, row.lng]).addTo(routeLayer);
-                        m.setIcon(L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [26,26] }));
-                        m.bindPopup(`<b>${row.ten_kh}</b><br>Mã KH: ${row.ma_kh}<br>NV: ${row.nv}<br>Tần suất: ${row.freq}`);
-                        window.currentMarkers[markerId] = m;
-                    });
-                    if (coords.length > 1 && chkLines && chkLines.checked) L.polyline(coords, { color: bg, weight: 3, dashArray: dash }).addTo(lineLayer);
-                };
-
-                let w13 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-1'), w24 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-2');
-                if (dayData.some(r => r.freq.includes('F2'))) {
-                    processGroup(w13, w13.some(r=>r.freq==='F4')?'marker-triangle':'marker-square', p.base, p.txt, AppState.isOptimizedView?'':'5,5');
-                    processGroup(w24, w24.some(r=>r.freq==='F4')?'marker-triangle':'marker-square', p.light, (AppState.selectedEmployees.length<=1 && day==='Thứ 6')?'#fff':'#000', AppState.isOptimizedView?'8,4':'2,6');
-                } else { processGroup(dayData, 'marker-circle', p.base, p.txt, AppState.isOptimizedView?'':'5,5'); }
-            });
-        });
-        for (let id in window.currentMarkers) if (!seenIds.has(id)) { routeLayer.removeLayer(window.currentMarkers[id]); delete window.currentMarkers[id]; }
-        if (AppState.isFirstMapRender && allLatLngs.length > 0) { map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]}); AppState.isFirstMapRender = false; }
-    }
-
-    window.fitMapBounds = function() { AppState.isFirstMapRender = true; processDataAndRender(); };
-    window.toggleRouteToolbarVisibility = function() { AppState.isToolbarExpanded = !AppState.isToolbarExpanded; document.getElementById('route-toggle-toolbar').style.display = AppState.isToolbarExpanded ? 'flex' : 'none'; };
-
-    function renderDetailTable(data) {
-        const thead = document.getElementById('table-head'); const tbody = document.getElementById('table-body');
-        thead.innerHTML = `<tr>
-            <th class="sticky-header" rowspan="2">STT</th><th class="sticky-header" rowspan="2" style="width:30px;" title="Loại khách">🗑️</th>
-            <th class="sticky-header" rowspan="2">Nhân viên</th><th class="sticky-header" rowspan="2">Mã KH</th><th class="sticky-header" rowspan="2">Tên KH</th>
-            <th class="sticky-header" colspan="7">Lộ trình (Nháp)</th><th class="sticky-header" colspan="4">Tần Suất (Nháp)</th><th class="sticky-header ds-col" colspan="4">Doanh Số</th>
-        </tr>
-        <tr>
-            ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
-            ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px;">${w}</th>`).join('')}
-            ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px;">${m}</th>`).join('')}
-        </tr>`;
-
-        let cMap = new Map(); data.forEach(r => { if(!cMap.has(r.ma_kh)) cMap.set(r.ma_kh, { ...r, days: new Set() }); cMap.get(r.ma_kh).days.add(r.thu); });
-        
-        tbody.innerHTML = Array.from(cMap.values()).map((cust, i) => {
-            const gx = d => cust.days.has(d) ? `<span style="color:var(--danger); font-weight:900;">x</span>` : ``;
-            const gw = h => h ? `<span style="color:#1e40af; font-weight:900;">x</span>` : ``;
-            const isF4 = cust.freq==='F4', isF21 = cust.freq==='F2-1', isF22 = cust.freq==='F2-2';
-            let ds = AppState.salesData[cust.ma_kh] || {}; let stt = cust._ai_order !== 999 ? cust._ai_order : i + 1;
-            
-            return `<tr class="hover-row">
-                <td class="text-center"><input type="number" class="stt-input" value="${stt}" onchange="updateOrder('${cust.ma_kh}', this.value)"></td>
-                <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${cust.ma_kh}')">×</button></td>
-                <td>${cust.nv}</td><td>${cust.ma_kh}</td><td>${cust.ten_kh}</td>
-                ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" onclick="toggleRouteDay('${cust.ma_kh}','${d}')">${gx(d)}</td>`).join('')}
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W1')">${gw(isF4||isF21)}</td>
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W2')">${gw(isF4||isF22)}</td>
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W3')">${gw(isF4||isF21)}</td>
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W4')">${gw(isF4||isF22)}</td>
-                <td class="num-right" style="background:#fffbeb;">${ds['M5']||'-'}</td><td class="num-right" style="background:#fef3c7;">${ds['M6']||'-'}</td>
-                <td class="num-right" style="background:#fffbeb;">${ds['M7']||'-'}</td><td class="num-right" style="background:#fef3c7;">${ds['M8']||'-'}</td>
-            </tr>`;
-        }).join('');
-    }
-
-    /* =========================================
-       7. AI INTEGRATION & EXPORT
-       ========================================= */
-    async function optimizeRouteWithAI() {
-        let dataToOptimize = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
-        if (dataToOptimize.length < 3) return showToast("Quá ít khách hàng để tối ưu", 'warning');
-        
-        executeMutation(() => {}); // Lưu lịch sử trước khi gọi AI
-        document.getElementById('ai-loading-overlay').classList.remove('hidden');
-        document.getElementById('ai-progress-fill').style.width = '60%';
-        
-        try {
-            const baseUrl = document.getElementById('sel-api-line').value;
-            // API MỘC: KHÔNG CẦN AUTH HEADER 
-            const payload = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, currentDay: r.thu, currentFreq: r.freq }));
-            const response = await fetch(`${baseUrl}/api/optimizeRoute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locations: payload, availableDays: AppState.selectedDays }) });
-            if (!response.ok) throw new Error("Lỗi Server AI");
-            
-            const aiResults = (await response.json()).optimized_data;
-            document.getElementById('ai-progress-fill').style.width = '100%';
-            
-            AppState.workingData.forEach(row => {
-                let match = aiResults.find(i => i.id === row.ma_kh);
-                if (match) { row.thu = match.day; row._ai_order = match.order; if(match.freq) row.freq = match.freq; }
-            });
-            AppState.workingData.sort((a,b) => a._ai_order - b._ai_order);
-            
-            showToast(`✨ Đã áp dụng đề xuất AI cho ${payload.length} khách!`);
-            AppState.isFirstMapRender = true; processDataAndRender();
-        } catch (error) { showToast(error.message, 'error'); } 
-        finally { document.getElementById('ai-loading-overlay').classList.add('hidden'); }
-    }
-
-    window.exportDetailToExcel = function() {
-        let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
-        if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
-
-        let excelRows = [ ["--- BẢN THẢO PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "Lat", "Lng", "M5", "M6", "M7", "M8"] ];
-        let cMap = new Map(); activeData.forEach(row => { if (!cMap.has(row.ma_kh)) cMap.set(row.ma_kh, { ...row, days: new Set() }); cMap.get(row.ma_kh).days.add(row.thu); });
-        
-        let sttCounter = 1;
-        cMap.forEach((cust) => {
-            excelRows.push([
-                cust._ai_order !== 999 ? cust._ai_order : sttCounter++, cust.npp, cust.nv, cust.ma_kh, cust.ten_kh, cust.dia_chi,
-                ...CONSTANTS.DAYS_TEXT.map(d => cust.days.has(d) ? "x" : ""), ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", cust.lat, cust.lng,
-                AppState.salesData[cust.ma_kh]?.['M5'] || 0, AppState.salesData[cust.ma_kh]?.['M6'] || 0, AppState.salesData[cust.ma_kh]?.['M7'] || 0, AppState.salesData[cust.ma_kh]?.['M8'] || 0
-            ]);
-        });
-        let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "ProposalRoute");
-        XLSX.writeFile(wb, `DE_XUAT_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); showToast("Tải Excel thành công", 'success');
-    }
-
-    async function checkServerStatus() {
-        const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
-        try { if ((await fetch(document.getElementById('sel-api-line').value + '/api/optimizeRoute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ping: true}) })).ok) { b.innerHTML = "🟢 OK"; b.className = "cursor-pointer text-emerald-700 bg-emerald-100 border border-emerald-300 px-1 rounded text-xs"; } else throw new Error(); } catch(e) { b.innerHTML = "🔴 Lỗi"; b.className = "cursor-pointer text-red-700 bg-red-100 border border-red-300 px-1 rounded text-xs"; }
-    }
-</script>
-</body>
-</html>
+}
