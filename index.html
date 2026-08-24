@@ -768,7 +768,9 @@
                 let p = empPalette[day] || empPalette['Thứ 2'];
                 
                 const processGroup = (group, shape, bg, txt, dash) => {
-                    if(group.length === 0) return; let coords = [];
+                    if(group.length === 0) return;
+                    group.sort((a, b) => (a._ai_order || 999) - (b._ai_order || 999));
+                    let coords = [];
                     group.forEach((row, i) => {
                         coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
                         let stt = row._ai_order !== 999 ? row._ai_order : i + 1;
@@ -809,7 +811,6 @@
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); const tbody = document.getElementById('table-body');
         
-        // YÊU CẦU: Thêm 2 cột Latitude và Longitude phía sau Doanh số
         thead.innerHTML = `<tr>
             <th class="sticky-header" rowspan="2">STT</th><th class="sticky-header" rowspan="2" style="width:30px;" title="Loại khách">🗑️</th>
             <th class="sticky-header" rowspan="2">Nhân viên</th><th class="sticky-header" rowspan="2">Mã KH</th><th class="sticky-header" rowspan="2">Tên KH</th>
@@ -883,24 +884,85 @@
     }
 
     window.exportDetailToExcel = function() {
-        let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
-        if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
+    let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
+    if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-        let excelRows = [ ["--- BẢN CHỈNH SỬA PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "M5", "M6", "M7", "M8", "Lat", "Lng"] ];
-        let cMap = new Map(); activeData.forEach(row => { if (!cMap.has(row.ma_kh)) cMap.set(row.ma_kh, { ...row, days: new Set() }); cMap.get(row.ma_kh).days.add(row.thu); });
+    // 1. Gom nhóm thông tin theo Mã KH
+    let cMap = new Map();
+    activeData.forEach(row => {
+        if (!cMap.has(row.ma_kh)) {
+            cMap.set(row.ma_kh, { ...row, days: new Set() });
+        }
+        cMap.get(row.ma_kh).days.add(row.thu);
+    });
+
+    // 2. Tạo Tiêu đề các cột đúng vị trí như File Tuyến Gốc
+    let excelRows = [];
+    let headerRow = [];
+    headerRow[0]  = "STT";             
+    headerRow[1]  = "Mã Đơn Vị";               
+    headerRow[2]  = "NPP";             
+    headerRow[3]  = "Kênh";                
+    headerRow[4]  = "Nhân viên";       
+    headerRow[5]  = "Mã KH";           
+    headerRow[6]  = "Tên Khách Hàng";  
+    headerRow[7]  = "Địa chỉ";         
+    
+    // Cột 11 -> 17: Các Thứ trong tuần
+    CONSTANTS.DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
+    // Cột 18 -> 21: Tần suất Tuần
+    headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
+    // Cột 22 -> 24: Tọa độ & Khu vực
+    headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
+    // Cột 25 -> 28: Doanh số 4 tháng
+    headerRow[25] = "DS M5"; headerRow[26] = "DS M6"; headerRow[27] = "DS M7"; headerRow[28] = "DS M8";
+    
+    excelRows.push(headerRow);
+
+    // 3. Điền dữ liệu vào đúng chỉ số cột (Index) của file gốc
+    let sttCounter = 1;
+    cMap.forEach((cust) => {
+        let row = new Array(29).fill(""); // Khởi tạo dòng gồm 29 cột chuẩn
         
-        let sttCounter = 1;
-        cMap.forEach((cust) => {
-            excelRows.push([
-                cust._ai_order !== 999 ? cust._ai_order : sttCounter++, cust.npp, cust.nv, cust.ma_kh, cust.ten_kh, cust.dia_chi,
-                ...CONSTANTS.DAYS_TEXT.map(d => cust.days.has(d) ? "x" : ""), ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "",
-                AppState.salesData[cust.ma_kh]?.['M5'] || 0, AppState.salesData[cust.ma_kh]?.['M6'] || 0, AppState.salesData[cust.ma_kh]?.['M7'] || 0, AppState.salesData[cust.ma_kh]?.['M8'] || 0,
-                cust.lat, cust.lng
-            ]);
+        row[0] = cust._ai_order !== 999 ? cust._ai_order : sttCounter++;
+        row[2] = cust.npp || "";
+        row[4] = cust.nv || "";
+        row[5] = cust.ma_kh || "";            
+        row[6] = cust.ten_kh || "";          
+        row[7] = cust.dia_chi || ""; 
+        
+        // Đánh dấu "x" vào đúng cột Thứ đã chỉnh sửa (Cột 11 -> 17)
+        CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
+            row[11 + idx] = cust.days.has(day) ? "x" : "";
         });
-        let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "ProposalRoute");
-        XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); showToast("Tải Excel thành công", 'success');
-    }
+
+        // Đánh dấu "x" vào đúng cột Tần suất mới (Cột 18 -> 21)
+        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+        // Tọa độ & Khu vực (Cột 22 -> 24)
+        row[22] = cust.lat || 0;
+        row[23] = cust.lng || 0;
+        row[24] = cust.area || "Khác";
+        
+        // Doanh số (Cột 25 -> 28)
+        let dsKH = AppState.salesData[cust.ma_kh] || {};
+        row[25] = dsKH['M5'] || 0;
+        row[26] = dsKH['M6'] || 0;
+        row[27] = dsKH['M7'] || 0;
+        row[28] = dsKH['M8'] || 0;
+
+        excelRows.push(row);
+    });
+
+    // 4. Ghi file Excel
+    let wb = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "MasterRoute");
+    XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
+    showToast("Tải Excel thành công", 'success');
+}
 
     async function checkServerStatus() {
         const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
