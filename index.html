@@ -16,7 +16,6 @@
         :root { --primary: #3b82f6; --primary-hover: #2563eb; --danger: #ef4444; --warning: #f59e0b; --success: #10b981; --bg-gray: #f1f5f9; --text-main: #334155; --text-muted: #64748b; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-gray); font-size: 13px; color: var(--text-main); }
         
-        /* CÁC CLASS HỖ TRỢ DÀN TRANG (Đã được bổ sung flex-1 và w-full) */
         .flex { display: flex; } .flex-col { display: flex; flex-direction: column; } .items-center { align-items: center; } .justify-between { justify-content: space-between; }
         .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .mt-2 { margin-top: 8px; } .mb-2 { margin-bottom: 8px; } .mb-1 { margin-bottom: 4px; }
         .font-bold { font-weight: bold; } .hidden { display: none !important; }
@@ -37,7 +36,6 @@
         .btn-danger { background-color: var(--danger); } .btn-danger:hover { background-color: #dc2626; }
         .btn:disabled { background-color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
 
-        /* BẢN ĐỒ & THANH CÔNG CỤ */
         #map-container { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; }
         #map { flex-grow: 1; background: #e2e8f0; z-index: 1; }
         .map-toolbar-wrapper { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; display: none; align-items: center; gap: 8px; }
@@ -46,7 +44,6 @@
         .icon-btn { background: white; border: 2px solid var(--primary); border-radius: 20px; width: 32px; height: 32px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 14px; }
         .icon-btn:hover { background: #eff6ff; }
 
-        /* BỘ LỌC VÀ BẢNG */
         .filter-section { background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
         .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
         .form-control[multiple] { min-height: 48px; padding: 2px; }
@@ -68,7 +65,6 @@
         .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 11px; box-sizing: border-box; }
         .marker-circle { border-radius: 50%; } .marker-square { border-radius: 4px; }
         
-        /* CHÚ THÍCH MÀU SẮC */
         .legend-box { width: 12px; height: 12px; display: inline-block; border-radius: 3px; border: 1px solid #94a3b8; }
         .legend-circle { border-radius: 50%; }
 
@@ -104,12 +100,10 @@
             <div class="flex justify-between font-bold text-sm mb-2"><span>1. Tuyến:</span><span id="statusRoute" class="font-normal">(Chưa tải)</span></div>
             <div class="flex justify-between font-bold text-sm mb-2"><span>2. Doanh số:</span><span id="statusSales" class="font-normal">(Chưa tải)</span></div>
             
-            <!-- KHUNG GHI CHÚ MÀU (LEGEND) VẪN GIỮ NGUYÊN -->
             <div id="legend-container" class="hidden mt-2 p-2 bg-white rounded border border-slate-300 text-xs"></div>
         </div>
         
         <div id="map-container">
-            <!-- THANH CÔNG CỤ BẢN ĐỒ VẪN GIỮ NGUYÊN -->
             <div id="map-toolbar-wrapper" class="map-toolbar-wrapper">
                 <div id="route-toggle-toolbar" class="map-toolbar">
                     <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Gốc</span></label>
@@ -137,7 +131,6 @@
                 <div id="day-chips-container" class="flex flex-wrap gap-2 items-center" style="min-height: 28px;"><span class="text-muted text-xs">-- Chọn Thứ --</span></div>
             </div>
             
-            <!-- HÀNG NÚT BẤM DÀN ĐỀU 100% CHIỀU RỘNG -->
             <div class="flex gap-3 w-full items-end mt-2">
                 <div class="flex-col relative" style="flex: 0 0 25%;">
                     <label class="flex justify-between items-center mb-1 font-bold">Kênh AI <span id="server-status-badge" class="cursor-pointer text-blue-600 bg-blue-100 border border-blue-200 px-1 rounded text-xs" onclick="checkServerStatus()">🔄 Ping</span></label>
@@ -146,7 +139,6 @@
                         <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2</option>
                     </select>
                 </div>
-                <!-- VÙNG NÚT BẤM CÓ CLASS flex-1 ĐỂ CO GIÃN THEO CHIỀU NGANG -->
                 <div class="flex gap-2 m-0" style="flex: 1;">
                     <button id="btn-ai-optimize" class="btn btn-warning flex-1" onclick="optimizeRouteWithAI()" disabled>✨ AI Gợi Ý</button>
                     <button id="btn-undo" class="btn btn-danger flex-1" onclick="undo()" disabled style="background-color: #64748b;">↩ Hoàn Tác</button>
@@ -178,17 +170,22 @@
        1. STATE MANAGEMENT (CORE ARCHITECTURE)
        ========================================= */
     const AppState = {
-        sourceData: [],    // Bất biến: Dữ liệu chuẩn từ file/DB
-        workingData: [],   // Động: Dữ liệu đang nháp
-        historyStack: [],  // Ngăn xếp để Undo (Ctrl+Z)
+        sourceData: [],    
+        workingData: [],   
+        historyStack: [],  
         salesData: {},     
         selectedEmployees: [], selectedDays: [],
         isOptimizedView: false, isFirstMapRender: true, isToolbarExpanded: true
     };
 
     const CONSTANTS = {
-        SUPABASE_URL: 'https://mrqldgycwovpbmzdeuyz.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p', BUCKET: 'mappingdata',
-        DAYS_TEXT: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'], DAY_COLS: [11, 12, 13, 14, 15, 16, 17]
+        SUPABASE_URL: 'https://mrqldgycwovpbmzdeuyz.supabase.co', 
+        SUPABASE_ANON_KEY: 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p', 
+        BUCKET: 'mappingdata',
+        FILE_ROUTE: 'tuyen.xlsx', 
+        HUB_URL: 'https://nguyen842-ai.github.io/Tong-hop-bao-cao/',
+        DAYS_TEXT: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'], 
+        DAY_COLS: [11, 12, 13, 14, 15, 16, 17]
     };
 
     const palettes_single = { 'Thứ 2':{base:'#22c55e',light:'#bbf7d0',txt:'#000'}, 'Thứ 3':{base:'#ef4444',light:'#fecaca',txt:'#fff'}, 'Thứ 4':{base:'#a855f7',light:'#e9d5ff',txt:'#fff'}, 'Thứ 5':{base:'#eab308',light:'#fef08a',txt:'#000'}, 'Thứ 6':{base:'#000000',light:'#cbd5e1',txt:'#fff'}, 'Thứ 7':{base:'#3b82f6',light:'#bfdbfe',txt:'#fff'}, 'Chủ nhật':{base:'#f97316',light:'#fed7aa',txt:'#fff'} };
@@ -215,7 +212,7 @@
     /* --- UNDO LOGIC --- */
     function saveHistory() {
         AppState.historyStack.push(structuredClone(AppState.workingData));
-        if (AppState.historyStack.length > 20) AppState.historyStack.shift(); // Max 20 steps
+        if (AppState.historyStack.length > 20) AppState.historyStack.shift(); 
         updateUndoButton();
     }
     window.undo = function() {
@@ -244,11 +241,19 @@
     }
 
     /* =========================================
-       3. DATA LOADING (SAFE PARSING)
+       3. DATA LOADING (SAFE PARSING & SUPABASE AUTH)
        ========================================= */
     async function loadSalesData() {
         renderStatus('statusSales', '⌛ Đang tải...', '#ea580c');
         try {
+            // [ĐÃ KHÔI PHỤC] Xác thực phiên người dùng từ Supabase để được phép tải file Private
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { 
+                console.error("Chưa đăng nhập, không thể lấy file doanh số.");
+                renderStatus('statusSales', '❌ Lỗi Auth', '#dc2626'); 
+                return; 
+            }
+
             let { data: urls } = await supabaseClient.storage.from('data').createSignedUrls(['dataM5.js','dataM6.js','dataM7.js','dataM8.js'], 60);
             if (!urls || urls[0].error) urls = (await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls(['data/dataM5.js','data/dataM6.js','data/dataM7.js','data/dataM8.js'], 60)).data;
             if (urls && urls.length > 0) {
@@ -280,7 +285,6 @@
         let rawValid = [];
         jsonRouteList.forEach((row, idx) => {
             if (idx === 0 || !row[0] || row[0] === 'STT') return;
-            // XSS PROTECTION
             let npp = escapeHTML(row[2]), nv = escapeHTML(row[4]), ma_kh = escapeHTML(row[5]);
             let ten_kh = escapeHTML(row[6]), dia_chi = escapeHTML(row[7] || 'N/A'), area = escapeHTML(row[24] || "Khác");
             let lat = parseFloat(row[22]), lng = parseFloat(row[23]);
@@ -317,14 +321,37 @@
     }
 
     async function loadDataFromSupabase() {
-        document.getElementById('btnLoadData').disabled = true; renderStatus('statusRoute', '⌛ Đang tải...', '#ea580c'); await loadSalesData();
+        const btn = document.getElementById('btnLoadData');
+        btn.disabled = true; 
+        renderStatus('statusRoute', '⌛ Đang tải...', '#ea580c'); 
+        
+        await loadSalesData();
         try {
-            let resRoute = await fetch((await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls([CONSTANTS.FILE_ROUTE], 60)).data[0].signedUrl);
+            // [ĐÃ KHÔI PHỤC] Điều hướng nếu Session Supabase hết hạn
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { 
+                alert("Phiên làm việc hết hạn. Vui lòng đăng nhập lại."); 
+                window.location.href = CONSTANTS.HUB_URL; 
+                return; 
+            }
+
+            let { data: signedUrls, error } = await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls([CONSTANTS.FILE_ROUTE], 60);
+            if (error || !signedUrls || signedUrls.length < 1) throw new Error("Lỗi xác thực file.");
+
+            let resRoute = await fetch(signedUrls[0].signedUrl);
+            if (!resRoute.ok) throw new Error("Lỗi tải file Route");
+
             let ws = XLSX.read(await resRoute.arrayBuffer(), {type: 'array'});
             processRawExcelData(XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1}));
-            renderStatus('statusRoute', '✅ Đã tải DB', '#16a34a'); setupFilters(false);
-        } catch (err) { renderStatus('statusRoute', '❌ Lỗi DB', '#dc2626'); showToast('Lỗi tải từ DB', 'error'); } 
-        finally { document.getElementById('btnLoadData').disabled = false; }
+            
+            renderStatus('statusRoute', '✅ Đã tải DB', '#16a34a'); 
+            setupFilters(false);
+        } catch (err) { 
+            console.error(err);
+            renderStatus('statusRoute', '❌ Lỗi DB', '#dc2626'); 
+            showToast('Lỗi tải từ DB', 'error'); 
+        } 
+        finally { btn.disabled = false; }
     }
 
     /* =========================================
@@ -447,7 +474,7 @@
 
         renderMapOptimized(activeData); renderDetailTable(activeData);
         document.getElementById('dashboard-section').classList.remove('hidden');
-        document.getElementById('map-toolbar-wrapper').style.display = 'flex'; // Hiển thị Menu chuyển đổi khi có dữ liệu
+        document.getElementById('map-toolbar-wrapper').style.display = 'flex'; 
     }
 
     function renderMapOptimized(data) {
@@ -535,13 +562,12 @@
         let dataToOptimize = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
         if (dataToOptimize.length < 3) return showToast("Quá ít khách hàng để tối ưu", 'warning');
         
-        executeMutation(() => {}); // Lưu lịch sử trước khi gọi AI
+        executeMutation(() => {}); 
         document.getElementById('ai-loading-overlay').classList.remove('hidden');
         document.getElementById('ai-progress-fill').style.width = '60%';
         
         try {
             const baseUrl = document.getElementById('sel-api-line').value;
-            // API MỘC: KHÔNG CẦN AUTH HEADER 
             const payload = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, currentDay: r.thu, currentFreq: r.freq }));
             const response = await fetch(`${baseUrl}/api/optimizeRoute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locations: payload, availableDays: AppState.selectedDays }) });
             if (!response.ok) throw new Error("Lỗi Server AI");
