@@ -177,7 +177,7 @@ Dưới đây là danh sách khách hàng (Tổng số: ${algorithmicData.length
 ${JSON.stringify(algorithmicData)}
 
 Nhiệm vụ của bạn:
-1. Sắp xếp lại thứ tự (order) của các điểm giao trong cùng một ngày (day) cho tối ưu quãng đường.
+1. Dò trên bản đồ thực, sắp xếp thứ tự (order) của các điểm trong cùng một ngày (day) sao cho việc di chuyển theo thứ tự hợp lý và ngắn nhất về khoảng cách/thời gian từ đầu đến cuối, không quay lại điểm xuất phát.
 2. TUYỆT ĐỐI KHÔNG ĐƯỢC XÓA, BỎ SÓT HOẶC TỰ Ý BỚT KHÁCH HÀNG NÀO. Mảng trả về BẮT BUỘC PHẢI CÓ ĐÚNG ${algorithmicData.length} PHẦN TỬ.
 3. Không thay đổi thuộc tính 'id', 'day', 'freq' của từng phần tử.
 4. Số lượng khách trên mỗi tuyến đã được cân bằng (~30 khách/ngày). KHÔNG được tự ý dời khách sang ngày khác.
