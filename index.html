@@ -574,16 +574,26 @@
     }
 
     document.getElementById('sel-area').addEventListener('change', (e) => {
-        clearWorkspace(true); 
-        if (!e.target.value) { 
-            document.getElementById('sel-npp').disabled = true; 
-            renderNVCheckboxes([]); 
-            return; 
-        }
-        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
-        document.getElementById('sel-npp').disabled = false; 
-        renderNVCheckboxes([]);
-    });
+    clearWorkspace(true); 
+    if (!e.target.value) { 
+        document.getElementById('sel-npp').disabled = true; 
+        renderNVCheckboxes([]); 
+        return; 
+    }
+    document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
+    document.getElementById('sel-npp').disabled = false; 
+    renderNVCheckboxes([]);
+});
+
+document.getElementById('sel-npp').addEventListener('change', (e) => {
+    clearWorkspace(true); 
+    if (!e.target.value) { 
+        renderNVCheckboxes([]); 
+        return; 
+    }
+    let nvs = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort();
+    renderNVCheckboxes(nvs);
+});
 
     document.getElementById('sel-npp').addEventListener('change', (e) => {
         clearWorkspace(true); 
