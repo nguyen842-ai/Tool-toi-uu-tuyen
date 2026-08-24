@@ -3,259 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Quy Hoạch Lộ Trình Di Chuyển - Master Optimized</title>
+    <title>Quy Hoạch Lộ Trình Di Chuyển - Master Optimized</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- SỬ DỤNG XLSX-JS-STYLE ĐỂ HỖ TRỢ BÔI MÀU & ĐỊNH DẠNG FILE EXCEL -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; font-size: 16px; }
-        #app-container { display: flex; height: 100vh; width: 100%; position: relative;}
+        /* CSS VARIABLES & COMPACT MODE */
+        :root { --primary: #3b82f6; --primary-hover: #2563eb; --danger: #ef4444; --warning: #f59e0b; --success: #10b981; --bg-gray: #f1f5f9; --text-main: #334155; --text-muted: #64748b; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-gray); font-size: 13px; color: var(--text-main); }
         
-        #left-panel { width: 40%; height: 100%; display: flex; flex-direction: column; border-right: 2px solid #cbd5e1; background: #fff; }
-        #upload-section { padding: 15px; background: #e2e8f0; border-bottom: 2px solid #cbd5e1; }
-        .upload-warning { color: #1e40af; font-weight: bold; font-size: 16px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
-        .btn-primary { width: 100%; padding: 10px; background-color: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; transition: background 0.3s; margin-bottom: 10px; }
-        .btn-primary:hover { background-color: #2563eb; }
-        .btn-primary:disabled { background-color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
-        .btn-warning { background-color: #f59e0b; margin: 0; padding: 8px 10px; flex: 1; }
-        .btn-warning:hover { background-color: #d97706; }
-        .btn-purple { background-color: #8b5cf6; margin: 0; padding: 8px 10px; flex: 1; }
-        .btn-purple:hover { background-color: #7c3aed; }
-        .btn-green { background-color: #10b981; width: auto; margin: 0; padding: 8px 15px; }
-        .btn-green:hover { background-color: #059669; }
-        .file-status-box { margin-bottom: 8px; display: flex; justify-content: space-between; font-weight: bold; font-size: 15px;}
-        .status-badge { font-weight: normal; font-size: 14px; }
+        /* CÁC CLASS HỖ TRỢ DÀN TRANG (Đã được bổ sung flex-1 và w-full) */
+        .flex { display: flex; } .flex-col { display: flex; flex-direction: column; } .items-center { align-items: center; } .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .mt-2 { margin-top: 8px; } .mb-2 { margin-bottom: 8px; } .mb-1 { margin-bottom: 4px; }
+        .font-bold { font-weight: bold; } .hidden { display: none !important; }
+        .flex-1 { flex: 1; } .w-full { width: 100%; }
         
+        #app-container { display: flex; height: 100vh; width: 100%; position: relative; }
+        #left-panel { width: 35%; height: 100%; border-right: 2px solid #cbd5e1; background: #fff; display: flex; flex-direction: column; }
+        #right-panel { width: 65%; height: 100%; padding: 12px 16px; overflow-y: auto; background-color: #ffffff; position: relative; }
+        
+        #upload-section { padding: 10px; background: #e2e8f0; border-bottom: 2px solid #cbd5e1; }
+        .upload-warning { color: #1e40af; font-weight: bold; font-size: 14px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 8px; border-radius: 6px; margin-bottom: 8px; }
+        
+        .btn { padding: 8px 12px; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-primary { background-color: var(--primary); } .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-warning { background-color: var(--warning); color: #fff; } .btn-warning:hover { background-color: #d97706; }
+        .btn-purple { background-color: #8b5cf6; } .btn-purple:hover { background-color: #7c3aed; }
+        .btn-success { background-color: var(--success); } .btn-success:hover { background-color: #059669; }
+        .btn-danger { background-color: var(--danger); } .btn-danger:hover { background-color: #dc2626; }
+        .btn:disabled { background-color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
+
+        /* BẢN ĐỒ & THANH CÔNG CỤ */
         #map-container { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; }
-        #map { flex-grow: 1; width: 100%; background: #e2e8f0; z-index: 1; }
-        #route-toggle-toolbar { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 8px 16px; border-radius: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; align-items: center; gap: 15px; border: 2px solid #3b82f6; }
-        .toggle-option { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 15px; font-weight: bold; color: #1e293b;}
-        .toggle-option input { cursor: pointer; }
+        #map { flex-grow: 1; background: #e2e8f0; z-index: 1; }
+        .map-toolbar-wrapper { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; display: none; align-items: center; gap: 8px; }
+        .map-toolbar { background: white; padding: 6px 12px; border-radius: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; border: 2px solid var(--primary); }
+        .toggle-option { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px; font-weight: bold; color: #1e293b;}
+        .icon-btn { background: white; border: 2px solid var(--primary); border-radius: 20px; width: 32px; height: 32px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 14px; }
+        .icon-btn:hover { background: #eff6ff; }
 
-        #right-panel { width: 60%; height: 100%; padding: 20px; box-sizing: border-box; overflow-y: auto; background-color: #ffffff; position: relative; }
-        
-        .filter-header-section { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
-        .filter-row-horizontal { display: flex; gap: 15px; width: 100%; align-items: flex-end;}
-        .filter-item { display: flex; flex-direction: column; flex: 1; }
-        .filter-item label { font-size: 15px; font-weight: bold; margin-bottom: 5px; color: #475569; }
-        .filter-item select { padding: 9px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 15px; width: 100%; background: #fff; font-weight: 500;}
-        .filter-item select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-        
-        .day-chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 35px; align-items: center; }
-        .day-chip { padding: 6px 14px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px; font-weight: 600; color: #475569; cursor: pointer; transition: all 0.2s; user-select: none; }
-        .day-chip:hover { background: #e2e8f0; }
-        .day-chip.active { background: #3b82f6; color: white; border-color: #3b82f6; }
-        .action-buttons-container { display: flex; gap: 10px; flex: 1; }
+        /* BỘ LỌC VÀ BẢNG */
+        .filter-section { background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
+        .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
+        .form-control[multiple] { min-height: 48px; padding: 2px; }
+        .day-chip { padding: 4px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .day-chip:hover { background: #e2e8f0; } .day-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-        .summary-card { margin-bottom: 20px; }
-        .header-title-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; }
-        .header-title-row h2 { margin: 0; color: #0f172a; font-size: 22px; }
-        .header-title-row h3 { margin: 0; color: #0f172a; font-size: 19px; }
-        
-        .warning-section-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: none; }
-        .warning-title { color: #dc2626; font-size: 18px; font-weight: bold; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;}
-        .warning-tag { background: #fee2e2; color: #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; border: 1px solid #fca5a5; display: inline-block; margin-bottom: 4px; margin-right: 4px;}
-
-        .data-table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 25px;}
-        
-        /* GHIM THANH CUỘN NGANG & TIÊU ĐỀ BẢNG CHI TIẾT TUYẾN */
-        .data-table-container:has(#detail-table) {
-            max-height: calc(100vh - 180px);
-            overflow: auto;
-            position: relative;
-        }
-
-        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 15px; }
-        th, td { padding: 9px 12px; text-align: left; border: 1px solid #e2e8f0; }
-        th.route-th { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; white-space: normal !important; word-wrap: break-word; font-size: 15px; }
-        th.danger-th { background-color: #dc2626 !important; color: white !important; }
-        th { position: sticky; top: 0; z-index: 2; }
-        td { white-space: nowrap; }
-        tfoot { background-color: #e2e8f0; font-weight: bold; font-size: 15px; }
-        .num-right { text-align: right; }
+        .table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 15px; max-height: calc(100vh - 180px); }
+        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 12px; }
+        th, td { padding: 6px 8px; text-align: left; border: 1px solid #e2e8f0; white-space: nowrap; }
+        th.sticky-header { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; position: sticky; top: 0; z-index: 2; }
         .ds-col { background-color: #fef3c7 !important; color: #065f46 !important; font-weight: bold; }
-        
-        .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 14px; box-sizing: border-box; }
-        .marker-circle { border-radius: 50%; }
-        .marker-square { border-radius: 6px; }
-
-        .hover-row { transition: background-color 0.2s ease; }
         .hover-row:hover td { background-color: #bfdbfe !important; }
+        .edit-cell { cursor: pointer; user-select: none; text-align: center; } .edit-cell:hover { background-color: #93c5fd !important; }
+        .stt-input { width: 40px; text-align: center; font-weight: bold; padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; }
         
-        .edit-cell { cursor: pointer; user-select: none; transition: background 0.2s; }
-        .edit-cell:hover { background-color: #93c5fd !important; }
+        .btn-remove { background-color: var(--danger); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-remove:hover { background-color: #b91c1c; transform: scale(1.1); }
         
-        .stt-input { width: 50px; text-align: center; font-weight: bold; padding: 6px 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 15px; }
-        .stt-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
+        .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 11px; box-sizing: border-box; }
+        .marker-circle { border-radius: 50%; } .marker-square { border-radius: 4px; }
+        
+        /* CHÚ THÍCH MÀU SẮC */
+        .legend-box { width: 12px; height: 12px; display: inline-block; border-radius: 3px; border: 1px solid #94a3b8; }
+        .legend-circle { border-radius: 50%; }
+
+        /* TOAST NOTIFICATION */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: #334155; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { border-left: 4px solid var(--success); } .toast.error { border-left: 4px solid var(--danger); } .toast.warning { border-left: 4px solid var(--warning); }
     </style>
 </head>
 <body>
 
-<!-- KHUNG HIỂN THỊ LOADING AI -->
-<div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 420px; width: 90%;">
-        <h2 id="ai-status-title" style="margin-top: 0; color: #1e40af; font-size: 18px;">Khởi động AI Hybrid...</h2>
-        <p id="ai-status-desc" style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Đang gom cụm địa lý K-Means trước khi gửi Gemini AI</p>
-        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-            <div id="ai-progress-fill" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s ease;"></div>
+<div id="ai-loading-overlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%;">
+        <h2 class="mt-0" style="color: #1e40af; font-size: 16px;">Đang thiết lập phương án AI...</h2>
+        <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 15px;">
+            <div id="ai-progress-fill" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
         </div>
     </div>
 </div>
 
+<div id="toast-container" aria-live="polite"></div>
+
 <div id="app-container">
     <div id="left-panel">
         <div id="upload-section">
-            <div class="upload-warning">
-                BẢN ĐỒ QUY HOẠCH TUYẾN MASTER
+            <div class="upload-warning">BẢN ĐỒ QUY HOẠCH TUYẾN MASTER</div>
+            <div class="flex gap-2 mb-2 w-full">
+                <button id="btnLoadData" class="btn btn-primary flex-1" onclick="loadDataFromSupabase()">📥 Tải Dữ Liệu DB</button>
+                <input type="file" id="localFileInput" accept=".xlsx, .xls" class="hidden" onchange="handleLocalFileUpload(event)" multiple>
+                <button class="btn btn-purple flex-1" onclick="document.getElementById('localFileInput').click()">📁 Tải File Mới</button>
             </div>
+            <div class="flex justify-between font-bold text-sm mb-2"><span>1. Tuyến:</span><span id="statusRoute" class="font-normal">(Chưa tải)</span></div>
+            <div class="flex justify-between font-bold text-sm mb-2"><span>2. Doanh số:</span><span id="statusSales" class="font-normal">(Chưa tải)</span></div>
             
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button id="btnLoadData" class="btn-primary" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="loadDataFromSupabase()">📥 Dữ liệu hệ thống</button>
-                <input type="file" id="localFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleLocalFileUpload(event)">
-                <button id="btnLocalUpload" class="btn-primary btn-purple" style="margin-bottom:0; flex: 1; padding: 10px 5px; font-size: 12px;" onclick="document.getElementById('localFileInput').click()">📁 Tự tải dữ liệu lên</button>
-            </div>
-
-            <div class="file-status-box">
-                <span>1. Dữ liệu Tuyến:</span>
-                <span id="statusRoute" class="status-badge" style="color:#64748b;">(Chưa tải)</span>
-            </div>
-            <div class="file-status-box">
-                <span>2. Dữ liệu Doanh số:</span>
-                <span id="statusSales" class="status-badge" style="color:#64748b;">(Chưa tải)</span>
-            </div>
-
-            <div style="font-size: 11.5px; color: #334155; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 5px; margin-top: 10px;">
-                <span style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#64748b; border:1px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></span> F4 thuần</span>
-                <span style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#64748b; border:1px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></span> F2 thuần</span>
-                <span style="display:flex; align-items:center; gap:4px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" style="filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.3));"><path fill="#64748b" stroke="white" stroke-width="1.5" stroke-linejoin="round" d="M12 2 L22 21 L2 21 Z"/></svg> Tuyến trộn (F4+F2)
-                </span>
-            </div>
+            <!-- KHUNG GHI CHÚ MÀU (LEGEND) VẪN GIỮ NGUYÊN -->
+            <div id="legend-container" class="hidden mt-2 p-2 bg-white rounded border border-slate-300 text-xs"></div>
         </div>
+        
         <div id="map-container">
-            <div id="route-toggle-toolbar">
-                <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Tuyến Gốc</span></label>
-                <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến Mới</span></label>
-                <div style="width: 2px; height: 16px; background: #cbd5e1; margin: 0 8px;"></div>
-                <label class="toggle-option">
-                    <input type="checkbox" id="chk-draw-lines" onchange="processDataAndRender()">
-                    <span style="color:#10b981;">🔗 Hiện liên kết</span>
-                </label>
+            <!-- THANH CÔNG CỤ BẢN ĐỒ VẪN GIỮ NGUYÊN -->
+            <div id="map-toolbar-wrapper" class="map-toolbar-wrapper">
+                <div id="route-toggle-toolbar" class="map-toolbar">
+                    <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Gốc</span></label>
+                    <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Nháp</span></label>
+                    <div style="width: 1px; height: 12px; background: #cbd5e1;"></div>
+                    <label class="toggle-option"><input type="checkbox" id="chk-draw-lines" onchange="processDataAndRender()"><span style="color:var(--success);">🔗 Nối tuyến</span></label>
+                </div>
+                <button class="icon-btn" onclick="toggleRouteToolbarVisibility()" title="Ẩn/Hiện Menu" aria-label="Ẩn hiện">⚙️</button>
+                <button class="icon-btn" onclick="fitMapBounds()" title="Góc nhìn toàn cảnh" aria-label="Toàn cảnh">🌍</button>
             </div>
             <div id="map"></div>
         </div>
     </div>
 
     <div id="right-panel">
-        <div class="filter-header-section">
-            <div class="filter-row-horizontal">
-                <div class="filter-item">
-                    <label>Khu vực (Area)</label>
-                    <select id="sel-area" disabled><option value="">-- Chọn Khu vực --</option></select>
-                </div>
-                <div class="filter-item">
-                    <label>Đơn vị PP (NPP)</label>
-                    <select id="sel-npp" disabled><option value="">-- Chọn NPP --</option></select>
-                </div>
-                <div class="filter-item">
-                    <label>Nhân viên</label>
-                    <select id="sel-nv" disabled><option value="">-- Chọn Nhân viên --</option></select>
-                </div>
-            </div>
-
-            <div class="filter-item" style="width: 100%;">
-                <label>Thứ (Day) - Chọn nhiều ngày</label>
-                <div id="day-chips-container" class="day-chips">
-                    <span style="color:#94a3b8; font-size: 13px;">-- Chọn Thứ --</span>
-                </div>
+        <div class="filter-section flex-col gap-2">
+            <div class="flex gap-3 w-full items-end">
+                <div class="flex-1 flex-col"><label class="mb-1 font-bold">Khu vực</label><select id="sel-area" class="form-control" disabled><option value="">-- Chọn Khu vực --</option></select></div>
+                <div class="flex-1 flex-col"><label class="mb-1 font-bold">NPP</label><select id="sel-npp" class="form-control" disabled><option value="">-- Chọn NPP --</option></select></div>
+                <div style="flex: 2;" class="flex-col"><label class="mb-1 font-bold">Nhân viên (Max 2)</label><select id="sel-nv" class="form-control" multiple disabled><option value="">-- Chọn Nhân viên --</option></select></div>
             </div>
             
-            <div class="filter-row-horizontal" style="margin-top: 5px;">
-                <div class="filter-item" style="flex: 1; position: relative;">
-                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                        Kênh xử lý dữ liệu
-                        <span id="server-status-badge" style="font-size: 11px; cursor: pointer; color: #3b82f6; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; border: 1px solid #bae6fd;" onclick="checkServerStatus()">
-                            🔄 Kiểm tra Server
-                        </span>
-                    </label>
-                    <select id="sel-api-line" style="border-color: #3b82f6; font-weight: bold; color: #1e40af; background-color: #eff6ff;" onchange="checkServerStatus()">
+            <div class="flex-col w-full mt-2">
+                <label class="mb-1 font-bold">Thứ (Day) - Có thể chọn nhiều</label>
+                <div id="day-chips-container" class="flex flex-wrap gap-2 items-center" style="min-height: 28px;"><span class="text-muted text-xs">-- Chọn Thứ --</span></div>
+            </div>
+            
+            <!-- HÀNG NÚT BẤM DÀN ĐỀU 100% CHIỀU RỘNG -->
+            <div class="flex gap-3 w-full items-end mt-2">
+                <div class="flex-col relative" style="flex: 0 0 25%;">
+                    <label class="flex justify-between items-center mb-1 font-bold">Kênh AI <span id="server-status-badge" class="cursor-pointer text-blue-600 bg-blue-100 border border-blue-200 px-1 rounded text-xs" onclick="checkServerStatus()">🔄 Ping</span></label>
+                    <select id="sel-api-line" class="form-control font-bold text-blue-800 bg-blue-50 border-blue-500" onchange="checkServerStatus()">
                         <option value="https://tool-toi-uu-tuyen.vercel.app">🔴 Line 1</option>
                         <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2</option>
                     </select>
                 </div>
-                <div class="action-buttons-container" style="flex: 2; margin: 0;">
-                    <button id="btn-ai-optimize" class="btn-primary btn-warning" onclick="optimizeRouteWithAI()" disabled style="margin-bottom:0;">✨ AI Tối Ưu Tuyến</button>
-                    <button id="btn-dl-map-week" class="btn-primary btn-purple" onclick="downloadWeeklyMap()" disabled style="margin-bottom:0;">🗺️ Tải Ảnh Bản Đồ</button>
+                <!-- VÙNG NÚT BẤM CÓ CLASS flex-1 ĐỂ CO GIÃN THEO CHIỀU NGANG -->
+                <div class="flex gap-2 m-0" style="flex: 1;">
+                    <button id="btn-ai-optimize" class="btn btn-warning flex-1" onclick="optimizeRouteWithAI()" disabled>✨ AI Gợi Ý</button>
+                    <button id="btn-undo" class="btn btn-danger flex-1" onclick="undo()" disabled style="background-color: #64748b;">↩ Hoàn Tác</button>
+                    <button id="btn-dl-map-week" class="btn btn-purple flex-1" onclick="downloadWeeklyMap()" disabled>🗺️ Lưu Ảnh</button>
                 </div>
-            </div>
-
-        </div>
-
-        <div id="warning-section" class="warning-section-box">
-            <h3 class="warning-title">🚨 CẢNH BÁO: DANH SÁCH KHÁCH HÀNG CẦN KIỂM TRA LẠI</h3>
-            <div style="margin-top:0; margin-bottom: 12px; font-size:12px; color:#475569; line-height: 1.5;">
-                <strong>Lưu ý:</strong><br>
-                - Khách bị <strong>lỗi tọa độ</strong> sẽ tạm ẩn khỏi bản đồ để tránh làm hỏng thuật toán AI.<br>
-                - Khách bị <strong>lỗi Chủ nhật</strong> hoặc <strong>sai Tần suất</strong> vẫn hiển thị trên bản đồ để bạn có thể ra lệnh cho Trợ lý AI dời tuyến.
-            </div>
-            <div class="data-table-container" style="margin-bottom: 0;">
-                <table id="warning-table" style="min-width: 600px;">
-                    <thead>
-                        <tr>
-                            <th class="route-th danger-th" style="width: 80px;">Mã KH</th>
-                            <th class="route-th danger-th">Tên Khách Hàng</th>
-                            <th class="route-th danger-th" style="width: 200px;">Chi Tiết Lỗi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="warning-body"></tbody>
-                </table>
             </div>
         </div>
 
-        <div class="summary-card" id="dashboard-section" style="display: none;">
-            <div class="header-title-row">
-                <h2>📊 Tổng quan tuyến</h2>
-            </div>
-            <div class="data-table-container">
-                <table id="comparison-table">
-                    <thead id="comp-head"></thead>
-                    <tbody id="comp-body"></tbody>
-                    <tfoot id="comp-foot"></tfoot>
-                </table>
-            </div>
-
-            <div id="ai-chat-section" style="display: none; margin-top: 25px; margin-bottom: 25px;">
-                <div class="header-title-row">
-                    <h3> Trợ Lý AI Tinh Chỉnh Lộ Trình</h3>
+        <div id="dashboard-section" class="hidden">
+            <div class="flex justify-between items-center border-b-2 border-slate-100 pb-2 mb-3">
+                <div class="flex items-baseline gap-3">
+                    <h2 class="m-0 text-base font-bold text-slate-900">Chi tiết tuyến (Bản Nháp)</h2>
+                    <span class="text-xs text-emerald-600 font-medium">(Mọi thay đổi tự động lưu vào bản nháp)</span>
                 </div>
-                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; font-style: italic;">
-                        *Ví dụ: "Dời các khách hàng Chủ nhật sang Thứ 6 và đưa lên đầu tuyến"*
-                    </div>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="ai-chat-input" placeholder="Nhập yêu cầu điều chỉnh tuyến tại đây..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
-                        <button id="btn-send-ai-chat" class="btn-primary btn-warning" onclick="sendCustomRequestToAI()" style="margin: 0; padding: 10px 15px; width: auto; font-size: 13px;">🚀 Gửi yêu cầu</button>
-                    </div>
-                </div>
+                <button class="btn btn-success" onclick="exportDetailToExcel()">📥 Xuất Excel Đề Xuất</button>
             </div>
-
-            <div class="header-title-row" style="margin-top: 30px;">
-                <div style="display: flex; align-items: baseline; gap: 15px;">
-                    <h2>Chi tiết tuyến</h2>
-                    <span style="font-size: 13px; color: #059669; font-weight: 500;">(Click các ô Tần suất / Thứ hoặc nhập số STT để Sửa Live Bản đồ)</span>
-                </div>
-                <button class="btn-primary btn-green" onclick="exportDetailToExcel()">📥 Tải file tuyến Excel</button>
-            </div>
-            <div class="data-table-container">
+            <div class="table-container">
                 <table id="detail-table">
                     <thead id="table-head"></thead>
                     <tbody id="table-body"></tbody>
-                    <tfoot id="table-foot"></tfoot>
                 </table>
             </div>
         </div>
@@ -263,1327 +174,416 @@
 </div>
 
 <script>
-    let selectedDays = []; 
-    let loadStatus = { route: 'idle' };
-    let allValidData = [];     
-    let allWarningData = [];   
-    let currentNVDataOriginal = [];  
-    let currentNVDataOptimized = []; 
-    let hasOptimizedData = false;    
-    let isOptimizedView = false;     
-    
-    window.salesDataMap = {}; 
-
-    const SUPABASE_URL = 'https://mrqldgycwovpbmzdeuyz.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p'; 
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const BUCKET_NAME = 'mappingdata';
-    const FILE_ROUTE = 'tuyen.xlsx'; 
-    const HUB_URL = 'https://nguyen842-ai.github.io/Tong-hop-bao-cao/';
-
-    const DAY_COLS = [11, 12, 13, 14, 15, 16, 17];
-    const DAYS_TEXT = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
-    
-    const palettes = {
-        'Thứ 2': { base: '#22c55e', light: '#bbf7d0', textLight: '#000' }, 
-        'Thứ 3': { base: '#ef4444', light: '#fecaca', textLight: '#000' }, 
-        'Thứ 4': { base: '#a855f7', light: '#e9d5ff', textLight: '#000' }, 
-        'Thứ 5': { base: '#eab308', light: '#fef08a', textLight: '#000' }, 
-        'Thứ 6': { base: '#000000', light: '#cbd5e1', textLight: '#000' }, 
-        'Thứ 7': { base: '#3b82f6', light: '#bfdbfe', textLight: '#000' }, 
-        'Chủ nhật': { base: '#f97316', light: '#fed7aa', textLight: '#000' } 
+    /* =========================================
+       1. STATE MANAGEMENT (CORE ARCHITECTURE)
+       ========================================= */
+    const AppState = {
+        sourceData: [],    // Bất biến: Dữ liệu chuẩn từ file/DB
+        workingData: [],   // Động: Dữ liệu đang nháp
+        historyStack: [],  // Ngăn xếp để Undo (Ctrl+Z)
+        salesData: {},     
+        selectedEmployees: [], selectedDays: [],
+        isOptimizedView: false, isFirstMapRender: true, isToolbarExpanded: true
     };
 
+    const CONSTANTS = {
+        SUPABASE_URL: 'https://mrqldgycwovpbmzdeuyz.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_itZfZBVw7bxE184tGh7x8A_0_r-QB5p', BUCKET: 'mappingdata',
+        DAYS_TEXT: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'], DAY_COLS: [11, 12, 13, 14, 15, 16, 17]
+    };
+
+    const palettes_single = { 'Thứ 2':{base:'#22c55e',light:'#bbf7d0',txt:'#000'}, 'Thứ 3':{base:'#ef4444',light:'#fecaca',txt:'#fff'}, 'Thứ 4':{base:'#a855f7',light:'#e9d5ff',txt:'#fff'}, 'Thứ 5':{base:'#eab308',light:'#fef08a',txt:'#000'}, 'Thứ 6':{base:'#000000',light:'#cbd5e1',txt:'#fff'}, 'Thứ 7':{base:'#3b82f6',light:'#bfdbfe',txt:'#fff'}, 'Chủ nhật':{base:'#f97316',light:'#fed7aa',txt:'#fff'} };
+    const palettes_emp1 = { 'Thứ 2':{base:'#0d2b47',light:'#3d5b77',txt:'#fff'}, 'Thứ 3':{base:'#1155cc',light:'#76a5af',txt:'#fff'}, 'Thứ 4':{base:'#9fc5e8',light:'#cfe2f3',txt:'#000'}, 'Thứ 5':{base:'#8e7cc3',light:'#d9d2e9',txt:'#000'}, 'Thứ 6':{base:'#d9d2e9',light:'#f4f0f9',txt:'#000'}, 'Thứ 7':{base:'#ead1dc',light:'#f8eef2',txt:'#000'}, 'Chủ nhật':{base:'#2b2b2b',light:'#777777',txt:'#fff'} };
+    const palettes_emp2 = { 'Thứ 2':{base:'#5b0f00',light:'#8b3f30',txt:'#fff'}, 'Thứ 3':{base:'#cc4125',light:'#e6b8af',txt:'#fff'}, 'Thứ 4':{base:'#ea9999',light:'#f4cccc',txt:'#000'}, 'Thứ 5':{base:'#f4cccc',light:'#fce5cd',txt:'#000'}, 'Thứ 6':{base:'#f9cb9c',light:'#fef0d9',txt:'#000'}, 'Thứ 7':{base:'#ffe599',light:'#fff2cc',txt:'#000'}, 'Chủ nhật':{base:'#b45f06',light:'#f6b26b',txt:'#fff'} };
+
+    /* =========================================
+       2. UTILS (SECURITY & UI)
+       ========================================= */
+    const supabaseClient = window.supabase.createClient(CONSTANTS.SUPABASE_URL, CONSTANTS.SUPABASE_ANON_KEY);
     const map = L.map('map').setView([10.8231, 106.6297], 10);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-    
-    let routeLayer = L.layerGroup().addTo(map); 
-    let lineLayer = L.layerGroup().addTo(map);  
-    window.currentMarkers = {}; 
-    window.isFirstMapRender = true; 
+    let routeLayer = L.layerGroup().addTo(map); let lineLayer = L.layerGroup().addTo(map); window.currentMarkers = {};
 
-    const selArea = document.getElementById('sel-area');
-    const selNPP = document.getElementById('sel-npp');
-    const selNV = document.getElementById('sel-nv');
-    
-    const dashboard = document.getElementById('dashboard-section');
-    const warningSection = document.getElementById('warning-section');
-    const btnOptimize = document.getElementById('btn-ai-optimize'); 
-    const btnDlMapWeek = document.getElementById('btn-dl-map-week');
-    const toggleToolbar = document.getElementById('route-toggle-toolbar');
+    function escapeHTML(str) { return !str ? '' : String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
+    function showToast(message, type = 'success') {
+        const c = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = `toast ${type}`;
+        t.innerHTML = `<span>${type === 'success'?'✅':type === 'error'?'❌':'⚠️'}</span><span>${escapeHTML(message)}</span>`;
+        c.appendChild(t); setTimeout(() => t.classList.add('show'), 10);
+        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+    }
+    function renderStatus(id, text, color) { document.getElementById(id).innerHTML = `<span style="color:${color};font-weight:bold;">${text}</span>`; }
 
-    function renderStatusBadge(elId, statusKey) {
-        const el = document.getElementById(elId);
-        const mapStyle = {
-            idle: { text: "(Chưa tải)", color: '#64748b' },
-            loading: { text: "⌛ Đang xử lý...", color: '#ea580c', bold: true },
-            done: { text: "✅ Đã tải xong", color: '#16a34a', bold: true },
-            error: { text: "❌ Lỗi", color: '#dc2626', bold: true },
-            warn: { text: "⚠️ Tải 1 phần", color: '#f59e0b', bold: true }
-        };
-        const s = mapStyle[statusKey] || mapStyle.idle;
-        el.innerHTML = `<span style="color:${s.color};${s.bold ? ' font-weight:bold;' : ''}">${s.text}</span>`;
+    /* --- UNDO LOGIC --- */
+    function saveHistory() {
+        AppState.historyStack.push(structuredClone(AppState.workingData));
+        if (AppState.historyStack.length > 20) AppState.historyStack.shift(); // Max 20 steps
+        updateUndoButton();
+    }
+    window.undo = function() {
+        if (AppState.historyStack.length === 0) return;
+        AppState.workingData = AppState.historyStack.pop();
+        updateUndoButton();
+        processDataAndRender();
+        showToast("Đã hoàn tác thao tác vừa rồi", "warning");
+    }
+    function updateUndoButton() {
+        const btn = document.getElementById('btn-undo');
+        if (AppState.historyStack.length > 0) { btn.disabled = false; btn.style.backgroundColor = '#ef4444'; } 
+        else { btn.disabled = true; btn.style.backgroundColor = '#64748b'; }
     }
 
+    function executeMutation(action) {
+        if (!AppState.isOptimizedView) {
+            AppState.isOptimizedView = true;
+            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
+            document.getElementById('map-toolbar-wrapper').style.display = 'flex';
+            showToast("Chuyển sang chế độ Phương Án Nháp", 'warning');
+        }
+        saveHistory();
+        action();
+        processDataAndRender();
+    }
+
+    /* =========================================
+       3. DATA LOADING (SAFE PARSING)
+       ========================================= */
     async function loadSalesData() {
-        renderStatusBadge('statusSales', 'loading');
+        renderStatus('statusSales', '⌛ Đang tải...', '#ea580c');
         try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { 
-                console.error("Chưa đăng nhập, không thể lấy file doanh số.");
-                renderStatusBadge('statusSales', 'error'); 
-                return; 
-            }
-
-            const months = ['M5', 'M6', 'M7', 'M8']; 
-            let { data: signedUrls, error } = await supabaseClient.storage.from('data').createSignedUrls(months.map(m => `data${m}.js`), 60);
-            
-            if (error || !signedUrls || signedUrls.length === 0 || signedUrls[0].error) {
-                console.log("Thử tìm doanh số trong mappingdata/data/ ...");
-                const alt = await supabaseClient.storage.from(BUCKET_NAME).createSignedUrls(months.map(m => `data/data${m}.js`), 60);
-                if (!alt.error && alt.data) signedUrls = alt.data;
-            }
-
-            if (signedUrls && signedUrls.length > 0) {
-                let successCount = 0;
-                for (let item of signedUrls) {
-                    if (!item.error && item.signedUrl) {
+            let { data: urls } = await supabaseClient.storage.from('data').createSignedUrls(['dataM5.js','dataM6.js','dataM7.js','dataM8.js'], 60);
+            if (!urls || urls[0].error) urls = (await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls(['data/dataM5.js','data/dataM6.js','data/dataM7.js','data/dataM8.js'], 60)).data;
+            if (urls && urls.length > 0) {
+                for (let item of urls) {
+                    if (!item.error) {
                         try {
-                            let res = await fetch(item.signedUrl);
-                            if (res.ok) {
-                                let text = await res.text();
-                                let mMatch = item.path.match(/M\d+/);
-                                let mName = mMatch ? mMatch[0] : 'M5'; 
-                                let arr = [];
-                                
-                                try {
-                                    let safeText = text.replace(/export\s+/g, '');
-                                    arr = new Function(`
-                                        ${safeText};
-                                        if (typeof dbSales${mName} !== 'undefined') return dbSales${mName};
-                                        if (typeof db_sales !== 'undefined') return db_sales;
-                                        if (typeof dbSales !== 'undefined') return dbSales;
-                                        return [];
-                                    `)();
-                                } catch(e) {
-                                    console.warn("Lỗi parse array qua Function, thử dùng Regex:", e);
-                                    let regex = new RegExp(`dbSales${mName}\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*(;|\n|$)`);
-                                    let match = text.match(regex);
-                                    if (match) {
-                                        try { arr = eval('(' + match[1] + ')'); } catch(err) {}
+                            let text = await (await fetch(item.signedUrl)).text();
+                            let mName = (item.path.match(/M\d+/) || ['M5'])[0];
+                            let match = text.match(/\[[\s\S]*\]/);
+                            if (match) {
+                                let arr = new Function('return ' + match[0])(); 
+                                arr.forEach(row => {
+                                    let id = String(row['cusCode']||row['Mã KH']||row['ma_kh']).trim();
+                                    if (id && row['sales']) {
+                                        if (!AppState.salesData[id]) AppState.salesData[id] = {};
+                                        AppState.salesData[id][mName] = parseFloat(String(row['sales']).replace(/,/g, '')) || 0;
                                     }
-                                }
-                                
-                                if (Array.isArray(arr) && arr.length > 0) {
-                                    successCount++;
-                                    arr.forEach(row => {
-                                        let keys = Object.keys(row);
-                                        if(keys.length < 2) return;
-                                        
-                                        let ma_kh = row['cusCode'] || row['Mã KH'] || row['ma_kh'] || row['Customer ID'] || row['Ma_KH'] || row['Mã Khách Hàng'];
-                                        let ds = row['sales'] || row['Doanh số'] || row['doanh_so'] || row['Sales'] || row['DS'] || row['Thực Đạt'];
-                                        
-                                        if (ma_kh !== undefined && ma_kh !== null && ds !== undefined && ds !== null) {
-                                            let id = ma_kh.toString().trim();
-                                            if (!window.salesDataMap[id]) window.salesDataMap[id] = {};
-                                            let cleanDs = ds.toString().replace(/,/g, '').replace(/\s/g, '');
-                                            window.salesDataMap[id][mName] = parseFloat(cleanDs) || 0;
-                                        }
-                                    });
-                                }
+                                });
                             }
-                        } catch(err) {
-                            console.error("Lỗi đọc nội dung file:", item.path, err);
-                        }
+                        } catch(e) {}
                     }
                 }
-                renderStatusBadge('statusSales', successCount > 0 ? 'done' : 'error');
-            } else {
-                renderStatusBadge('statusSales', 'warn');
+                renderStatus('statusSales', '✅ Tải thành công', '#16a34a');
             }
-        } catch (e) {
-            console.error("Lỗi tổng quát khi tải Doanh số:", e);
-            renderStatusBadge('statusSales', 'error');
-        }
+        } catch (e) { renderStatus('statusSales', '❌ Lỗi', '#dc2626'); }
     }
 
-    function normalizeOrder(targetData) {
-        let dayCounters = {"Thứ 2":1,"Thứ 3":1,"Thứ 4":1,"Thứ 5":1,"Thứ 6":1,"Thứ 7":1,"Chủ nhật":1};
-        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-        
-        targetData.sort((a, b) => {
-            let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
-            if (dayDiff !== 0) return dayDiff;
+    function processRawExcelData(jsonRouteList) {
+        let rawValid = [];
+        jsonRouteList.forEach((row, idx) => {
+            if (idx === 0 || !row[0] || row[0] === 'STT') return;
+            // XSS PROTECTION
+            let npp = escapeHTML(row[2]), nv = escapeHTML(row[4]), ma_kh = escapeHTML(row[5]);
+            let ten_kh = escapeHTML(row[6]), dia_chi = escapeHTML(row[7] || 'N/A'), area = escapeHTML(row[24] || "Khác");
+            let lat = parseFloat(row[22]), lng = parseFloat(row[23]);
+            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
             
-            let orderDiff = (a._ai_order || 999) - (b._ai_order || 999);
-            if (orderDiff !== 0) return orderDiff;
+            let w1 = (row[18]||'').toString().toLowerCase().trim()==='x', w2 = (row[19]||'').toString().toLowerCase().trim()==='x';
+            let w3 = (row[20]||'').toString().toLowerCase().trim()==='x', w4 = (row[21]||'').toString().toLowerCase().trim()==='x';
+            let freqType = (w1&&w2&&w3&&w4) ? "F4" : (w1&&!w2&&w3&&!w4) ? "F2-1" : (!w1&&w2&&!w3&&w4) ? "F2-2" : "Lỗi Tần Suất";
 
-            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-        });
-        
-        targetData.forEach(r => {
-            if (dayCounters[r.thu] !== undefined) {
-                r._ai_order = dayCounters[r.thu]++;
-            }
-        });
-    }
-
-    // ĐỌC VÀ LƯU TRỮ ĐẦY ĐỦ CỘT B & CỘT D NGUYÊN BẢN
-    function processRawExcelData(jsonRoute) {
-        allValidData = [];
-        allWarningData = [];
-
-        if (jsonRoute && jsonRoute.length > 0 && jsonRoute[0]) {
-            window.colB_header = jsonRoute[0][1] !== undefined ? jsonRoute[0][1] : "";
-            window.colD_header = jsonRoute[0][3] !== undefined ? jsonRoute[0][3] : "";
-        }
-
-        jsonRoute.forEach((row, rowIndex) => {
-            if (rowIndex === 0 || !row[0]) return;
-
-            let colB = row[1] !== undefined ? row[1] : "";
-            let npp = row[2];
-            let colD = row[3] !== undefined ? row[3] : "";
-            let nv = row[4];
-            let ma_kh = row[5];
-            let ten_kh = row[6];
-            let dia_chi = row[7] ? row[7].toString().trim() : 'Chưa có thông tin địa chỉ';
-            
-            let lat = parseFloat(row[22]); 
-            let lng = parseFloat(row[23]); 
-            
-            let areaRaw = row[24];
-            let area = (areaRaw === 0 || areaRaw === '0' || !areaRaw) ? "Khác" : areaRaw.toString().trim();
-
-            let isValidCoord = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-            let addedToWarning = false;
-
-            let w1 = (row[18] || '').toString().toLowerCase().trim() === 'x';
-            let w2 = (row[19] || '').toString().toLowerCase().trim() === 'x';
-            let w3 = (row[20] || '').toString().toLowerCase().trim() === 'x';
-            let w4 = (row[21] || '').toString().toLowerCase().trim() === 'x';
-            
-            let freqType = "Lỗi Tần Suất";
-            if (w1 && w2 && w3 && w4) freqType = "F4";
-            else if (w1 && !w2 && w3 && !w4) freqType = "F2-1";
-            else if (!w1 && w2 && !w3 && w4) freqType = "F2-2";
-
-            DAY_COLS.forEach((colIdx, i) => {
-                let cellVal = (row[colIdx] || '').toString().toLowerCase().trim();
-                if (cellVal === 'x') {
-                    let dayName = DAYS_TEXT[i];
-                    let warnings = [];
-                    
-                    if (!isValidCoord) warnings.push("Không có tọa độ");
-                    if (dayName === 'Chủ nhật') warnings.push("Tuyến rơi vào Chủ nhật");
-                    if (freqType === "Lỗi Tần Suất") warnings.push("Sai chuẩn tần suất (Bắt buộc kiểm tra và trả về F4, F2-1, F2-2)");
-
-                    if (warnings.length > 0 && !addedToWarning) {
-                        allWarningData.push({ area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, errors: warnings });
-                        addedToWarning = true;
-                    }
-
-                    if (isValidCoord) {
-                        allValidData.push({
-                            area: area, npp: npp, nv: nv, ma_kh: ma_kh, ten_kh: ten_kh, dia_chi: dia_chi, 
-                            thu: dayName, lat: lat, lng: lng, freq: freqType, _ai_order: 999,
-                            colB: colB, colD: colD
-                        });
-                    }
-                }
+            CONSTANTS.DAY_COLS.forEach((col, i) => {
+                if ((row[col]||'').toString().toLowerCase().trim() === 'x')
+                    rawValid.push({ area, npp, nv, ma_kh, ten_kh, dia_chi, thu: CONSTANTS.DAYS_TEXT[i], lat, lng, freq: freqType, _ai_order: 999 });
             });
         });
-    }
-
-    async function loadDataFromSupabase() {
-        const btn = document.getElementById('btnLoadData');
-        btn.disabled = true;
-        loadStatus.route = 'loading'; renderStatusBadge('statusRoute', loadStatus.route);
-        
-        await loadSalesData(); 
-        
-        try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { alert("Phiên làm việc hết hạn. Vui lòng đăng nhập lại."); window.location.href = HUB_URL; return; }
-            const { data: signedUrls, error } = await supabaseClient.storage.from(BUCKET_NAME).createSignedUrls([FILE_ROUTE], 60);
-            if (error || !signedUrls || signedUrls.length < 1) throw new Error("Lỗi xác thực file.");
-
-            let resRoute = await fetch(signedUrls[0].signedUrl);
-            if (!resRoute.ok) throw new Error("Lỗi tải file Route");
-            
-            let arrRoute = await resRoute.arrayBuffer();
-            let wbRoute = XLSX.read(arrRoute, {type: 'array'});
-            let jsonRoute = XLSX.utils.sheet_to_json(wbRoute.Sheets[wbRoute.SheetNames[0]], {header: 1});
-            
-            processRawExcelData(jsonRoute);
-            
-            loadStatus.route = 'done'; renderStatusBadge('statusRoute', loadStatus.route);
-            updateFilters();
-        } catch (err) {
-            console.error(err); loadStatus.route = 'error'; renderStatusBadge('statusRoute', loadStatus.route); alert("Lỗi tải dữ liệu.");
-        } finally { btn.disabled = false; }
+        AppState.sourceData = rawValid;
     }
 
     async function handleLocalFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        if (files.length > 2) return showToast("Tối đa 2 file một lúc!", 'warning');
         
-        loadStatus.route = 'loading'; renderStatusBadge('statusRoute', loadStatus.route);
-        
-        await loadSalesData(); 
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                let data = new Uint8Array(e.target.result);
-                let workbook = XLSX.read(data, {type: 'array'});
-                let jsonRoute = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
-
-                processRawExcelData(jsonRoute);
-                loadStatus.route = 'done'; renderStatusBadge('statusRoute', loadStatus.route);
-                
-                selArea.disabled = true; selNPP.disabled = true; selNV.disabled = true;
-                selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`;
-                selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`;
-                selNV.innerHTML = `<option>-- Dữ liệu Local --</option>`;
-                
-                currentNVDataOriginal = [...allValidData];
-                normalizeOrder(currentNVDataOriginal);
-
-                let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
-                let chipsHTML = `<div class="day-chip active" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
-                thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day active" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
-                document.getElementById('day-chips-container').innerHTML = chipsHTML;
-                
-                selectedDays = thus;
-                
-                currentNVDataOptimized = []; hasOptimizedData = false; isOptimizedView = false;
-                toggleToolbar.style.display = 'flex';
-                let originalRadio = document.querySelector('input[name="routeType"][value="original"]');
-                if(originalRadio) originalRadio.checked = true;
-                
-                document.getElementById('chk-draw-lines').checked = false;
-                window.isFirstMapRender = true; 
-
-                // TỐI ƯU GOM HTML CHO BẢNG CẢNH BÁO
-                let tbody = document.getElementById('warning-body');
-                if (allWarningData.length > 0) {
-                    let warningHtml = [];
-                    allWarningData.forEach(row => {
-                        let tagsHTML = row.errors.map(err => `<span class="warning-tag">⚠️ ${err}</span>`).join('');
-                        warningHtml.push(`<tr><td style="font-weight:bold; color:#dc2626;">${row.ma_kh}</td><td style="white-space: normal;">${row.ten_kh}</td><td style="white-space: normal;">${tagsHTML}</td></tr>`);
-                    });
-                    tbody.innerHTML = warningHtml.join('');
-                    warningSection.style.display = 'block';
-                } else {
-                    tbody.innerHTML = '';
-                    warningSection.style.display = 'none';
-                }
-
-                btnDlMapWeek.disabled = false; btnOptimize.disabled = false;
-                processDataAndRender();
-
-            } catch (err) {
-                console.error(err); loadStatus.route = 'error'; renderStatusBadge('statusRoute', loadStatus.route); alert("Lỗi đọc file Excel.");
+        renderStatus('statusRoute', '⌛ Đang đọc...', '#ea580c'); await loadSalesData(); 
+        let allJson = [];
+        try {
+            for(let i=0; i<files.length; i++) {
+                let ws = XLSX.read(await files[i].arrayBuffer(), {type: 'array'});
+                let json = XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1});
+                if (i > 0 && json.length > 0) json.shift();
+                allJson = allJson.concat(json);
             }
-        };
-        reader.readAsArrayBuffer(file);
+            processRawExcelData(allJson); renderStatus('statusRoute', '✅ Đã tải file', '#16a34a'); setupFilters(true);
+        } catch (err) { renderStatus('statusRoute', '❌ Lỗi đọc', '#dc2626'); showToast('Lỗi cấu trúc Excel', 'error'); }
     }
 
-    function updateFilters() {
-        let allData = [...allValidData, ...allWarningData];
-        let areas = [...new Set(allData.map(r => r.area))].filter(Boolean).sort();
-        selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>`;
-        areas.forEach(a => selArea.innerHTML += `<option value="${a}">${a}</option>`);
-        selArea.disabled = false;
-        
-        selNPP.innerHTML = `<option value="">-- Chọn NPP --</option>`; selNPP.disabled = true;
-        selNV.innerHTML = `<option value="">-- Chọn Nhân viên --</option>`; selNV.disabled = true;
-        clearDayChips();
+    async function loadDataFromSupabase() {
+        document.getElementById('btnLoadData').disabled = true; renderStatus('statusRoute', '⌛ Đang tải...', '#ea580c'); await loadSalesData();
+        try {
+            let resRoute = await fetch((await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls([CONSTANTS.FILE_ROUTE], 60)).data[0].signedUrl);
+            let ws = XLSX.read(await resRoute.arrayBuffer(), {type: 'array'});
+            processRawExcelData(XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1}));
+            renderStatus('statusRoute', '✅ Đã tải DB', '#16a34a'); setupFilters(false);
+        } catch (err) { renderStatus('statusRoute', '❌ Lỗi DB', '#dc2626'); showToast('Lỗi tải từ DB', 'error'); } 
+        finally { document.getElementById('btnLoadData').disabled = false; }
     }
 
-    function clearNVData() {
-        dashboard.style.display = 'none';
-        warningSection.style.display = 'none';
-        currentNVDataOriginal = []; currentNVDataOptimized = [];
-        hasOptimizedData = false; isOptimizedView = false;
-        toggleToolbar.style.display = 'none';
-        document.getElementById('chk-draw-lines').checked = false;
-        let originalRadio = document.querySelector('input[name="routeType"][value="original"]');
-        if(originalRadio) originalRadio.checked = true;
-    }
-
-    function clearDayChips() {
-        selectedDays = [];
-        document.getElementById('day-chips-container').innerHTML = `<span style="color:#94a3b8; font-size: 13px;">-- Chọn Thứ --</span>`;
-    }
-
-    selArea.addEventListener('change', () => {
-        clearNVData();
-        const area = selArea.value;
-        if (!area) {
-            selNPP.innerHTML = `<option value="">-- Chọn NPP --</option>`; selNPP.disabled = true;
-            selNV.innerHTML = `<option value="">-- Chọn Nhân viên --</option>`; selNV.disabled = true;
-            clearDayChips(); return;
-        }
-        let allData = [...allValidData, ...allWarningData];
-        let npps = [...new Set(allData.filter(r => r.area === area).map(r => r.npp))].filter(Boolean).sort();
-        selNPP.innerHTML = `<option value="">-- Chọn NPP --</option>`;
-        npps.forEach(npp => selNPP.innerHTML += `<option value="${npp}">${npp}</option>`);
-        selNPP.disabled = false;
-        selNV.innerHTML = `<option value="">-- Chọn Nhân viên --</option>`; selNV.disabled = true;
-        clearDayChips();
-    });
-
-    selNPP.addEventListener('change', () => {
-        clearNVData(); 
-        const area = selArea.value; const npp = selNPP.value;
-        if (!npp) { selNV.disabled = true; clearDayChips(); return; }
-        let allData = [...allValidData, ...allWarningData];
-        let nvs = [...new Set(allData.filter(r => r.area === area && r.npp === npp).map(r => r.nv))].filter(Boolean).sort();
-        selNV.innerHTML = `<option value="">-- Chọn Nhân viên --</option>`;
-        nvs.forEach(nv => selNV.innerHTML += `<option value="${nv}">${nv}</option>`);
-        selNV.disabled = false;
-        clearDayChips();
-    });
-
-    selNV.addEventListener('change', () => {
-        clearNVData(); 
-        const area = selArea.value; const npp = selNPP.value; const nv = selNV.value; 
-        if (!nv) { clearDayChips(); return; }
-        
-        let myWarning = allWarningData.filter(r => r.area === area && r.npp === npp && r.nv === nv);
-        let tbody = document.getElementById('warning-body');
-        if (myWarning.length > 0) {
-            let warningHtml = [];
-            myWarning.forEach(row => {
-                let tagsHTML = row.errors.map(err => `<span class="warning-tag">⚠️ ${err}</span>`).join('');
-                warningHtml.push(`<tr><td style="font-weight:bold; color:#dc2626;">${row.ma_kh}</td><td style="white-space: normal;">${row.ten_kh}</td><td style="white-space: normal;">${tagsHTML}</td></tr>`);
-            });
-            tbody.innerHTML = warningHtml.join('');
-            warningSection.style.display = 'block';
+    /* =========================================
+       4. UI FILTERS & LEGEND
+       ========================================= */
+    function setupFilters(isLocal) {
+        const selArea = document.getElementById('sel-area'); const selNPP = document.getElementById('sel-npp'); const selNV = document.getElementById('sel-nv');
+        if (isLocal) {
+            selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`; selArea.disabled = true;
+            selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`; selNPP.disabled = true;
+            selNV.innerHTML = [...new Set(AppState.sourceData.map(r=>r.nv))].map(nv => `<option value="${nv}">${nv}</option>`).join('');
+            selNV.disabled = false;
         } else {
-            tbody.innerHTML = '';
-            warningSection.style.display = 'none';
+            selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>` + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => `<option value="${a}">${a}</option>`).join('');
+            selArea.disabled = false;
         }
+        clearWorkspace();
+    }
 
-        currentNVDataOriginal = allValidData.filter(r => r.area === area && r.npp === npp && r.nv === nv);
-        normalizeOrder(currentNVDataOriginal);
-        
-        let thus = [...new Set(currentNVDataOriginal.map(r => r.thu))].filter(Boolean);
-        let chipsHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>`;
-        thus.forEach(thu => { chipsHTML += `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`; });
-        document.getElementById('day-chips-container').innerHTML = chipsHTML;
-        
-        window.isFirstMapRender = true;
+    document.getElementById('sel-area').addEventListener('change', (e) => {
+        clearWorkspace(); if (!e.target.value) { document.getElementById('sel-npp').disabled = true; document.getElementById('sel-nv').disabled = true; return; }
+        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${n}">${n}</option>`).join('');
+        document.getElementById('sel-npp').disabled = false; document.getElementById('sel-nv').disabled = true;
     });
 
-    window.toggleDay = function(day) {
-        let idx = selectedDays.indexOf(day);
-        if(idx > -1) selectedDays.splice(idx, 1); else selectedDays.push(day);
-        updateDaySelection();
-    };
+    document.getElementById('sel-npp').addEventListener('change', (e) => {
+        clearWorkspace(); if (!e.target.value) { document.getElementById('sel-nv').disabled = true; return; }
+        document.getElementById('sel-nv').innerHTML = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(nv => `<option value="${nv}">${nv}</option>`).join('');
+        document.getElementById('sel-nv').disabled = false;
+    });
 
-    window.toggleAllDays = function() {
-        let chipElements = Array.from(document.querySelectorAll('.chip-day'));
-        if(selectedDays.length === chipElements.length) selectedDays = []; 
-        else selectedDays = chipElements.map(el => el.getAttribute('data-day'));
-        updateDaySelection();
-    };
+    document.getElementById('sel-nv').addEventListener('change', (e) => {
+        let opts = Array.from(e.target.selectedOptions);
+        if (opts.length > 2) { showToast("Chọn tối đa 2 nhân viên!", 'warning'); opts[opts.length - 1].selected = false; opts = Array.from(e.target.selectedOptions); }
+        AppState.selectedEmployees = opts.map(o => o.value);
+        clearWorkspace();
+        if (AppState.selectedEmployees.length === 0) return;
 
+        AppState.workingData = structuredClone(AppState.sourceData.filter(r => AppState.selectedEmployees.includes(r.nv)));
+        AppState.workingData.sort((a,b) => (a.nv > b.nv) ? 1 : -1); 
+        AppState.historyStack = []; updateUndoButton();
+        
+        let thus = [...new Set(AppState.workingData.map(r => r.thu))];
+        document.getElementById('day-chips-container').innerHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>` + thus.map(thu => `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`).join('');
+        
+        updateLegendUI(AppState.selectedEmployees.length);
+        AppState.isFirstMapRender = true;
+    });
+
+    function updateLegendUI(count) {
+        const container = document.getElementById('legend-container'); container.classList.remove('hidden');
+        if (count <= 1) {
+            container.innerHTML = `<div class="flex gap-2 flex-wrap items-center">
+                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4</span>
+                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2</span>
+                <div style="width:1px;height:12px;background:#cbd5e1;"></div>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#22c55e;"></span> T2</span>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#ef4444;"></span> T3</span>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#a855f7;"></span> T4</span>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#eab308;"></span> T5</span>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#000000;"></span> T6</span>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#3b82f6;"></span> T7</span>
+                <span class="flex items-center gap-1"><span class="legend-box" style="background:#f97316;"></span> CN</span>
+            </div>`;
+        } else {
+            container.innerHTML = `<div class="flex gap-3 flex-wrap mb-1">
+                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4</span>
+                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2</span>
+            </div>
+            <div class="border-t border-slate-200 pt-1 flex-col gap-1">
+                <div class="flex gap-2 items-center"><span style="width:35px;font-weight:600;">NV 1:</span><span class="legend-box" style="background:#0d2b47;" title="T2"></span><span class="legend-box" style="background:#1155cc;" title="T3"></span><span class="legend-box" style="background:#9fc5e8;" title="T4"></span><span class="legend-box" style="background:#8e7cc3;" title="T5"></span><span class="legend-box" style="background:#d9d2e9;" title="T6"></span><span class="legend-box" style="background:#ead1dc;" title="T7"></span></div>
+                <div class="flex gap-2 items-center"><span style="width:35px;font-weight:600;">NV 2:</span><span class="legend-box" style="background:#5b0f00;" title="T2"></span><span class="legend-box" style="background:#cc4125;" title="T3"></span><span class="legend-box" style="background:#ea9999;" title="T4"></span><span class="legend-box" style="background:#f4cccc;" title="T5"></span><span class="legend-box" style="background:#f9cb9c;" title="T6"></span><span class="legend-box" style="background:#ffe599;" title="T7"></span></div>
+            </div>`;
+        }
+    }
+
+    function clearWorkspace() {
+        document.getElementById('dashboard-section').classList.add('hidden');
+        document.getElementById('map-toolbar-wrapper').style.display = 'none';
+        document.getElementById('day-chips-container').innerHTML = `<span class="text-muted text-xs">-- Chọn Thứ --</span>`;
+        AppState.selectedDays = []; routeLayer.clearLayers(); lineLayer.clearLayers();
+    }
+
+    window.toggleDay = function(day) { let idx = AppState.selectedDays.indexOf(day); if(idx > -1) AppState.selectedDays.splice(idx, 1); else AppState.selectedDays.push(day); updateDaySelection(); };
+    window.toggleAllDays = function() { let els = Array.from(document.querySelectorAll('.chip-day')); if(AppState.selectedDays.length === els.length) AppState.selectedDays = []; else AppState.selectedDays = els.map(e => e.getAttribute('data-day')); updateDaySelection(); };
+    
     function updateDaySelection() {
-        document.querySelectorAll('.chip-day').forEach(el => {
-            if(selectedDays.includes(el.getAttribute('data-day'))) el.classList.add('active');
-            else el.classList.remove('active');
-        });
-        
-        let chipAll = document.getElementById('chip-all');
-        if(chipAll) {
-            let totalDays = document.querySelectorAll('.chip-day').length;
-            if(selectedDays.length === totalDays && totalDays > 0) chipAll.classList.add('active');
-            else chipAll.classList.remove('active');
-        }
-
-        btnDlMapWeek.disabled = (selectedDays.length === 0);
-        btnOptimize.disabled = (selectedDays.length === 0);
-
-        if (selectedDays.length > 0) {
-            window.isFirstMapRender = true; 
-            processDataAndRender();
-        }
-        else { dashboard.style.display = 'none'; routeLayer.clearLayers(); lineLayer.clearLayers(); window.currentMarkers = {}; }
+        document.querySelectorAll('.chip-day').forEach(el => el.classList.toggle('active', AppState.selectedDays.includes(el.getAttribute('data-day'))));
+        let active = AppState.selectedDays.length > 0;
+        document.getElementById('btn-dl-map-week').disabled = !active; document.getElementById('btn-ai-optimize').disabled = !active;
+        if (active) processDataAndRender(); else clearWorkspace();
     }
 
-    function ensureEditMode() {
-        if (!hasOptimizedData) {
-            currentNVDataOptimized = currentNVDataOriginal.map(r => ({...r}));
-            hasOptimizedData = true;
-        }
-        if (!isOptimizedView) {
-            isOptimizedView = true;
-            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            toggleToolbar.style.display = 'flex';
-        }
-    }
-
-    window.editOrder = function(ma_kh, inputVal) {
-        ensureEditMode();
-        let newOrder = parseInt(inputVal);
-        if(isNaN(newOrder)) newOrder = 999;
-        
-        currentNVDataOptimized.forEach(r => {
-            if(r.ma_kh === ma_kh) r._ai_order = newOrder; 
-        });
-        
-        normalizeOrder(currentNVDataOptimized); 
-        processDataAndRender(); 
+    /* =========================================
+       5. USER MUTATIONS (LIVE SYNC)
+       ========================================= */
+    window.handleRouteToggle = function() {
+        AppState.isOptimizedView = document.querySelector('input[name="routeType"]:checked').value === 'optimized';
+        AppState.isFirstMapRender = true; processDataAndRender();
     };
-
-    window.toggleRouteDay = function(ma_kh, day) {
-        ensureEditMode();
-        let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh) || currentNVDataOriginal.find(r => r.ma_kh === ma_kh);
-        if (!template) return;
-        
-        currentNVDataOptimized = currentNVDataOptimized.filter(r => r.ma_kh !== ma_kh);
-        currentNVDataOptimized.push({...template, thu: day});
-        
-        normalizeOrder(currentNVDataOptimized);
-        processDataAndRender();
+    window.updateOrder = function(id, v) { executeMutation(() => { let t = AppState.workingData.find(r => r.ma_kh === id); if(t) t._ai_order = parseInt(v)||999; }); };
+    window.toggleRouteDay = function(id, d) { executeMutation(() => { let t = AppState.workingData.find(r => r.ma_kh === id); if(t) t.thu = d; }); };
+    window.toggleFreq = function(id, w) { 
+        executeMutation(() => {
+            let t = AppState.workingData.find(r => r.ma_kh === id); if(!t) return;
+            let w13 = ['F4', 'F2-1'].includes(t.freq), w24 = ['F4', 'F2-2'].includes(t.freq);
+            if(w === 'W1' || w === 'W3') w13 = !w13; else w24 = !w24;
+            if(!w13 && !w24) { if(w === 'W1' || w === 'W3') w24 = true; else w13 = true; }
+            t.freq = (w13 && w24) ? 'F4' : (w13 ? 'F2-1' : 'F2-2');
+        }); 
     };
+    window.removeCustomer = function(id) { executeMutation(() => { AppState.workingData = AppState.workingData.filter(r => r.ma_kh !== id); }); };
 
-    window.toggleFrequency = function(ma_kh, week) {
-        ensureEditMode();
-        let template = currentNVDataOptimized.find(r => r.ma_kh === ma_kh);
-        if(!template) return;
-        let currentFreq = template.freq;
-        
-        let w13 = ['F4', 'F2-1'].includes(currentFreq); 
-        let w24 = ['F4', 'F2-2'].includes(currentFreq); 
+    /* =========================================
+       6. RENDER LOGIC
+       ========================================= */
+    function processDataAndRender() {
+        let activeData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
+        activeData = activeData.filter(r => AppState.selectedEmployees.includes(r.nv) && AppState.selectedDays.includes(r.thu));
 
-        if (week === 'W1' || week === 'W3') { w13 = !w13; } 
-        else if (week === 'W2' || week === 'W4') { w24 = !w24; }
-
-        if (!w13 && !w24) {
-            if (week === 'W1' || week === 'W3') w24 = true;
-            else w13 = true;
-        }
-
-        let newFreq = (w13 && w24) ? 'F4' : (w13 ? 'F2-1' : 'F2-2');
-
-        currentNVDataOptimized.forEach(r => {
-            if(r.ma_kh === ma_kh) r.freq = newFreq;
-        });
-        
-        normalizeOrder(currentNVDataOptimized);
-        processDataAndRender();
-    };
-
-    async function processDataAndRender() {
-        let rightPanel = document.getElementById('right-panel');
-        let savedScrollTop = rightPanel ? rightPanel.scrollTop : 0;
-
-        if (selectedDays.length === 0 || currentNVDataOriginal.length === 0) { dashboard.style.display = 'none'; return; }
-        dashboard.style.display = 'none';
-
-        let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
-        let activeData = baseData.filter(r => selectedDays.includes(r.thu));
-
-        renderMapOptimized(activeData);
-        renderComparisonTable();
-        renderDetailTable(activeData);
-        
-        document.getElementById('ai-chat-section').style.display = hasOptimizedData ? 'block' : 'none';
-        dashboard.style.display = 'block';
-
-        if (rightPanel) {
-            setTimeout(() => { rightPanel.scrollTop = savedScrollTop; }, 0);
-        }
+        renderMapOptimized(activeData); renderDetailTable(activeData);
+        document.getElementById('dashboard-section').classList.remove('hidden');
+        document.getElementById('map-toolbar-wrapper').style.display = 'flex'; // Hiển thị Menu chuyển đổi khi có dữ liệu
     }
 
     function renderMapOptimized(data) {
-        let seenIds = new Set();
-        lineLayer.clearLayers(); 
-        let allLatLngs = [];
-
-        const dayOrder = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-        let uniqueDays = [...new Set(data.map(r => r.thu))].sort((a,b) => dayOrder[a] - dayOrder[b]);
-
-        for (let day of uniqueDays) {
-            let dayData = data.filter(r => r.thu === day);
-            let hasF21 = dayData.some(r => r.freq === 'F2-1');
-            let hasF22 = dayData.some(r => r.freq === 'F2-2');
-            let p = palettes[day] || palettes['Thứ 2'];
-
-            const processGroup = (groupData, shape, bgColor, textColor, lineDash) => {
-                if (groupData.length === 0) return;
-                let coords = [];
-                for (let i = 0; i < groupData.length; i++) {
-                    let row = groupData[i];
-                    coords.push([row.lat, row.lng]);
-                    allLatLngs.push([row.lat, row.lng]);
-                    
-                    let stt = row._ai_order; 
-
-                    let iconHtml = '';
-                    if (shape === 'marker-triangle') {
-                        iconHtml = `
-                        <div style="position:relative; width: 34px; height: 34px; display:flex; align-items:center; justify-content:center; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">
-                            <svg width="34" height="34" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;">
-                                <path fill="${bgColor}" stroke="white" stroke-width="1.5" stroke-linejoin="round" d="M12 2 L22 21 L2 21 Z"/>
-                            </svg>
-                            <span style="position:relative; z-index: 2; color:${textColor}; font-size:12px; font-weight:bold; margin-top: 6px;">${stt}</span>
-                        </div>`;
-                    } else {
-                        iconHtml = `<div class="route-marker ${shape}" style="background-color: ${bgColor}; color: ${textColor};">${stt}</div>`;
-                    }
-
-                    let icon = L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [34, 34], iconAnchor: [17, 17] });
-                    let markerId = row.ma_kh + '_' + day; 
-                    seenIds.add(markerId);
-
-                    let popupHtml = `
-                        <div style="font-size: 13px; line-height: 1.5; min-width: 180px;">
-                            <b style="color:#1e40af; font-size:14px; text-transform: uppercase;">${row.ten_kh || 'N/A'}</b><br>
-                            <b style="color:#ef4444;">Mã KH:</b> ${row.ma_kh}<br>
-                            <b style="color:#10b981;">Địa chỉ:</b> ${row.dia_chi}<br>
-                            <hr style="margin: 5px 0; border: 0; border-top: 1px solid #e2e8f0;">
-                            <b>Tần suất:</b> ${row.freq}
-                        </div>
-                    `;
-
-                    if (window.currentMarkers[markerId]) {
-                        let m = window.currentMarkers[markerId];
-                        m.setIcon(icon);
-                        m.setPopupContent(popupHtml);
-                    } else {
-                        let m = L.marker([row.lat, row.lng], {icon: icon});
-                        m.bindPopup(popupHtml, { autoPan: false });
-                        routeLayer.addLayer(m);
-                        window.currentMarkers[markerId] = m;
-                    }
-                }
-
-                let chkLines = document.getElementById('chk-draw-lines');
-                if (coords.length > 1 && chkLines && chkLines.checked) {
-                    L.polyline(coords, { color: bgColor, weight: 3, opacity: 0.9, dashArray: lineDash }).addTo(lineLayer);
-                }
-            };
-
-            if (hasF21 || hasF22) {
-                let routeW13 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-1');
-                let routeW24 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-2');
-
-                let shape13 = (routeW13.some(r=>r.freq==='F4') && routeW13.some(r=>r.freq==='F2-1')) ? 'marker-triangle' : (routeW13.some(r=>r.freq==='F2-1') ? 'marker-square' : 'marker-circle');
-                let shape24 = (routeW24.some(r=>r.freq==='F4') && routeW24.some(r=>r.freq==='F2-2')) ? 'marker-triangle' : (routeW24.some(r=>r.freq==='F2-2') ? 'marker-square' : 'marker-circle');
-
-                processGroup(routeW13, shape13, p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
-                processGroup(routeW24, shape24, p.light, p.textLight, isOptimizedView ? '8, 4' : '2, 6');
-            } else {
-                processGroup(dayData, 'marker-circle', p.base, '#ffffff', isOptimizedView ? '' : '5, 5');
-            }
-        }
-
-        for (let id in window.currentMarkers) {
-            if (!seenIds.has(id)) {
-                routeLayer.removeLayer(window.currentMarkers[id]);
-                delete window.currentMarkers[id];
-            }
-        }
-
-        if (window.isFirstMapRender && allLatLngs.length > 0) {
-            map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]});
-            window.isFirstMapRender = false;
-        }
-    }
-
-    window.highlightMarker = function(ma_kh) {
-        for(let id in window.currentMarkers) {
-            if (id.startsWith(ma_kh + "_")) {
-                window.currentMarkers[id].openPopup();
-            }
-        }
-    };
-
-    window.resetHighlightMarker = function(ma_kh) {
-        for(let id in window.currentMarkers) {
-            if (id.startsWith(ma_kh + "_")) {
-                window.currentMarkers[id].closePopup();
-            }
-        }
-    };
-
-    function getRouteStatsForGroup(groupData) {
-        let dist = 0;
-        if (!groupData || groupData.length === 0) return { count: 0, dist: 0 };
-        for(let i = 0; i < groupData.length - 1; i++) {
-            dist += getHaversine14(groupData[i].lat, groupData[i].lng, groupData[i+1].lat, groupData[i+1].lng);
-        }
-        return { count: groupData.length, dist: dist };
-    }
-
-    function renderComparisonTable() {
-        const thead = document.getElementById('comp-head'); 
-        const tbody = document.getElementById('comp-body'); 
-        const tfoot = document.getElementById('comp-foot');
-        
-        thead.innerHTML = `<tr>
-            <th class="route-th">Thứ</th>
-            <th class="route-th">Nhóm Tuyến</th>
-            <th class="route-th">Khách ( tuyến Gốc)</th>
-            <th class="route-th">Khách (tuyến Mới)</th>
-            <th class="route-th num-right">Km (tuyến Mới)</th>
-        </tr>`;
-        
-        let tOldCount=0, tNewCount=0, tNewDist=0;
-        let htmlRows = [];
-
-        selectedDays.forEach(day => {
-            let origDayData = currentNVDataOriginal.filter(r => r.thu === day);
-            let optDayData = hasOptimizedData ? currentNVDataOptimized.filter(r => r.thu === day) : [];
-
-            let hasF21 = origDayData.some(r => r.freq === 'F2-1') || optDayData.some(r => r.freq === 'F2-1');
-            let hasF22 = origDayData.some(r => r.freq === 'F2-2') || optDayData.some(r => r.freq === 'F2-2');
-
-            const groups = [];
-            if (hasF21 || hasF22) {
-                groups.push({ label: "Tuần 1 & 3", orig: origDayData.filter(r => r.freq === 'F4' || r.freq === 'F2-1'), opt: optDayData.filter(r => r.freq === 'F4' || r.freq === 'F2-1') });
-                groups.push({ label: "Tuần 2 & 4", orig: origDayData.filter(r => r.freq === 'F4' || r.freq === 'F2-2'), opt: optDayData.filter(r => r.freq === 'F4' || r.freq === 'F2-2') });
-            } else {
-                groups.push({ label: "Mỗi Tuần", orig: origDayData, opt: optDayData });
-            }
-
-            groups.forEach(g => {
-                let oldStats = getRouteStatsForGroup(g.orig);
-                let newStats = hasOptimizedData ? getRouteStatsForGroup(g.opt) : { count: 0, dist: 0 };
+        let seenIds = new Set(); lineLayer.clearLayers(); let allLatLngs = []; let chkLines = document.getElementById('chk-draw-lines');
+        AppState.selectedEmployees.forEach((emp, empIdx) => {
+            let empData = data.filter(r => r.nv === emp);
+            let empPalette = AppState.selectedEmployees.length <= 1 ? palettes_single : (empIdx === 0 ? palettes_emp1 : palettes_emp2);
+            
+            AppState.selectedDays.forEach(day => {
+                let dayData = empData.filter(r => r.thu === day); if(dayData.length === 0) return;
+                let p = empPalette[day] || empPalette['Thứ 2'];
                 
-                if (oldStats.count === 0 && newStats.count === 0) return;
+                const processGroup = (group, shape, bg, txt, dash) => {
+                    if(group.length === 0) return; let coords = [];
+                    group.forEach((row, i) => {
+                        coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
+                        let stt = row._ai_order !== 999 ? row._ai_order : i + 1;
+                        let iconHtml = shape === 'marker-triangle' 
+                            ? `<div aria-label="Tuyến ${day}" style="position:relative; width: 26px; height: 26px; display:flex; align-items:center; justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;"><path fill="${bg}" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg><span style="position:relative; z-index: 2; color:${txt}; font-size:11px; font-weight:bold; margin-top: 4px;">${stt}</span></div>`
+                            : `<div aria-label="Tuyến ${day}" class="route-marker ${shape}" style="background-color: ${bg}; color: ${txt};">${stt}</div>`;
+                        
+                        let markerId = `${row.ma_kh}_${day}_${empIdx}`; seenIds.add(markerId);
+                        let m = window.currentMarkers[markerId] || L.marker([row.lat, row.lng]).addTo(routeLayer);
+                        m.setIcon(L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [26,26] }));
+                        m.bindPopup(`<b>${row.ten_kh}</b><br>Mã KH: ${row.ma_kh}<br>NV: ${row.nv}<br>Tần suất: ${row.freq}`);
+                        window.currentMarkers[markerId] = m;
+                    });
+                    if (coords.length > 1 && chkLines && chkLines.checked) L.polyline(coords, { color: bg, weight: 3, dashArray: dash }).addTo(lineLayer);
+                };
 
-                tOldCount += oldStats.count; 
-                if (hasOptimizedData) tNewCount += newStats.count; 
-                if (hasOptimizedData) tNewDist += newStats.dist;
-
-                htmlRows.push(`<tr>
-                    <td style="font-weight:bold; color: ${palettes[day].base}; text-align: center;">${day}</td>
-                    <td style="text-align:center; font-weight:bold; color:#0f766e; background:#f0fdfa;">${g.label}</td>
-                    <td style="text-align:center;">${oldStats.count}</td>
-                    <td style="text-align:center; font-weight:bold; color:#f59e0b;">${hasOptimizedData ? newStats.count : '--'}</td>
-                    <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? formatNum(newStats.dist) : '--'}</td>
-                </tr>`);
+                let w13 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-1'), w24 = dayData.filter(r => r.freq === 'F4' || r.freq === 'F2-2');
+                if (dayData.some(r => r.freq.includes('F2'))) {
+                    processGroup(w13, w13.some(r=>r.freq==='F4')?'marker-triangle':'marker-square', p.base, p.txt, AppState.isOptimizedView?'':'5,5');
+                    processGroup(w24, w24.some(r=>r.freq==='F4')?'marker-triangle':'marker-square', p.light, (AppState.selectedEmployees.length<=1 && day==='Thứ 6')?'#fff':'#000', AppState.isOptimizedView?'8,4':'2,6');
+                } else { processGroup(dayData, 'marker-circle', p.base, p.txt, AppState.isOptimizedView?'':'5,5'); }
             });
         });
-        
-        tbody.innerHTML = htmlRows.join('');
-        
-        tfoot.innerHTML = `<tr>
-            <td colspan="2" style="font-weight:bold; text-align:right;">TỔNG CÁC NHÓM</td>
-            <td style="text-align:center; font-weight:bold;">${tOldCount}</td>
-            <td style="text-align:center; font-weight:bold; color:#f59e0b;">${hasOptimizedData ? tNewCount : '--'}</td>
-            <td class="num-right" style="color:#f59e0b; font-weight:bold;">${hasOptimizedData ? formatNum(tNewDist) + ' km' : '--'}</td>
-        </tr>`;
+        for (let id in window.currentMarkers) if (!seenIds.has(id)) { routeLayer.removeLayer(window.currentMarkers[id]); delete window.currentMarkers[id]; }
+        if (AppState.isFirstMapRender && allLatLngs.length > 0) { map.fitBounds(L.latLngBounds(allLatLngs), {padding: [30, 30]}); AppState.isFirstMapRender = false; }
     }
+
+    window.fitMapBounds = function() { AppState.isFirstMapRender = true; processDataAndRender(); };
+    window.toggleRouteToolbarVisibility = function() { AppState.isToolbarExpanded = !AppState.isToolbarExpanded; document.getElementById('route-toggle-toolbar').style.display = AppState.isToolbarExpanded ? 'flex' : 'none'; };
 
     function renderDetailTable(data) {
-        const thead = document.getElementById('table-head'); 
-        const tbody = document.getElementById('table-body');
-        const tfoot = document.getElementById('table-foot');
-
-        thead.innerHTML = `
-        <tr>
-            <th class="route-th" rowspan="2" style="z-index: 3;">STT</th>
-            <th class="route-th" rowspan="2" style="z-index: 3;">Mã KH</th>
-            <th class="route-th" rowspan="2" style="z-index: 3;">Tên KH</th>
-            <th class="route-th" colspan="7" style="z-index: 3;">Lộ trình</th>
-            <th class="route-th" colspan="4" style="z-index: 3;">Tần Suất</th>
-            <th class="route-th ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
+        const thead = document.getElementById('table-head'); const tbody = document.getElementById('table-body');
+        thead.innerHTML = `<tr>
+            <th class="sticky-header" rowspan="2">STT</th><th class="sticky-header" rowspan="2" style="width:30px;" title="Loại khách">🗑️</th>
+            <th class="sticky-header" rowspan="2">Nhân viên</th><th class="sticky-header" rowspan="2">Mã KH</th><th class="sticky-header" rowspan="2">Tên KH</th>
+            <th class="sticky-header" colspan="7">Lộ trình (Nháp)</th><th class="sticky-header" colspan="4">Tần Suất (Nháp)</th><th class="sticky-header ds-col" colspan="4">Doanh Số</th>
         </tr>
         <tr>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 2</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 3</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 4</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 5</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 6</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">Thứ 7</th>
-            <th class="route-th" style="width: 50px; top: 36px; z-index: 2;">CN</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W1</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W2</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W3</th>
-            <th class="route-th" style="width: 40px; top: 36px; z-index: 2;">W4</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">May</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jun</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Jul</th>
-            <th class="route-th ds-col" style="width: 70px; top: 36px; z-index: 2;">Aug</th>
+            ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
+            ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px;">${w}</th>`).join('')}
+            ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px;">${m}</th>`).join('')}
         </tr>`;
+
+        let cMap = new Map(); data.forEach(r => { if(!cMap.has(r.ma_kh)) cMap.set(r.ma_kh, { ...r, days: new Set() }); cMap.get(r.ma_kh).days.add(r.thu); });
         
-        tfoot.innerHTML = '';
-
-        let customerMap = new Map();
-        let uniqueCustomers = [];
-        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
-        const freqOrderRules = {"F4": 1, "F2-1": 2, "F2-2": 3};
-
-        data.forEach(row => {
-            if (!customerMap.has(row.ma_kh)) {
-                let custInfo = {
-                    ma_kh: row.ma_kh, 
-                    ten_kh: row.ten_kh, 
-                    freq: row.freq,
-                    lat: row.lat, 
-                    lng: row.lng, 
-                    area: row.area, 
-                    days: new Set(),
-                    minDayNum: 99,
-                    earliestOrder: 999
-                };
-                customerMap.set(row.ma_kh, custInfo);
-                uniqueCustomers.push(custInfo);
-            }
-            let cust = customerMap.get(row.ma_kh);
-            cust.days.add(row.thu);
+        tbody.innerHTML = Array.from(cMap.values()).map((cust, i) => {
+            const gx = d => cust.days.has(d) ? `<span style="color:var(--danger); font-weight:900;">x</span>` : ``;
+            const gw = h => h ? `<span style="color:#1e40af; font-weight:900;">x</span>` : ``;
+            const isF4 = cust.freq==='F4', isF21 = cust.freq==='F2-1', isF22 = cust.freq==='F2-2';
+            let ds = AppState.salesData[cust.ma_kh] || {}; let stt = cust._ai_order !== 999 ? cust._ai_order : i + 1;
             
-            let currentDayNum = dayOrderRules[row.thu] || 99;
-            if (currentDayNum < cust.minDayNum) {
-                cust.minDayNum = currentDayNum;
-                cust.earliestOrder = row._ai_order || 999;
-            } else if (currentDayNum === cust.minDayNum) {
-                cust.earliestOrder = Math.min(cust.earliestOrder, row._ai_order || 999);
-            }
-        });
-
-        uniqueCustomers.sort((a, b) => {
-            if (a.minDayNum !== b.minDayNum) return a.minDayNum - b.minDayNum;
-            let orderDiff = a.earliestOrder - b.earliestOrder;
-            if (orderDiff !== 0) return orderDiff;
-            return (freqOrderRules[a.freq] || 99) - (freqOrderRules[b.freq] || 99);
-        });
-
-        let htmlRows = [];
-        uniqueCustomers.forEach((cust) => {
-            const getX = (day) => cust.days.has(day) ? `<span style="color:#dc2626; font-weight:900; font-size:14px;">x</span>` : ``;
-            const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
-            
-            const isF4 = cust.freq === 'F4';
-            const isF21 = cust.freq === 'F2-1';
-            const isF22 = cust.freq === 'F2-2';
-
-            let dsKH = window.salesDataMap[cust.ma_kh] || {};
-            let dsM5 = formatNum(dsKH['M5'] || 0);
-            let dsM6 = formatNum(dsKH['M6'] || 0);
-            let dsM7 = formatNum(dsKH['M7'] || 0);
-            let dsM8 = formatNum(dsKH['M8'] || 0);
-
-            htmlRows.push(`<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
-                <td style="text-align:center;">
-                    <input type="number" class="stt-input" value="${cust.earliestOrder}" onchange="editOrder('${cust.ma_kh}', this.value)">
-                </td>
-                <td style="font-weight:600;">${cust.ma_kh}</td>
-                <td style="white-space: normal;">${cust.ten_kh}</td>
-                
-                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 2')">${getX('Thứ 2')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 3')">${getX('Thứ 3')}</td>
-                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 4')">${getX('Thứ 4')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 5')">${getX('Thứ 5')}</td>
-                <td class="edit-cell" style="text-align:center; background:#f8fafc;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 6')">${getX('Thứ 6')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fff;" onclick="toggleRouteDay('${cust.ma_kh}', 'Thứ 7')">${getX('Thứ 7')}</td>
-                <td class="edit-cell" style="text-align:center; background:#fef2f2;" onclick="toggleRouteDay('${cust.ma_kh}', 'Chủ nhật')">${getX('Chủ nhật')}</td>
-                
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFrequency('${cust.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-                
-                <td class="num-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-                <td class="num-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
-                <td class="num-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
-                <td class="num-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
-            </tr>`);
-        });
-
-        tbody.innerHTML = htmlRows.join('');
+            return `<tr class="hover-row">
+                <td class="text-center"><input type="number" class="stt-input" value="${stt}" onchange="updateOrder('${cust.ma_kh}', this.value)"></td>
+                <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${cust.ma_kh}')">×</button></td>
+                <td>${cust.nv}</td><td>${cust.ma_kh}</td><td>${cust.ten_kh}</td>
+                ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" onclick="toggleRouteDay('${cust.ma_kh}','${d}')">${gx(d)}</td>`).join('')}
+                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W1')">${gw(isF4||isF21)}</td>
+                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W2')">${gw(isF4||isF22)}</td>
+                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W3')">${gw(isF4||isF21)}</td>
+                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W4')">${gw(isF4||isF22)}</td>
+                <td class="num-right" style="background:#fffbeb;">${ds['M5']||'-'}</td><td class="num-right" style="background:#fef3c7;">${ds['M6']||'-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${ds['M7']||'-'}</td><td class="num-right" style="background:#fef3c7;">${ds['M8']||'-'}</td>
+            </tr>`;
+        }).join('');
     }
 
-    function runKMeansClustering(locations, k, maxIterations = 100) {
-        let centroids = [];
-        let shuffled = [...locations].sort(() => 0.5 - Math.random());
-        for (let i = 0; i < k; i++) centroids.push({ lat: shuffled[i].lat, lng: shuffled[i].lng });
-        
-        let assignments = new Array(locations.length);
-        let changed = true, iterations = 0;
-        
-        while (changed && iterations < maxIterations) {
-            changed = false; iterations++;
-            for (let i = 0; i < locations.length; i++) {
-                let loc = locations[i], minDist = Infinity, closestCluster = 0;
-                for (let c = 0; c < k; c++) {
-                    let d = Math.pow(loc.lat - centroids[c].lat, 2) + Math.pow(loc.lng - centroids[c].lng, 2);
-                    if (d < minDist) { minDist = d; closestCluster = c; }
-                }
-                if (assignments[i] !== closestCluster) { assignments[i] = closestCluster; changed = true; }
-            }
-            let newCentroids = Array.from({ length: k }, () => ({ lat: 0, lng: 0, count: 0 }));
-            for (let i = 0; i < locations.length; i++) {
-                let c = assignments[i];
-                newCentroids[c].lat += locations[i].lat; newCentroids[c].lng += locations[i].lng; newCentroids[c].count++;
-            }
-            for (let c = 0; c < k; c++) {
-                if (newCentroids[c].count > 0) {
-                    centroids[c].lat = newCentroids[c].lat / newCentroids[c].count;
-                    centroids[c].lng = newCentroids[c].lng / newCentroids[c].count;
-                }
-            }
-        }
-        return assignments;
-    }
-
-    function optimizeRouteFallbackLocal(dataToOptimize) {
-        const k = selectedDays.length;
-        const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-        const assignments = runKMeansClustering(locations, k);
-
-        let allAiResults = []; 
-        let finalChunks = [];
-
-        for (let c = 0; c < k; c++) {
-            let clusterLocs = locations.filter((_, idx) => assignments[idx] === c);
-            if (clusterLocs.length === 0) continue;
-            
-            let targetDay = selectedDays[c];
-
-            if (clusterLocs.length <= 40) {
-                finalChunks.push({ day: targetDay, freq: 'F4', locations: clusterLocs });
-            } else {
-                clusterLocs.sort((a, b) => a.lat - b.lat);
-                let half = Math.ceil(clusterLocs.length / 2);
-                finalChunks.push({ day: targetDay, freq: 'F2-1', locations: clusterLocs.slice(0, half) });
-                finalChunks.push({ day: targetDay, freq: 'F2-2', locations: clusterLocs.slice(half) });
-            }
-        }
-
-        finalChunks.forEach(chunk => {
-            let unvisited = [...chunk.locations];
-            let currentLoc = unvisited.shift();
-            let order = 1;
-            allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
-            
-            while (unvisited.length > 0) {
-                let nearestIdx = 0, minDist = Infinity;
-                for (let j = 0; j < unvisited.length; j++) {
-                    let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
-                    if (d < minDist) { minDist = d; nearestIdx = j; }
-                }
-                currentLoc = unvisited.splice(nearestIdx, 1)[0];
-                allAiResults.push({ id: currentLoc.id, day: chunk.day, order: order++, freq: chunk.freq });
-            }
-        });
-
-        return allAiResults;
-    }
-
+    /* =========================================
+       7. AI INTEGRATION & EXPORT
+       ========================================= */
     async function optimizeRouteWithAI() {
-        let dataToOptimize = currentNVDataOriginal.filter(r => selectedDays.includes(r.thu));
-        if (dataToOptimize.length < 3) return alert("Quá ít khách hàng, không cần tối ưu.");
+        let dataToOptimize = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
+        if (dataToOptimize.length < 3) return showToast("Quá ít khách hàng để tối ưu", 'warning');
         
-        const overlay = document.getElementById('ai-loading-overlay');
-        const titleEl = document.getElementById('ai-status-title');
-        const descEl = document.getElementById('ai-status-desc');
-        const progressEl = document.getElementById('ai-progress-fill');
+        executeMutation(() => {}); // Lưu lịch sử trước khi gọi AI
+        document.getElementById('ai-loading-overlay').classList.remove('hidden');
+        document.getElementById('ai-progress-fill').style.width = '60%';
         
-        if(overlay) overlay.style.display = 'flex';
-        if(progressEl) progressEl.style.width = '10%';
-        if(titleEl) titleEl.innerText = "BƯỚC 1: Gom cụm khách hàng theo tọa độ...";
-        if(descEl) descEl.innerText = "Chia nhỏ dữ liệu theo cụm không gian chuẩn trước khi đẩy lên AI";
-        
-        btnOptimize.disabled = true;
-        btnOptimize.innerText = "⌛ Đang xử lý...";
-
         try {
-            await new Promise(resolve => setTimeout(resolve, 200));
-
-            const MAX_PER_CLUSTER = 30;
-            const totalCustomers = dataToOptimize.length;
-            let k = Math.max(selectedDays.length, Math.ceil(totalCustomers / MAX_PER_CLUSTER));
-
-            const locations = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, original: r }));
-            const assignments = runKMeansClustering(locations, k);
-
-            if(progressEl) progressEl.style.width = '35%';
-            if(titleEl) titleEl.innerText = "BƯỚC 2: Sắp xếp thứ tự sơ bộ...";
-
-            let preGroupedLocations = [];
-            for (let c = 0; c < k; c++) {
-                let clusterLocs = locations.filter((_, idx) => assignments[idx] === c);
-                if (clusterLocs.length === 0) continue;
-
-                let unvisited = [...clusterLocs];
-                let currentLoc = unvisited.shift();
-                let orderedCluster = [currentLoc];
-
-                while (unvisited.length > 0) {
-                    let nearestIdx = 0, minDist = Infinity;
-                    for (let j = 0; j < unvisited.length; j++) {
-                        let d = getHaversine14(currentLoc.lat, currentLoc.lng, unvisited[j].lat, unvisited[j].lng);
-                        if (d < minDist) { minDist = d; nearestIdx = j; }
-                    }
-                    currentLoc = unvisited.splice(nearestIdx, 1)[0];
-                    orderedCluster.push(currentLoc);
-                }
-
-                preGroupedLocations.push(...orderedCluster);
-            }
-
-            if(progressEl) progressEl.style.width = '60%';
-            if(titleEl) titleEl.innerText = "BƯỚC 3: AI Tinh chỉnh lộ trình & Tần suất...";
-            if(descEl) descEl.innerText = "Tiến hành phân lộ trình và tần suất";
-
-            const payloadLocations = preGroupedLocations.map(r => ({
-                id: r.id,
-                lat: r.lat,
-                lng: r.lng
-            }));
-
             const baseUrl = document.getElementById('sel-api-line').value;
-
-            const response = await fetch(`${baseUrl}/api/optimizeRoute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    locations: payloadLocations,
-                    availableDays: selectedDays
-                })
-            });
-
-            let aiResults = [];
-
-            if (response.ok) {
-                const resData = await response.json();
-                aiResults = resData.optimized_data;
-                if(progressEl) progressEl.style.width = '85%';
-            } else {
-                console.warn("Server AI lỗi, giữ nguyên kết quả gom cụm Local!");
-                aiResults = optimizeRouteFallbackLocal(dataToOptimize);
-            }
-
-            if(progressEl) progressEl.style.width = '95%';
-            if(titleEl) titleEl.innerText = "BƯỚC 4: Ráp dữ liệu & Vẽ bản đồ...";
-
-            currentNVDataOptimized = currentNVDataOriginal.map(row => {
-                let newRow = {...row};
+            // API MỘC: KHÔNG CẦN AUTH HEADER 
+            const payload = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, currentDay: r.thu, currentFreq: r.freq }));
+            const response = await fetch(`${baseUrl}/api/optimizeRoute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locations: payload, availableDays: AppState.selectedDays }) });
+            if (!response.ok) throw new Error("Lỗi Server AI");
+            
+            const aiResults = (await response.json()).optimized_data;
+            document.getElementById('ai-progress-fill').style.width = '100%';
+            
+            AppState.workingData.forEach(row => {
                 let match = aiResults.find(i => i.id === row.ma_kh);
-                if (match) {
-                    newRow.thu = match.day;
-                    newRow._ai_order = match.order;
-                    if (match.freq) newRow.freq = match.freq; 
-                }
-                return newRow;
+                if (match) { row.thu = match.day; row._ai_order = match.order; if(match.freq) row.freq = match.freq; }
             });
+            AppState.workingData.sort((a,b) => a._ai_order - b._ai_order);
             
-            normalizeOrder(currentNVDataOptimized);
-            hasOptimizedData = true; 
-            toggleToolbar.style.display = 'flex';
-            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            isOptimizedView = true; 
-            document.getElementById('chk-draw-lines').checked = true;
-            window.isFirstMapRender = true;
-            
-            await processDataAndRender();
-            
-            if(progressEl) progressEl.style.width = '100%';
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            alert(`🎉 Thành công! Đã tối ưu xong cho ${payloadLocations.length} khách hàng.`);
-            
-        } catch (error) { 
-            console.error("Lỗi Hybrid Optimization:", error);
-            alert("⚠️ Lỗi kết nối AI. Hệ thống đang chuyển sang thuật toán tọa độ không gian tự động.");
-            
-            let fallbackResults = optimizeRouteFallbackLocal(dataToOptimize);
-            currentNVDataOptimized = currentNVDataOriginal.map(row => {
-                let newRow = {...row};
-                let match = fallbackResults.find(i => i.id === row.ma_kh);
-                if (match) {
-                    newRow.thu = match.day;
-                    newRow._ai_order = match.order;
-                    if (match.freq) newRow.freq = match.freq; 
-                }
-                return newRow;
-            });
-            
-            normalizeOrder(currentNVDataOptimized);
-            hasOptimizedData = true; 
-            toggleToolbar.style.display = 'flex';
-            document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
-            isOptimizedView = true; 
-            document.getElementById('chk-draw-lines').checked = true;
-            window.isFirstMapRender = true;
-            await processDataAndRender();
-
-        } finally { 
-            if(overlay) overlay.style.display = 'none'; 
-            btnOptimize.innerText = "✨ AI Tối Ưu Tuyến"; 
-            btnOptimize.disabled = false; 
-        }
+            showToast(`✨ Đã áp dụng đề xuất AI cho ${payload.length} khách!`);
+            AppState.isFirstMapRender = true; processDataAndRender();
+        } catch (error) { showToast(error.message, 'error'); } 
+        finally { document.getElementById('ai-loading-overlay').classList.add('hidden'); }
     }
 
-    async function sendCustomRequestToAI() {
-        const inputEl = document.getElementById('ai-chat-input');
-        const userCommand = inputEl.value.trim(); const btn = document.getElementById('btn-send-ai-chat');
-        if (!userCommand) return alert("Vui lòng nhập yêu cầu!");
-        btn.innerText = "⌛ Đang xử lý..."; btn.disabled = true;
-        try {
-            const baseUrl = document.getElementById('sel-api-line').value;
+    window.exportDetailToExcel = function() {
+        let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
+        if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-            const response = await fetch(`${baseUrl}/api/modifyRoute`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    currentData: currentNVDataOptimized.map(r => ({ id: r.ma_kh, day: r.thu, lat: r.lat, lng: r.lng })),
-                    command: userCommand, availableDays: selectedDays
-                })
-            });
-            if (response.status === 503) throw new Error("AI đang quá tải, thử lại sau!");
-            if (!response.ok) throw new Error("Lỗi AI tinh chỉnh");
-
-            const data = await response.json(); const aiResults = data.modified_data;
-            currentNVDataOptimized = currentNVDataOptimized.map(row => {
-                let newRow = {...row}; let match = aiResults.find(i => i.id === row.ma_kh);
-                if (match) { newRow.thu = match.day; newRow._ai_order = match.order; }
-                return newRow;
-            });
-            
-            normalizeOrder(currentNVDataOptimized);
-            
-            window.isFirstMapRender = true;
-            await processDataAndRender(); inputEl.value = ""; 
-        } catch (error) { alert("⚠️ " + error.message); } 
-        finally { btn.innerText = "🚀 Gửi yêu cầu"; btn.disabled = false; }
-    }
-
-    function handleRouteToggle() {
-        isOptimizedView = (document.querySelector('input[name="routeType"]:checked').value === 'optimized');
-        window.isFirstMapRender = true;
-        processDataAndRender();
-    }
-    
-    function exportDetailToExcel() {
-        let baseData = isOptimizedView ? currentNVDataOptimized : currentNVDataOriginal;
-        let activeData = baseData.filter(r => selectedDays.includes(r.thu));
+        let excelRows = [ ["--- BẢN THẢO PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "Lat", "Lng", "M5", "M6", "M7", "M8"] ];
+        let cMap = new Map(); activeData.forEach(row => { if (!cMap.has(row.ma_kh)) cMap.set(row.ma_kh, { ...row, days: new Set() }); cMap.get(row.ma_kh).days.add(row.thu); });
         
-        if (activeData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
-
-        let customerMap = new Map();
-        activeData.forEach(row => {
-            if (!customerMap.has(row.ma_kh)) {
-                customerMap.set(row.ma_kh, {
-                    ma_kh: row.ma_kh,
-                    ten_kh: row.ten_kh,
-                    freq: row.freq,
-                    lat: row.lat,
-                    lng: row.lng,
-                    area: row.area,
-                    days: new Set()
-                });
-            }
-            customerMap.get(row.ma_kh).days.add(row.thu);
-        });
-
-        let excelRows = [];
-        
-        let headerRow = [];
-        headerRow[0]  = "STT";             
-        headerRow[1]  = window.colB_header || "";                
-        headerRow[2]  = "NPP";             
-        headerRow[3]  = window.colD_header || "";                
-        headerRow[4]  = "Nhân viên";       
-        headerRow[5]  = "Mã KH";           
-        headerRow[6]  = "Tên Khách Hàng";  
-        headerRow[7]  = "Địa chỉ";         
-        
-        DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
-        headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
-        headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
-        
-        headerRow[25] = "DS May"; 
-        headerRow[26] = "DS Jun"; 
-        headerRow[27] = "DS Jul"; 
-        headerRow[28] = "DS Aug";
-        
-        excelRows.push(headerRow);
-
         let sttCounter = 1;
-        customerMap.forEach((cust) => {
-            let row = [];
-            let rawRef = activeData.find(x => x.ma_kh === cust.ma_kh) || {};
-            
-            row[0] = sttCounter++;
-            row[1] = rawRef.colB !== undefined ? rawRef.colB : ""; 
-            row[2] = rawRef.npp || "";
-            row[3] = rawRef.colD !== undefined ? rawRef.colD : "";
-            row[4] = rawRef.nv || "";
-            
-            row[5] = cust.ma_kh;            
-            row[6] = cust.ten_kh;          
-            row[7] = rawRef.dia_chi || ""; 
-            
-            DAYS_TEXT.forEach((day, idx) => {
-                row[11 + idx] = cust.days.has(day) ? "x" : "";
-            });
-
-            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-
-            row[22] = cust.lat || 0;
-            row[23] = cust.lng || 0;
-            row[24] = cust.area || "Khác";
-            
-            let dsKH = window.salesDataMap[cust.ma_kh] || {};
-            row[25] = dsKH['M5'] || 0;
-            row[26] = dsKH['M6'] || 0;
-            row[27] = dsKH['M7'] || 0;
-            row[28] = dsKH['M8'] || 0;
-
-            excelRows.push(row);
+        cMap.forEach((cust) => {
+            excelRows.push([
+                cust._ai_order !== 999 ? cust._ai_order : sttCounter++, cust.npp, cust.nv, cust.ma_kh, cust.ten_kh, cust.dia_chi,
+                ...CONSTANTS.DAYS_TEXT.map(d => cust.days.has(d) ? "x" : ""), ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", cust.lat, cust.lng,
+                AppState.salesData[cust.ma_kh]?.['M5'] || 0, AppState.salesData[cust.ma_kh]?.['M6'] || 0, AppState.salesData[cust.ma_kh]?.['M7'] || 0, AppState.salesData[cust.ma_kh]?.['M8'] || 0
+            ]);
         });
-
-        let worksheet = XLSX.utils.aoa_to_sheet(excelRows);
-
-        const colsLetters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC'];
-        colsLetters.forEach((colChar, index) => {
-            let cellAddress = colChar + '1';
-            if (worksheet[cellAddress]) {
-                let bgColor = "1E40AF"; 
-                if (index >= 25 && index <= 28) bgColor = "D97706";      
-                else if (index >= 11 && index <= 17) bgColor = "2563EB"; 
-                else if (index >= 18 && index <= 21) bgColor = "7C3AED"; 
-                else if (index >= 22 && index <= 24) bgColor = "475569"; 
-
-                worksheet[cellAddress].s = {
-                    fill: { fgColor: { rgb: bgColor } },
-                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                    alignment: { horizontal: "center", vertical: "center", wrapText: true },
-                    border: {
-                        top: { style: "thin", color: { rgb: "CBD5E1" } },
-                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
-                        left: { style: "thin", color: { rgb: "CBD5E1" } },
-                        right: { style: "thin", color: { rgb: "CBD5E1" } }
-                    }
-                };
-            }
-        });
-
-        worksheet['!cols'] = [
-            { wch: 6 },  { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 18 },
-            { wch: 15 }, { wch: 32 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, 
-            { wch: 10 }, { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 8 },  
-            { wch: 8 },  { wch: 8 },  { wch: 8 },  { wch: 6 },  { wch: 6 },  
-            { wch: 6 },  { wch: 6 },  { wch: 12 }, { wch: 12 }, { wch: 16 }, 
-            { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }               
-        ];
-
-        let workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "MasterRoute");
-        
-        let nvName = (document.getElementById('sel-nv').value || '').trim();
-        let nppName = (document.getElementById('sel-npp').value || '').trim();
-        if ((!nvName || nvName.includes('Local')) && activeData.length > 0) nvName = activeData[0].nv || 'NhanVien';
-        if ((!nppName || nppName.includes('Local')) && activeData.length > 0) nppName = activeData[0].npp || 'NPP';
-
-        let safeNv = nvName.replace(/[\\/:\*\?"<>\|]/g, '_');
-        let safeNpp = nppName.replace(/[\\/:\*\?"<>\|]/g, '_');
-
-        XLSX.writeFile(workbook, `Tuyến ${safeNv}-${safeNpp}.xlsx`);
+        let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "ProposalRoute");
+        XLSX.writeFile(wb, `DE_XUAT_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); showToast("Tải Excel thành công", 'success');
     }
-    
-    window.getHaversine14 = function(lat1, lon1, lat2, lon2) {
-        if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
-        const dLat = (lat2 - lat1) * (Math.PI / 180); 
-        const dLon = (lon2 - lon1) * (Math.PI / 180);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + 
-                  Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 1.4; 
-    };
-
-    if (typeof getHaversine14 === 'undefined') {
-        var getHaversine14 = window.getHaversine14;
-    }
-    
-    function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0); }
-    
-    window.downloadWeeklyMap = function() {
-        const btn = document.getElementById('btn-dl-map-week');
-        const originalText = btn.innerHTML;
-        
-        btn.innerHTML = '⌛ Đang xuất ảnh...';
-        btn.disabled = true;
-
-        const mapContainer = document.getElementById('map-container');
-
-        html2canvas(mapContainer, {
-            useCORS: true,       
-            allowTaint: false,
-            backgroundColor: null 
-        }).then(canvas => {
-            const link = document.createElement('a');
-            const nvName = document.getElementById('sel-nv').value || 'NhanVien';
-            link.download = `BanDo_LoTrinh_${nvName}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }).catch(err => {
-            console.error("Lỗi khi xuất ảnh bản đồ:", err);
-            alert("Có lỗi xảy ra khi chụp ảnh bản đồ. Vui lòng thử lại!");
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        });
-    };
 
     async function checkServerStatus() {
-        const badge = document.getElementById('server-status-badge');
-        const baseUrl = document.getElementById('sel-api-line').value;
-        
-        badge.innerHTML = "⏳ Đang ping...";
-        badge.style.color = "#d97706";
-        badge.style.background = "#fef3c7";
-        badge.style.borderColor = "#fde68a";
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-            const response = await fetch(`${baseUrl}/api/optimizeRoute`, { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ping: true }), 
-                signal: controller.signal 
-            });
-            
-            clearTimeout(timeoutId);
-
-            if (response.status === 503 || response.status === 504 || response.status === 500) {
-                badge.innerHTML = "🔴 Server Đang Bận / Lỗi";
-                badge.style.color = "#dc2626";
-                badge.style.background = "#fee2e2";
-                badge.style.borderColor = "#fca5a5";
-            } else {
-                badge.innerHTML = "🟢 Server Đang Rảnh";
-                badge.style.color = "#059669";
-                badge.style.background = "#d1fae5";
-                badge.style.borderColor = "#6ee7b7";
-            }
-        } catch (error) {
-            badge.innerHTML = "🔴 Mất Kết Nối";
-            badge.style.color = "#dc2626";
-            badge.style.background = "#fee2e2";
-            badge.style.borderColor = "#fca5a5";
-        }
+        const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
+        try { if ((await fetch(document.getElementById('sel-api-line').value + '/api/optimizeRoute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ping: true}) })).ok) { b.innerHTML = "🟢 OK"; b.className = "cursor-pointer text-emerald-700 bg-emerald-100 border border-emerald-300 px-1 rounded text-xs"; } else throw new Error(); } catch(e) { b.innerHTML = "🔴 Lỗi"; b.className = "cursor-pointer text-red-700 bg-red-100 border border-red-300 px-1 rounded text-xs"; }
     }
-
-    window.addEventListener('DOMContentLoaded', () => {
-        setTimeout(checkServerStatus, 1500); 
-    });
 </script>
 </body>
 </html>
