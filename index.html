@@ -9,26 +9,32 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-        /* CSS VARIABLES & COMPACT MODE */
-        :root { --primary: #3b82f6; --primary-hover: #2563eb; --danger: #ef4444; --warning: #f59e0b; --success: #10b981; --bg-gray: #f1f5f9; --text-main: #334155; --text-muted: #64748b; }
+        /* CSS VARIABLES & SUPER ELLIPSE COMPACT MODE */
+        :root { 
+            --primary: #3b82f6; --primary-hover: #2563eb; --danger: #ef4444; 
+            --warning: #f59e0b; --success: #10b981; --bg-gray: #f1f5f9; 
+            --text-main: #334155; --text-muted: #64748b;
+            --radius-sm: 8px; /* Bo góc mềm cho nút, input */
+            --radius-md: 12px; /* Bo góc super ellipse cho các box/panel */
+        }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-gray); font-size: 13px; color: var(--text-main); }
         
-        .flex { display: flex; } .flex-col { display: flex; flex-direction: column; } .items-center { align-items: center; } .justify-between { justify-content: space-between; }
-        .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .mt-2 { margin-top: 8px; } .mb-2 { margin-bottom: 8px; } .mb-1 { margin-bottom: 4px; }
+        .flex { display: flex; } .flex-col { display: flex; flex-direction: column; } .items-center { align-items: center; } .justify-between { justify-content: space-between; } .items-stretch { align-items: stretch; }
+        .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .mt-2 { margin-top: 8px; } .mt-3 { margin-top: 12px; } .mb-2 { margin-bottom: 8px; } .mb-1 { margin-bottom: 4px; }
         .font-bold { font-weight: bold; } .hidden { display: none !important; }
-        .flex-1 { flex: 1; } .w-full { width: 100%; }
+        .flex-1 { flex: 1; } .w-full { width: 100%; } .w-auto { width: auto; } .whitespace-nowrap { white-space: nowrap; }
+        .py-1 { padding-top: 6px; padding-bottom: 6px; } 
         
         #app-container { display: flex; height: 100vh; width: 100%; position: relative; }
         #left-panel { width: 35%; height: 100%; border-right: 2px solid #cbd5e1; background: #fff; display: flex; flex-direction: column; }
         #right-panel { width: 65%; height: 100%; padding: 12px 16px; overflow-y: auto; background-color: #ffffff; position: relative; }
         
         #upload-section { padding: 10px; background: #e2e8f0; border-bottom: 2px solid #cbd5e1; }
-        .upload-warning { color: #1e40af; font-weight: bold; font-size: 14px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 8px; border-radius: 6px; margin-bottom: 8px; }
+        .upload-warning { color: #1e40af; font-weight: bold; font-size: 14px; text-transform: uppercase; background: #dbeafe; border: 1px solid #bfdbfe; text-align: center; padding: 8px; border-radius: var(--radius-sm); margin-bottom: 8px; }
         
-        .btn { padding: 8px 12px; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn { padding: 8px 12px; color: white; border: none; border-radius: var(--radius-sm); font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
         .btn-primary { background-color: var(--primary); } .btn-primary:hover { background-color: var(--primary-hover); }
         .btn-warning { background-color: var(--warning); color: #fff; } .btn-warning:hover { background-color: #d97706; }
         .btn-purple { background-color: #8b5cf6; } .btn-purple:hover { background-color: #7c3aed; }
@@ -44,33 +50,37 @@
         .icon-btn { background: white; border: 2px solid var(--primary); border-radius: 20px; width: 32px; height: 32px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 14px; }
         .icon-btn:hover { background: #eff6ff; }
 
-        .filter-section { background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
-        .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
-        .form-control[multiple] { min-height: 48px; padding: 2px; }
-        .day-chip { padding: 4px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .filter-section { background: #f8fafc; padding: 12px; border-radius: var(--radius-md); border: 1px solid #e2e8f0; margin-bottom: 12px; }
+        .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
+        .form-control[multiple] { min-height: 52px; padding: 4px; }
+        .day-chip { padding: 4px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; user-select: none; }
         .day-chip:hover { background: #e2e8f0; } .day-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-        .table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 15px; max-height: calc(100vh - 180px); }
+        .warning-section-box { background: #fef2f2; border: 1px solid #fca5a5; padding: 12px; margin-bottom: 15px; border-radius: var(--radius-md); }
+        .warning-title { color: #dc2626; font-size: 14px; font-weight: bold; margin: 0 0 8px 0; display: flex; align-items: center; gap: 6px;}
+        .warning-tag { background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #fca5a5; display: inline-block; margin-bottom: 2px; margin-right: 2px;}
+
+        .table-container { overflow-x: auto; max-width: 100%; border: 1px solid #e2e8f0; border-radius: var(--radius-md); margin-bottom: 15px; max-height: calc(100vh - 180px); }
         table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 12px; }
         th, td { padding: 6px 8px; text-align: left; border: 1px solid #e2e8f0; white-space: nowrap; }
         th.sticky-header { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; position: sticky; top: 0; z-index: 2; }
+        th.danger-th { background-color: #dc2626 !important; color: white !important; }
         .ds-col { background-color: #fef3c7 !important; color: #065f46 !important; font-weight: bold; }
         .hover-row:hover td { background-color: #bfdbfe !important; }
         .edit-cell { cursor: pointer; user-select: none; text-align: center; } .edit-cell:hover { background-color: #93c5fd !important; }
-        .stt-input { width: 40px; text-align: center; font-weight: bold; padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; }
-        
+        .stt-input { width: 40px; text-align: center; font-weight: bold; padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; }
         .btn-remove { background-color: var(--danger); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .btn-remove:hover { background-color: #b91c1c; transform: scale(1.1); }
         
-        .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 11px; box-sizing: border-box; }
-        .marker-circle { border-radius: 50%; } .marker-square { border-radius: 4px; }
+        .route-marker { font-weight: bold; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-size: 11px; box-sizing: border-box; border-radius: 8px; }
+        .marker-circle { border-radius: 50%; } .marker-square { border-radius: 6px; }
         
+        #legend-container { border-radius: var(--radius-md); }
         .legend-box { width: 12px; height: 12px; display: inline-block; border-radius: 3px; border: 1px solid #94a3b8; }
         .legend-circle { border-radius: 50%; }
 
-        /* TOAST NOTIFICATION */
         #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: #334155; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .toast { background: #334155; color: white; padding: 12px 20px; border-radius: var(--radius-md); box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { border-left: 4px solid var(--success); } .toast.error { border-left: 4px solid var(--danger); } .toast.warning { border-left: 4px solid var(--warning); }
     </style>
@@ -78,7 +88,7 @@
 <body>
 
 <div id="ai-loading-overlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%;">
+    <div style="background: white; padding: 25px; border-radius: var(--radius-md); box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%;">
         <h2 class="mt-0" style="color: #1e40af; font-size: 16px;">Đang thiết lập phương án AI...</h2>
         <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 15px;">
             <div id="ai-progress-fill" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
@@ -93,21 +103,21 @@
         <div id="upload-section">
             <div class="upload-warning">BẢN ĐỒ QUY HOẠCH TUYẾN MASTER</div>
             <div class="flex gap-2 mb-2 w-full">
-                <button id="btnLoadData" class="btn btn-primary flex-1" onclick="loadDataFromSupabase()">📥 Tải Dữ Liệu DB</button>
+                <button id="btnLoadData" class="btn btn-primary flex-1" onclick="loadDataFromSupabase()">📥 Tải dữ liệu từ hệ thống</button>
                 <input type="file" id="localFileInput" accept=".xlsx, .xls" class="hidden" onchange="handleLocalFileUpload(event)" multiple>
-                <button class="btn btn-purple flex-1" onclick="document.getElementById('localFileInput').click()">📁 Tải File Mới</button>
+                <button class="btn btn-purple flex-1" onclick="document.getElementById('localFileInput').click()">📁 Upload file từ máy tính</button>
             </div>
             <div class="flex justify-between font-bold text-sm mb-2"><span>1. Tuyến:</span><span id="statusRoute" class="font-normal">(Chưa tải)</span></div>
             <div class="flex justify-between font-bold text-sm mb-2"><span>2. Doanh số:</span><span id="statusSales" class="font-normal">(Chưa tải)</span></div>
             
-            <div id="legend-container" class="hidden mt-2 p-2 bg-white rounded border border-slate-300 text-xs"></div>
+            <div id="legend-container" class="hidden mt-2 p-2 bg-white border border-slate-300 text-xs"></div>
         </div>
         
         <div id="map-container">
             <div id="map-toolbar-wrapper" class="map-toolbar-wrapper">
                 <div id="route-toggle-toolbar" class="map-toolbar">
                     <label class="toggle-option"><input type="radio" name="routeType" value="original" checked onchange="handleRouteToggle()"><span>📍 Gốc</span></label>
-                    <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Nháp</span></label>
+                    <label class="toggle-option"><input type="radio" name="routeType" value="optimized" onchange="handleRouteToggle()"><span style="color:#f59e0b;">✨ Tuyến Mới</span></label>
                     <div style="width: 1px; height: 12px; background: #cbd5e1;"></div>
                     <label class="toggle-option"><input type="checkbox" id="chk-draw-lines" onchange="processDataAndRender()"><span style="color:var(--success);">🔗 Nối tuyến</span></label>
                 </div>
@@ -120,40 +130,66 @@
 
     <div id="right-panel">
         <div class="filter-section flex-col gap-2">
-            <div class="flex gap-3 w-full items-end">
-                <div class="flex-1 flex-col"><label class="mb-1 font-bold">Khu vực</label><select id="sel-area" class="form-control" disabled><option value="">-- Chọn Khu vực --</option></select></div>
-                <div class="flex-1 flex-col"><label class="mb-1 font-bold">NPP</label><select id="sel-npp" class="form-control" disabled><option value="">-- Chọn NPP --</option></select></div>
-                <div style="flex: 2;" class="flex-col"><label class="mb-1 font-bold">Nhân viên (Max 2)</label><select id="sel-nv" class="form-control" multiple disabled><option value="">-- Chọn Nhân viên --</option></select></div>
+            <div class="flex gap-3 w-full items-stretch">
+                <div class="flex-col" style="flex: 1;">
+                    <label class="mb-1 font-bold text-xs">Khu vực</label>
+                    <select id="sel-area" class="form-control" disabled><option value="">-- Chọn Khu vực --</option></select>
+                </div>
+                <div class="flex-col" style="flex: 1;">
+                    <label class="mb-1 font-bold text-xs">NPP</label>
+                    <select id="sel-npp" class="form-control" disabled><option value="">-- Chọn NPP --</option></select>
+                </div>
+                <div class="flex-col" style="flex: 1.5;">
+                    <label class="mb-1 font-bold text-xs">Chọn tối đa 2 nhân viên</label>
+                    <select id="sel-nv" class="form-control" multiple disabled style="height: 100%;"><option value="">-- Chọn Nhân viên --</option></select>
+                </div>
+                <div class="flex-col" style="flex: 2;">
+                    <label class="mb-1 font-bold text-xs">Thứ (Day)</label>
+                    <div id="day-chips-container" class="flex flex-wrap gap-2 items-start content-start" style="height: 100%;">
+                        <span class="text-muted text-xs">-- Chọn Thứ --</span>
+                    </div>
+                </div>
             </div>
             
-            <div class="flex-col w-full mt-2">
-                <label class="mb-1 font-bold">Thứ (Day) - Có thể chọn nhiều</label>
-                <div id="day-chips-container" class="flex flex-wrap gap-2 items-center" style="min-height: 28px;"><span class="text-muted text-xs">-- Chọn Thứ --</span></div>
-            </div>
-            
-            <div class="flex gap-3 w-full items-end mt-2">
-                <div class="flex-col relative" style="flex: 0 0 25%;">
-                    <label class="flex justify-between items-center mb-1 font-bold">Kênh AI <span id="server-status-badge" class="cursor-pointer text-blue-600 bg-blue-100 border border-blue-200 px-1 rounded text-xs" onclick="checkServerStatus()">🔄 Ping</span></label>
-                    <select id="sel-api-line" class="form-control font-bold text-blue-800 bg-blue-50 border-blue-500" onchange="checkServerStatus()">
+            <div class="flex gap-3 w-full items-center mt-3">
+                <div class="flex items-center gap-2">
+                    <label class="font-bold text-xs whitespace-nowrap">Kênh AI <span id="server-status-badge" class="cursor-pointer text-blue-600 bg-blue-100 border border-blue-200 px-1 rounded" onclick="checkServerStatus()">🔄 Ping</span></label>
+                    <select id="sel-api-line" class="form-control font-bold text-blue-800 bg-blue-50 border-blue-500 w-auto" onchange="checkServerStatus()">
                         <option value="https://tool-toi-uu-tuyen.vercel.app">🔴 Line 1</option>
                         <option value="https://tool-toi-uu-tuyen-line2.vercel.app">🟢 Line 2</option>
                     </select>
                 </div>
-                <div class="flex gap-2 m-0" style="flex: 1;">
-                    <button id="btn-ai-optimize" class="btn btn-warning flex-1" onclick="optimizeRouteWithAI()" disabled>✨ AI Gợi Ý</button>
-                    <button id="btn-undo" class="btn btn-danger flex-1" onclick="undo()" disabled style="background-color: #64748b;">↩ Hoàn Tác</button>
-                    <button id="btn-dl-map-week" class="btn btn-purple flex-1" onclick="downloadWeeklyMap()" disabled>🗺️ Lưu Ảnh</button>
+                <div class="flex gap-2 m-0 flex-1">
+                    <button id="btn-ai-optimize" class="btn btn-warning flex-1 py-1" onclick="optimizeRouteWithAI()" disabled>✨ AI Gợi Ý</button>
+                    <button id="btn-undo" class="btn btn-danger flex-1 py-1" onclick="undo()" disabled style="background-color: #64748b;">↩ Hoàn Tác</button>
                 </div>
+            </div>
+        </div>
+
+        <div id="warning-section" class="warning-section-box hidden">
+            <h3 class="warning-title">🚨 CẢNH BÁO LỖI DỮ LIỆU</h3>
+            <div class="table-container" style="margin-bottom: 0; max-height: 200px;">
+                <table id="warning-table">
+                    <thead>
+                        <tr>
+                            <th class="sticky-header danger-th" style="width:60px;">Mã KH</th>
+                            <th class="sticky-header danger-th">Nhân viên</th>
+                            <th class="sticky-header danger-th">Tên Khách Hàng</th>
+                            <th class="sticky-header danger-th">Chi Tiết Lỗi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="warning-body"></tbody>
+                </table>
             </div>
         </div>
 
         <div id="dashboard-section" class="hidden">
             <div class="flex justify-between items-center border-b-2 border-slate-100 pb-2 mb-3">
                 <div class="flex items-baseline gap-3">
-                    <h2 class="m-0 text-base font-bold text-slate-900">Chi tiết tuyến (Bản Nháp)</h2>
-                    <span class="text-xs text-emerald-600 font-medium">(Mọi thay đổi tự động lưu vào bản nháp)</span>
+                    <h2 class="m-0 text-base font-bold text-slate-900">Chi tiết tuyến</h2>
+                    <span class="text-xs text-emerald-600 font-medium">(Mọi thay đổi sẽ không được lưu vào hệ thống DMS, vui lòng xuất file excel bản chỉnh sửa và gửi mail cho CDM để được phê duyệt.)</span>
                 </div>
-                <button class="btn btn-success" onclick="exportDetailToExcel()">📥 Xuất Excel Đề Xuất</button>
+                <button class="btn btn-success" onclick="exportDetailToExcel()">📥 Xuất Excel bản chỉnh sửa</button>
             </div>
             <div class="table-container">
                 <table id="detail-table">
@@ -171,6 +207,7 @@
        ========================================= */
     const AppState = {
         sourceData: [],    
+        warningData: [],
         workingData: [],   
         historyStack: [],  
         salesData: {},     
@@ -201,6 +238,8 @@
     let routeLayer = L.layerGroup().addTo(map); let lineLayer = L.layerGroup().addTo(map); window.currentMarkers = {};
 
     function escapeHTML(str) { return !str ? '' : String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
+    function formatNum(num) { if (!num) return '-'; return new Intl.NumberFormat('en-US').format(num); }
+    
     function showToast(message, type = 'success') {
         const c = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = `toast ${type}`;
         t.innerHTML = `<span>${type === 'success'?'✅':type === 'error'?'❌':'⚠️'}</span><span>${escapeHTML(message)}</span>`;
@@ -208,6 +247,18 @@
         setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
     }
     function renderStatus(id, text, color) { document.getElementById(id).innerHTML = `<span style="color:${color};font-weight:bold;">${text}</span>`; }
+
+    /* --- HOVER BẢN ĐỒ --- */
+    window.highlightMarker = function(ma_kh) {
+        for(let id in window.currentMarkers) {
+            if (id.startsWith(ma_kh + "_")) window.currentMarkers[id].openPopup();
+        }
+    };
+    window.resetHighlightMarker = function(ma_kh) {
+        for(let id in window.currentMarkers) {
+            if (id.startsWith(ma_kh + "_")) window.currentMarkers[id].closePopup();
+        }
+    };
 
     /* --- UNDO LOGIC --- */
     function saveHistory() {
@@ -233,7 +284,7 @@
             AppState.isOptimizedView = true;
             document.querySelector('input[name="routeType"][value="optimized"]').checked = true;
             document.getElementById('map-toolbar-wrapper').style.display = 'flex';
-            showToast("Chuyển sang chế độ Phương Án Nháp", 'warning');
+            showToast("Chuyển sang chế độ Tuyến Mới", 'warning');
         }
         saveHistory();
         action();
@@ -246,7 +297,6 @@
     async function loadSalesData() {
         renderStatus('statusSales', '⌛ Đang tải...', '#ea580c');
         try {
-            // [ĐÃ KHÔI PHỤC] Xác thực phiên người dùng từ Supabase để được phép tải file Private
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) { 
                 console.error("Chưa đăng nhập, không thể lấy file doanh số.");
@@ -282,24 +332,42 @@
     }
 
     function processRawExcelData(jsonRouteList) {
-        let rawValid = [];
+        let rawValid = []; let rawWarn = [];
         jsonRouteList.forEach((row, idx) => {
             if (idx === 0 || !row[0] || row[0] === 'STT') return;
-            let npp = escapeHTML(row[2]), nv = escapeHTML(row[4]), ma_kh = escapeHTML(row[5]);
-            let ten_kh = escapeHTML(row[6]), dia_chi = escapeHTML(row[7] || 'N/A'), area = escapeHTML(row[24] || "Khác");
+            
+            let npp = String(row[2] || ''), nv = String(row[4] || '');
+            let ma_kh = String(row[5] || '').trim(); // Giữ nguyên để map Doanh số
+            let ten_kh = String(row[6] || ''), dia_chi = String(row[7] || 'N/A'), area = String(row[24] || "Khác");
             let lat = parseFloat(row[22]), lng = parseFloat(row[23]);
-            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
+            let isValidCoord = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
             
             let w1 = (row[18]||'').toString().toLowerCase().trim()==='x', w2 = (row[19]||'').toString().toLowerCase().trim()==='x';
             let w3 = (row[20]||'').toString().toLowerCase().trim()==='x', w4 = (row[21]||'').toString().toLowerCase().trim()==='x';
             let freqType = (w1&&w2&&w3&&w4) ? "F4" : (w1&&!w2&&w3&&!w4) ? "F2-1" : (!w1&&w2&&!w3&&w4) ? "F2-2" : "Lỗi Tần Suất";
 
+            let addedToWarn = false;
+
             CONSTANTS.DAY_COLS.forEach((col, i) => {
-                if ((row[col]||'').toString().toLowerCase().trim() === 'x')
-                    rawValid.push({ area, npp, nv, ma_kh, ten_kh, dia_chi, thu: CONSTANTS.DAYS_TEXT[i], lat, lng, freq: freqType, _ai_order: 999 });
+                let dayName = CONSTANTS.DAYS_TEXT[i];
+                if ((row[col]||'').toString().toLowerCase().trim() === 'x') {
+                    let warnings = [];
+                    if (!isValidCoord) warnings.push("Không tọa độ");
+                    if (dayName === 'Chủ nhật') warnings.push("Tuyến CN");
+                    if (freqType === "Lỗi Tần Suất") warnings.push("Sai T.Suất");
+                    
+                    if (warnings.length > 0 && !addedToWarn) {
+                        rawWarn.push({ area, npp, nv, ma_kh, ten_kh, errors: warnings });
+                        addedToWarn = true;
+                    }
+                    if (isValidCoord) {
+                        rawValid.push({ area, npp, nv, ma_kh, ten_kh, dia_chi, thu: dayName, lat, lng, freq: freqType, _ai_order: 999 });
+                    }
+                }
             });
         });
         AppState.sourceData = rawValid;
+        AppState.warningData = rawWarn;
     }
 
     async function handleLocalFileUpload(event) {
@@ -327,7 +395,6 @@
         
         await loadSalesData();
         try {
-            // [ĐÃ KHÔI PHỤC] Điều hướng nếu Session Supabase hết hạn
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) { 
                 alert("Phiên làm việc hết hạn. Vui lòng đăng nhập lại."); 
@@ -362,24 +429,24 @@
         if (isLocal) {
             selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`; selArea.disabled = true;
             selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`; selNPP.disabled = true;
-            selNV.innerHTML = [...new Set(AppState.sourceData.map(r=>r.nv))].map(nv => `<option value="${nv}">${nv}</option>`).join('');
+            selNV.innerHTML = [...new Set(AppState.sourceData.map(r=>r.nv))].map(nv => `<option value="${escapeHTML(nv)}">${escapeHTML(nv)}</option>`).join('');
             selNV.disabled = false;
         } else {
-            selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>` + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => `<option value="${a}">${a}</option>`).join('');
+            selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>` + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => `<option value="${escapeHTML(a)}">${escapeHTML(a)}</option>`).join('');
             selArea.disabled = false;
         }
-        clearWorkspace();
+        clearWorkspace(true);
     }
 
     document.getElementById('sel-area').addEventListener('change', (e) => {
-        clearWorkspace(); if (!e.target.value) { document.getElementById('sel-npp').disabled = true; document.getElementById('sel-nv').disabled = true; return; }
-        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${n}">${n}</option>`).join('');
+        clearWorkspace(true); if (!e.target.value) { document.getElementById('sel-npp').disabled = true; document.getElementById('sel-nv').disabled = true; return; }
+        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
         document.getElementById('sel-npp').disabled = false; document.getElementById('sel-nv').disabled = true;
     });
 
     document.getElementById('sel-npp').addEventListener('change', (e) => {
-        clearWorkspace(); if (!e.target.value) { document.getElementById('sel-nv').disabled = true; return; }
-        document.getElementById('sel-nv').innerHTML = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(nv => `<option value="${nv}">${nv}</option>`).join('');
+        clearWorkspace(true); if (!e.target.value) { document.getElementById('sel-nv').disabled = true; return; }
+        document.getElementById('sel-nv').innerHTML = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(nv => `<option value="${escapeHTML(nv)}">${escapeHTML(nv)}</option>`).join('');
         document.getElementById('sel-nv').disabled = false;
     });
 
@@ -387,27 +454,47 @@
         let opts = Array.from(e.target.selectedOptions);
         if (opts.length > 2) { showToast("Chọn tối đa 2 nhân viên!", 'warning'); opts[opts.length - 1].selected = false; opts = Array.from(e.target.selectedOptions); }
         AppState.selectedEmployees = opts.map(o => o.value);
-        clearWorkspace();
-        if (AppState.selectedEmployees.length === 0) return;
+        clearWorkspace(true);
+        if (AppState.selectedEmployees.length === 0) {
+            document.getElementById('warning-section').classList.add('hidden');
+            return;
+        }
+
+        let activeWarnings = AppState.warningData.filter(r => AppState.selectedEmployees.includes(r.nv));
+        let tbody = document.getElementById('warning-body');
+        if (activeWarnings.length > 0) {
+            tbody.innerHTML = activeWarnings.map(row => 
+                `<tr class="hover-row"><td class="font-bold text-red-600 text-center">${escapeHTML(row.ma_kh)}</td><td>${escapeHTML(row.nv)}</td><td class="whitespace-normal">${escapeHTML(row.ten_kh)}</td><td class="whitespace-normal">${row.errors.map(err=>`<span class="warning-tag">⚠️ ${escapeHTML(err)}</span>`).join('')}</td></tr>`
+            ).join('');
+            document.getElementById('warning-section').classList.remove('hidden');
+        } else {
+            document.getElementById('warning-section').classList.add('hidden');
+        }
 
         AppState.workingData = structuredClone(AppState.sourceData.filter(r => AppState.selectedEmployees.includes(r.nv)));
         AppState.workingData.sort((a,b) => (a.nv > b.nv) ? 1 : -1); 
         AppState.historyStack = []; updateUndoButton();
         
         let thus = [...new Set(AppState.workingData.map(r => r.thu))];
-        document.getElementById('day-chips-container').innerHTML = `<div class="day-chip" id="chip-all" onclick="toggleAllDays()">Tất cả</div>` + thus.map(thu => `<div class="day-chip chip-day" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`).join('');
+        document.getElementById('day-chips-container').innerHTML = `<div class="day-chip active" id="chip-all" onclick="toggleAllDays()">Tất cả</div>` + thus.map(thu => `<div class="day-chip chip-day active" data-day="${thu}" onclick="toggleDay('${thu}')">${thu}</div>`).join('');
         
         updateLegendUI(AppState.selectedEmployees.length);
+        
+        AppState.selectedDays = [...thus];
         AppState.isFirstMapRender = true;
+        document.getElementById('btn-ai-optimize').disabled = false;
+        
+        processDataAndRender();
     });
 
     function updateLegendUI(count) {
         const container = document.getElementById('legend-container'); container.classList.remove('hidden');
         if (count <= 1) {
             container.innerHTML = `<div class="flex gap-2 flex-wrap items-center">
-                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4</span>
-                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2</span>
-                <div style="width:1px;height:12px;background:#cbd5e1;"></div>
+                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4 thuần</span>
+                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2 thuần</span>
+                <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24"><path fill="#64748b" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg> Tuyến trộn (F4+F2)</span>
+                <div style="width:1px;height:12px;background:#cbd5e1;margin:0 4px;"></div>
                 <span class="flex items-center gap-1"><span class="legend-box" style="background:#22c55e;"></span> T2</span>
                 <span class="flex items-center gap-1"><span class="legend-box" style="background:#ef4444;"></span> T3</span>
                 <span class="flex items-center gap-1"><span class="legend-box" style="background:#a855f7;"></span> T4</span>
@@ -418,8 +505,9 @@
             </div>`;
         } else {
             container.innerHTML = `<div class="flex gap-3 flex-wrap mb-1">
-                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4</span>
-                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2</span>
+                <span class="flex items-center gap-1"><span class="legend-box legend-circle bg-slate-500"></span> F4 thuần</span>
+                <span class="flex items-center gap-1"><span class="legend-box bg-slate-500"></span> F2 thuần</span>
+                <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24"><path fill="#64748b" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg> Tuyến trộn (F4+F2)</span>
             </div>
             <div class="border-t border-slate-200 pt-1 flex-col gap-1">
                 <div class="flex gap-2 items-center"><span style="width:35px;font-weight:600;">NV 1:</span><span class="legend-box" style="background:#0d2b47;" title="T2"></span><span class="legend-box" style="background:#1155cc;" title="T3"></span><span class="legend-box" style="background:#9fc5e8;" title="T4"></span><span class="legend-box" style="background:#8e7cc3;" title="T5"></span><span class="legend-box" style="background:#d9d2e9;" title="T6"></span><span class="legend-box" style="background:#ead1dc;" title="T7"></span></div>
@@ -428,11 +516,14 @@
         }
     }
 
-    function clearWorkspace() {
+    function clearWorkspace(resetChips = false) {
         document.getElementById('dashboard-section').classList.add('hidden');
         document.getElementById('map-toolbar-wrapper').style.display = 'none';
-        document.getElementById('day-chips-container').innerHTML = `<span class="text-muted text-xs">-- Chọn Thứ --</span>`;
-        AppState.selectedDays = []; routeLayer.clearLayers(); lineLayer.clearLayers();
+        if(resetChips) {
+            document.getElementById('day-chips-container').innerHTML = `<span class="text-muted text-xs">-- Chọn Thứ --</span>`;
+            AppState.selectedDays = []; 
+        }
+        routeLayer.clearLayers(); lineLayer.clearLayers();
     }
 
     window.toggleDay = function(day) { let idx = AppState.selectedDays.indexOf(day); if(idx > -1) AppState.selectedDays.splice(idx, 1); else AppState.selectedDays.push(day); updateDaySelection(); };
@@ -440,9 +531,17 @@
     
     function updateDaySelection() {
         document.querySelectorAll('.chip-day').forEach(el => el.classList.toggle('active', AppState.selectedDays.includes(el.getAttribute('data-day'))));
+        
+        let chipAll = document.getElementById('chip-all');
+        if(chipAll) {
+            let totalDays = document.querySelectorAll('.chip-day').length;
+            if(AppState.selectedDays.length === totalDays && totalDays > 0) chipAll.classList.add('active');
+            else chipAll.classList.remove('active');
+        }
+        
         let active = AppState.selectedDays.length > 0;
-        document.getElementById('btn-dl-map-week').disabled = !active; document.getElementById('btn-ai-optimize').disabled = !active;
-        if (active) processDataAndRender(); else clearWorkspace();
+        document.getElementById('btn-ai-optimize').disabled = !active;
+        if (active) processDataAndRender(); else clearWorkspace(false);
     }
 
     /* =========================================
@@ -499,7 +598,7 @@
                         let markerId = `${row.ma_kh}_${day}_${empIdx}`; seenIds.add(markerId);
                         let m = window.currentMarkers[markerId] || L.marker([row.lat, row.lng]).addTo(routeLayer);
                         m.setIcon(L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [26,26] }));
-                        m.bindPopup(`<b>${row.ten_kh}</b><br>Mã KH: ${row.ma_kh}<br>NV: ${row.nv}<br>Tần suất: ${row.freq}`);
+                        m.bindPopup(`<b>${escapeHTML(row.ten_kh)}</b><br>Mã KH: ${escapeHTML(row.ma_kh)}<br>NV: ${escapeHTML(row.nv)}<br>Tần suất: ${row.freq}`);
                         window.currentMarkers[markerId] = m;
                     });
                     if (coords.length > 1 && chkLines && chkLines.checked) L.polyline(coords, { color: bg, weight: 3, dashArray: dash }).addTo(lineLayer);
@@ -524,7 +623,7 @@
         thead.innerHTML = `<tr>
             <th class="sticky-header" rowspan="2">STT</th><th class="sticky-header" rowspan="2" style="width:30px;" title="Loại khách">🗑️</th>
             <th class="sticky-header" rowspan="2">Nhân viên</th><th class="sticky-header" rowspan="2">Mã KH</th><th class="sticky-header" rowspan="2">Tên KH</th>
-            <th class="sticky-header" colspan="7">Lộ trình (Nháp)</th><th class="sticky-header" colspan="4">Tần Suất (Nháp)</th><th class="sticky-header ds-col" colspan="4">Doanh Số</th>
+            <th class="sticky-header" colspan="7">Lộ trình</th><th class="sticky-header" colspan="4">Tần Suất</th><th class="sticky-header ds-col" colspan="4">Doanh Số</th>
         </tr>
         <tr>
             ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
@@ -540,17 +639,17 @@
             const isF4 = cust.freq==='F4', isF21 = cust.freq==='F2-1', isF22 = cust.freq==='F2-2';
             let ds = AppState.salesData[cust.ma_kh] || {}; let stt = cust._ai_order !== 999 ? cust._ai_order : i + 1;
             
-            return `<tr class="hover-row">
+            return `<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
                 <td class="text-center"><input type="number" class="stt-input" value="${stt}" onchange="updateOrder('${cust.ma_kh}', this.value)"></td>
                 <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${cust.ma_kh}')">×</button></td>
-                <td>${cust.nv}</td><td>${cust.ma_kh}</td><td>${cust.ten_kh}</td>
+                <td>${escapeHTML(cust.nv)}</td><td>${escapeHTML(cust.ma_kh)}</td><td>${escapeHTML(cust.ten_kh)}</td>
                 ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" onclick="toggleRouteDay('${cust.ma_kh}','${d}')">${gx(d)}</td>`).join('')}
                 <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W1')">${gw(isF4||isF21)}</td>
                 <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W2')">${gw(isF4||isF22)}</td>
                 <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W3')">${gw(isF4||isF21)}</td>
                 <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W4')">${gw(isF4||isF22)}</td>
-                <td class="num-right" style="background:#fffbeb;">${ds['M5']||'-'}</td><td class="num-right" style="background:#fef3c7;">${ds['M6']||'-'}</td>
-                <td class="num-right" style="background:#fffbeb;">${ds['M7']||'-'}</td><td class="num-right" style="background:#fef3c7;">${ds['M8']||'-'}</td>
+                <td class="num-right" style="background:#fffbeb;">${formatNum(ds['M5'])}</td><td class="num-right" style="background:#fef3c7;">${formatNum(ds['M6'])}</td>
+                <td class="num-right" style="background:#fffbeb;">${formatNum(ds['M7'])}</td><td class="num-right" style="background:#fef3c7;">${formatNum(ds['M8'])}</td>
             </tr>`;
         }).join('');
     }
@@ -591,7 +690,7 @@
         let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
         if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-        let excelRows = [ ["--- BẢN THẢO PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "Lat", "Lng", "M5", "M6", "M7", "M8"] ];
+        let excelRows = [ ["--- BẢN CHỈNH SỬA PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "Lat", "Lng", "M5", "M6", "M7", "M8"] ];
         let cMap = new Map(); activeData.forEach(row => { if (!cMap.has(row.ma_kh)) cMap.set(row.ma_kh, { ...row, days: new Set() }); cMap.get(row.ma_kh).days.add(row.thu); });
         
         let sttCounter = 1;
@@ -603,7 +702,7 @@
             ]);
         });
         let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "ProposalRoute");
-        XLSX.writeFile(wb, `DE_XUAT_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); showToast("Tải Excel thành công", 'success');
+        XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); showToast("Tải Excel thành công", 'success');
     }
 
     async function checkServerStatus() {
