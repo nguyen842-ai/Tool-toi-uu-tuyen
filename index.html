@@ -400,9 +400,7 @@
     function processRawExcelData(jsonRouteList) {
         let rawValid = []; 
         let warnMap = new Map(); 
-
-        // Bước 1: Trích xuất danh sách khách hàng và chuẩn hóa dữ liệu thô
-        let uniqueCustomersMap = new Map(); // Key: ma_kh, Value: { ten_kh, area, npp, nv, lat, lng, days: Set, freq }
+        let coordMap = new Map(); // Key: "lat_lng", Value: Set các ma_kh KHÁC NHAU
 
         jsonRouteList.forEach((row, idx) => {
             if (idx === 0 || !row[0] || row[0] === 'STT') return;
@@ -443,27 +441,30 @@
                 itemWarn.errors.add(`Trùng ${daysCount} ngày trong 1 tuần`);
             }
 
-            // Lưu thông tin duy nhất của KH để quét trùng tọa độ
-            if (isValidCoord && !uniqueCustomersMap.has(ma_kh)) {
-                uniqueCustomersMap.set(ma_kh, { ma_kh, ten_kh, lat, lng });
+            // Gom nhóm tọa độ bằng Set() để tự động loại bỏ trùng lặp cùng 1 ma_kh
+            if (isValidCoord) {
+                let coordKey = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+                if (!coordMap.has(coordKey)) {
+                    coordMap.set(coordKey, new Map());
+                }
+                // Lưu Mã KH và Tên KH vào Map của điểm tọa độ đó
+                coordMap.get(coordKey).set(ma_kh, ten_kh);
             }
         });
 
-        // Bước 2: Quét trùng tọa độ chính xác giữa các KH KHÁC NHAU (Khoảng cách < 5 mét)
-        let custArray = Array.from(uniqueCustomersMap.values());
-        for (let i = 0; i < custArray.length; i++) {
-            for (let j = i + 1; j < custArray.length; j++) {
-                let c1 = custArray[i];
-                let c2 = custArray[j];
+        // Quét nhanh O(N) các tọa độ có >= 2 MÃ KH KHÁC NHAU
+        coordMap.forEach((custMap) => {
+            if (custMap.size > 1) { // Chỉ xử lý khi có từ 2 MÃ KH khác nhau trở lên
+                let allCustList = Array.from(custMap.keys());
                 
-                // Tính khoảng cách bằng mét
-                let distanceKm = getHaversine14(c1.lat, c1.lng, c2.lat, c2.lng); 
-                if (distanceKm <= 0.005) { // Dưới 5 mét coi như trùng tọa độ
-                    if (warnMap.has(c1.ma_kh)) warnMap.get(c1.ma_kh).errors.add(`Trùng vị trí tọa độ với (${c2.ma_kh} - ${c2.ten_kh})`);
-                    if (warnMap.has(c2.ma_kh)) warnMap.get(c2.ma_kh).errors.add(`Trùng vị trí tọa độ với (${c1.ma_kh} - ${c1.ten_kh})`);
-                }
+                custMap.forEach((ten_kh, ma_kh) => {
+                    let otherCusts = allCustList.filter(id => id !== ma_kh).join(', ');
+                    if (warnMap.has(ma_kh)) {
+                        warnMap.get(ma_kh).errors.add(`Trùng tọa độ với Mã KH khác: (${otherCusts})`);
+                    }
+                });
             }
-        }
+        });
 
         // Chuyển Set error thành Array để hiển thị bảng cảnh báo
         let rawWarn = [];
@@ -476,7 +477,6 @@
         AppState.sourceData = rawValid;
         AppState.warningData = rawWarn;
     }
-
     async function handleLocalFileUpload(event) {
         const files = event.target.files;
         if (!files || files.length === 0) return;
