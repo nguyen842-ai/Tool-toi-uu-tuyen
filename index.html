@@ -848,25 +848,39 @@
                     group.sort((a, b) => (a._ai_order || 999) - (b._ai_order || 999));
                     let coords = [];
                     group.forEach((row, i) => {
-                        coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
-                        let stt = row._ai_order !== 999 ? row._ai_order : i + 1;
-                        let iconHtml = shape === 'marker-triangle' 
-                            ? `<div aria-label="Tuyến ${day}" style="position:relative; width: 26px; height: 26px; display:flex; align-items:center; justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;"><path fill="${bg}" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg><span style="position:relative; z-index: 2; color:${txt}; font-size:11px; font-weight:bold; margin-top: 4px;">${stt}</span></div>`
-                            : `<div aria-label="Tuyến ${day}" class="route-marker ${shape}" style="background-color: ${bg}; color: ${txt};">${stt}</div>`;
-                        
-                        let markerId = `${row.ma_kh}_${day}_${empIdx}`; seenIds.add(markerId);
-                        
-                        let m = window.currentMarkers[markerId];
-                        if (!m) {
-                            m = L.marker([row.lat, row.lng]).addTo(routeLayer);
-                            window.currentMarkers[markerId] = m;
-                        } else if (!routeLayer.hasLayer(m)) {
-                            m.addTo(routeLayer);
-                        }
+    coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
+    
+    // 1. Tính và gán STT thực tế hiển thị trên bản đồ vào dữ liệu
+    let stt = row._ai_order !== 999 ? row._ai_order : i + 1;
+    row._map_stt = stt; 
 
-                        m.setIcon(L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [26,26] }));
-                        m.bindPopup(`<b>${escapeHTML(row.ten_kh)}</b><br>Mã KH: ${escapeHTML(row.ma_kh)}<br>NV: ${escapeHTML(row.nv)}<br>Tần suất: ${row.freq}`);
-                    });
+    let iconHtml = shape === 'marker-triangle' 
+        ? `<div aria-label="Tuyến ${day}" style="position:relative; width: 26px; height: 26px; display:flex; align-items:center; justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;"><path fill="${bg}" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg><span style="position:relative; z-index: 2; color:${txt}; font-size:11px; font-weight:bold; margin-top: 4px;">${stt}</span></div>`
+        : `<div aria-label="Tuyến ${day}" class="route-marker ${shape}" style="background-color: ${bg}; color: ${txt};">${stt}</div>`;
+    
+    let markerId = `${row.ma_kh}_${day}_${empIdx}`; seenIds.add(markerId);
+    
+    let m = window.currentMarkers[markerId];
+    if (!m) {
+        m = L.marker([row.lat, row.lng]).addTo(routeLayer);
+        window.currentMarkers[markerId] = m;
+    } else if (!routeLayer.hasLayer(m)) {
+        m.addTo(routeLayer);
+    }
+
+    m.setIcon(L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [26,26] }));
+    m.bindPopup(`<b>${escapeHTML(row.ten_kh)}</b><br>STT Lộ Trình: <b>${stt}</b><br>Mã KH: ${escapeHTML(row.ma_kh)}<br>NV: ${escapeHTML(row.nv)}<br>Tần suất: ${row.freq}`);
+
+    // 2. Tự động cuộn Bảng & Tô vàng dòng tương ứng khi CLICK vào điểm trên Bản Đồ
+    m.off('click').on('click', () => {
+        let tableRow = document.getElementById(`row-${row.ma_kh}`);
+        if (tableRow) {
+            tableRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            tableRow.style.backgroundColor = '#fef08a';
+            setTimeout(() => { tableRow.style.backgroundColor = ''; }, 2500);
+        }
+    });
+});
                     if (coords.length > 1 && chkLines && chkLines.checked) L.polyline(coords, { color: bg, weight: 3, dashArray: dash }).addTo(lineLayer);
                 };
 
@@ -883,78 +897,82 @@
 
     window.fitMapBounds = function() { AppState.isFirstMapRender = true; processDataAndRender(); };
     window.toggleRouteToolbarVisibility = function() { AppState.isToolbarExpanded = !AppState.isToolbarExpanded; document.getElementById('route-toggle-toolbar').style.display = AppState.isToolbarExpanded ? 'flex' : 'none'; };
-    
-    // HÀM RENDER GIỮ NGUYÊN THỨ TỰ THÔ RAW DATA - KHÔNG TỰ SẮP XẾP NHÓM
     function renderDetailTable(data) {
-        const thead = document.getElementById('table-head'); 
-        const tbody = document.getElementById('table-body');
+    const thead = document.getElementById('table-head'); 
+    const tbody = document.getElementById('table-body');
 
-        thead.innerHTML = `
-        <tr>
-            <th class="sticky-header" rowspan="2" style="z-index: 3;">STT</th>
-            <th class="sticky-header" rowspan="2" style="width:30px; z-index: 3;" title="Loại khách">🗑️</th>
-            <th class="sticky-header" rowspan="2" style="z-index: 3;">Mã KH</th>
-            <th class="sticky-header" rowspan="2" style="z-index: 3;">Tên KH</th>
-            <th class="sticky-header" colspan="7" style="z-index: 3;">Lộ trình</th>
-            <th class="sticky-header" colspan="4" style="z-index: 3;">Tần Suất</th>
-            <th class="sticky-header ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
-            <th class="sticky-header coord-col" colspan="2" style="z-index: 3;">Tọa Độ</th>
-        </tr>
-        <tr>
-            ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px; z-index: 2;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
-            ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px; z-index: 2;">${w}</th>`).join('')}
-            ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">${m}</th>`).join('')}
-            <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lat</th>
-            <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lng</th>
-        </tr>`;
+    thead.innerHTML = `
+    <tr>
+        <th class="sticky-header" rowspan="2" style="z-index: 3;">STT</th>
+        <th class="sticky-header" rowspan="2" style="width:30px; z-index: 3;" title="Loại khách">🗑️</th>
+        <th class="sticky-header" rowspan="2" style="z-index: 3;">Mã KH</th>
+        <th class="sticky-header" rowspan="2" style="z-index: 3;">Tên KH</th>
+        <th class="sticky-header" colspan="7" style="z-index: 3;">Lộ trình</th>
+        <th class="sticky-header" colspan="4" style="z-index: 3;">Tần Suất</th>
+        <th class="sticky-header ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
+        <th class="sticky-header coord-col" colspan="2" style="z-index: 3;">Tọa Độ</th>
+    </tr>
+    <tr>
+        ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px; z-index: 2;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
+        ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px; z-index: 2;">${w}</th>`).join('')}
+        ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">${m}</th>`).join('')}
+        <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lat</th>
+        <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lng</th>
+    </tr>`;
+    
+    let htmlRows = [];
+    let baseData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
+
+    // Sắp xếp lại bảng theo STT trên bản đồ nếu chọn 1 Thứ cụ thể
+    let sortedTableData = [...data];
+    if (AppState.selectedDays.length === 1) {
+        sortedTableData.sort((a, b) => (a._map_stt || 999) - (b._map_stt || 999));
+    } else {
+        sortedTableData.sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
+    }
+
+    sortedTableData.forEach(row => {
+        let allCustRecords = baseData.filter(r => r.ma_kh === row.ma_kh);
+        let custDays = new Set(allCustRecords.map(r => r.thu));
+
+        const getX = (day) => custDays.has(day) ? `<span style="color:var(--danger); font-weight:900; font-size:14px;">x</span>` : ``;
+        const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
         
-        let htmlRows = [];
-        let baseData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
+        const isF4 = row.freq === 'F4'; const isF21 = row.freq === 'F2-1'; const isF22 = row.freq === 'F2-2';
 
-        let rawSortedData = [...data].sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
+        let dsKH = AppState.salesData[row.ma_kh] || {};
+        let dsM5 = formatNum(dsKH['M5'] || 0); let dsM6 = formatNum(dsKH['M6'] || 0);
+        let dsM7 = formatNum(dsKH['M7'] || 0); let dsM8 = formatNum(dsKH['M8'] || 0);
+        
+        // ƯU TIÊN KHỚP SỐ STT TRÊN BẢN ĐỒ
+        let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
 
-        rawSortedData.forEach(row => {
-            let allCustRecords = baseData.filter(r => r.ma_kh === row.ma_kh);
-            let custDays = new Set(allCustRecords.map(r => r.thu));
-
-            const getX = (day) => custDays.has(day) ? `<span style="color:var(--danger); font-weight:900; font-size:14px;">x</span>` : ``;
-            const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+        htmlRows.push(`<tr id="row-${row.ma_kh}" class="hover-row" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
+            <td style="text-align:center;">
+                <input type="number" class="stt-input" value="${displaySTT}" onchange="updateOrder('${row.ma_kh}', '${row.thu}', this.value)">
+            </td>
+            <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${row.ma_kh}')">×</button></td>
+            <td style="font-weight:600; color:#1e40af;">${escapeHTML(row.ma_kh)}</td>
+            <td style="white-space: normal;">${escapeHTML(row.ten_kh)}</td>
             
-            const isF4 = row.freq === 'F4'; const isF21 = row.freq === 'F2-1'; const isF22 = row.freq === 'F2-2';
-
-            let dsKH = AppState.salesData[row.ma_kh] || {};
-            let dsM5 = formatNum(dsKH['M5'] || 0); let dsM6 = formatNum(dsKH['M6'] || 0);
-            let dsM7 = formatNum(dsKH['M7'] || 0); let dsM8 = formatNum(dsKH['M8'] || 0);
+            ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" style="text-align:center; background:${d === 'Thứ 3' || d === 'Thứ 5' || d === 'Thứ 7' ? '#fff' : (d === 'Chủ nhật' ? '#fef2f2' : '#f8fafc')};" onclick="toggleRouteDay('${row.ma_kh}', '${d}')">${getX(d)}</td>`).join('')}
             
-            let displaySTT = (row._ai_order && row._ai_order !== 999) ? row._ai_order : (row.sttRaw || row.rawIndex || "");
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
+            
+            <td class="text-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+            <td class="text-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+            <td class="text-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
+            <td class="text-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
+            <td class="text-center bg-slate-100 font-bold">${row.lat || '-'}</td>
+            <td class="text-center bg-slate-100 font-bold">${row.lng || '-'}</td>
+        </tr>`);
+    });
 
-            htmlRows.push(`<tr class="hover-row" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
-                <td style="text-align:center;">
-                    <input type="number" class="stt-input" value="${displaySTT}" onchange="updateOrder('${row.ma_kh}', '${row.thu}', this.value)">
-                </td>
-                <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${row.ma_kh}')">×</button></td>
-                <td style="font-weight:600; color:#1e40af;">${escapeHTML(row.ma_kh)}</td>
-                <td style="white-space: normal;">${escapeHTML(row.ten_kh)}</td>
-                
-                ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" style="text-align:center; background:${d === 'Thứ 3' || d === 'Thứ 5' || d === 'Thứ 7' ? '#fff' : (d === 'Chủ nhật' ? '#fef2f2' : '#f8fafc')};" onclick="toggleRouteDay('${row.ma_kh}', '${d}')">${getX(d)}</td>`).join('')}
-                
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-                
-                <td class="text-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-                <td class="text-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
-                <td class="text-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
-                <td class="text-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
-                <td class="text-center bg-slate-100 font-bold">${row.lat || '-'}</td>
-                <td class="text-center bg-slate-100 font-bold">${row.lng || '-'}</td>
-            </tr>`);
-        });
-
-        tbody.innerHTML = htmlRows.join('');
-    }    
-
+    tbody.innerHTML = htmlRows.join('');
+}
     /* =========================================
        7. AI INTEGRATION & EXPORT
        ========================================= */
