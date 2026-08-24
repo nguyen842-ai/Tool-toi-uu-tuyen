@@ -55,7 +55,6 @@
         .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
         .form-control option { text-align: center; } 
         
-        /* Giao diện Checkbox Nhân Viên mới */
         .nv-checkbox-container { border: 1px solid #cbd5e1; border-radius: var(--radius-sm); background: #fff; padding: 6px; max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
         .nv-checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; user-select: none; }
         .nv-checkbox-item input { cursor: pointer; }
@@ -238,6 +237,7 @@
        1. STATE MANAGEMENT (CORE ARCHITECTURE)
        ========================================= */
     const AppState = {
+        rawExcelData: [], // THÊM MỚI: Biến lưu trữ dữ liệu thô từ file Excel gốc
         sourceData: [],    
         warningData: [],
         workingData: [],   
@@ -451,7 +451,9 @@
                 if (i > 0 && json.length > 0) json.shift();
                 allJson = allJson.concat(json);
             }
-            processRawExcelData(allJson); renderStatus('statusRoute', '✅ Đã tải file', '#16a34a'); setupFilters(true);
+            AppState.rawExcelData = allJson; // LƯU RAW DATA KHI TẢI TỪ FILE
+            processRawExcelData(allJson); 
+            renderStatus('statusRoute', '✅ Đã tải file', '#16a34a'); setupFilters(true);
         } catch (err) { renderStatus('statusRoute', '❌ Lỗi đọc', '#dc2626'); showToast('Lỗi cấu trúc Excel', 'error'); }
     }
 
@@ -476,7 +478,9 @@
             if (!resRoute.ok) throw new Error("Lỗi tải file Route");
 
             let ws = XLSX.read(await resRoute.arrayBuffer(), {type: 'array'});
-            processRawExcelData(XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1}));
+            let json = XLSX.utils.sheet_to_json(ws.Sheets[ws.SheetNames[0]], {header: 1});
+            AppState.rawExcelData = json; // LƯU RAW DATA KHI TẢI TỪ DATABASE
+            processRawExcelData(json);
             
             renderStatus('statusRoute', '✅ Đã tải DB', '#16a34a'); 
             setupFilters(false);
@@ -576,7 +580,7 @@
             renderNVCheckboxes([]); 
             return; 
         }
-        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
+        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
         document.getElementById('sel-npp').disabled = false; 
         renderNVCheckboxes([]);
     });
@@ -852,7 +856,7 @@
     }
 
     /* =========================================
-       7. AI INTEGRATION & EXPORT
+       7. AI INTEGRATION & EXPORT (ĐÃ LÀM LẠI CHỨC NĂNG XUẤT)
        ========================================= */
     async function optimizeRouteWithAI() {
         let dataToOptimize = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
@@ -869,29 +873,29 @@
             if (!response.ok) throw new Error("Lỗi Server AI");
             
             const aiResults = (await response.json()).optimized_data;
-document.getElementById('ai-progress-fill').style.width = '100%';
+            document.getElementById('ai-progress-fill').style.width = '100%';
 
-// TẠO BẢN SAO ĐỂ RÚT DẦN KẾT QUẢ, TRÁNH LỖI ĐÈ KHÁCH F2/F4
-let resultsCopy = [...aiResults];
+            // TẠO BẢN SAO ĐỂ RÚT DẦN KẾT QUẢ, TRÁNH LỖI ĐÈ KHÁCH F2/F4
+            let resultsCopy = [...aiResults];
 
-AppState.workingData.forEach(row => {
-    // Chỉ xét cập nhật những khách thuộc các Thứ đang được chọn để AI chạy
-    if (AppState.selectedDays.includes(row.thu)) {
-        // Tìm vị trí kết quả của mã KH này
-        let matchIdx = resultsCopy.findIndex(i => i.id === row.ma_kh);
-        
-        if (matchIdx !== -1) {
-            let match = resultsCopy[matchIdx];
-            row.thu = match.day;
-            row._ai_order = match.order;
-            if(match.freq) row.freq = match.freq;
-            
-            // CỰC KỲ QUAN TRỌNG: Xóa kết quả vừa dùng khỏi mảng copy 
-            // để dòng lặp tiếp theo của cùng khách hàng này sẽ lấy kết quả khác
-            resultsCopy.splice(matchIdx, 1);
-        }
-    }
-});
+            AppState.workingData.forEach(row => {
+                // Chỉ xét cập nhật những khách thuộc các Thứ đang được chọn để AI chạy
+                if (AppState.selectedDays.includes(row.thu)) {
+                    // Tìm vị trí kết quả của mã KH này
+                    let matchIdx = resultsCopy.findIndex(i => i.id === row.ma_kh);
+                    
+                    if (matchIdx !== -1) {
+                        let match = resultsCopy[matchIdx];
+                        row.thu = match.day;
+                        row._ai_order = match.order;
+                        if(match.freq) row.freq = match.freq;
+                        
+                        // CỰC KỲ QUAN TRỌNG: Xóa kết quả vừa dùng khỏi mảng copy 
+                        // để dòng lặp tiếp theo của cùng khách hàng này sẽ lấy kết quả khác
+                        resultsCopy.splice(matchIdx, 1);
+                    }
+                }
+            });
             AppState.workingData.sort((a,b) => a._ai_order - b._ai_order);
             
             showToast(`✨ Đã áp dụng đề xuất AI cho ${payload.length} khách!`);
@@ -901,85 +905,84 @@ AppState.workingData.forEach(row => {
     }
 
     window.exportDetailToExcel = function() {
-    let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
-    if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
+        let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
+        if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-    // 1. Gom nhóm thông tin theo Mã KH
-    let cMap = new Map();
-    activeData.forEach(row => {
-        if (!cMap.has(row.ma_kh)) {
-            cMap.set(row.ma_kh, { ...row, days: new Set() });
-        }
-        cMap.get(row.ma_kh).days.add(row.thu);
-    });
-
-    // 2. Tạo Tiêu đề các cột đúng vị trí như File Tuyến Gốc
-    let excelRows = [];
-    let headerRow = [];
-    headerRow[0]  = "STT";             
-    headerRow[1]  = "Mã Đơn Vị";               
-    headerRow[2]  = "NPP";             
-    headerRow[3]  = "Kênh";                
-    headerRow[4]  = "Nhân viên";       
-    headerRow[5]  = "Mã KH";           
-    headerRow[6]  = "Tên Khách Hàng";  
-    headerRow[7]  = "Địa chỉ";         
-    
-    // Cột 11 -> 17: Các Thứ trong tuần
-    CONSTANTS.DAYS_TEXT.forEach((day, idx) => { headerRow[11 + idx] = day; });
-    // Cột 18 -> 21: Tần suất Tuần
-    headerRow[18] = "W1"; headerRow[19] = "W2"; headerRow[20] = "W3"; headerRow[21] = "W4";
-    // Cột 22 -> 24: Tọa độ & Khu vực
-    headerRow[22] = "Latitude"; headerRow[23] = "Longitude"; headerRow[24] = "Area";
-    // Cột 25 -> 28: Doanh số 4 tháng
-    headerRow[25] = "DS M5"; headerRow[26] = "DS M6"; headerRow[27] = "DS M7"; headerRow[28] = "DS M8";
-    
-    excelRows.push(headerRow);
-
-    // 3. Điền dữ liệu vào đúng chỉ số cột (Index) của file gốc
-    let sttCounter = 1;
-    cMap.forEach((cust) => {
-        let row = new Array(29).fill(""); // Khởi tạo dòng gồm 29 cột chuẩn
-        
-        row[0] = cust._ai_order !== 999 ? cust._ai_order : sttCounter++;
-        row[2] = cust.npp || "";
-        row[4] = cust.nv || "";
-        row[5] = cust.ma_kh || "";            
-        row[6] = cust.ten_kh || "";          
-        row[7] = cust.dia_chi || ""; 
-        
-        // Đánh dấu "x" vào đúng cột Thứ đã chỉnh sửa (Cột 11 -> 17)
-        CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
-            row[11 + idx] = cust.days.has(day) ? "x" : "";
+        // 1. Gom nhóm thông tin theo Mã KH
+        let cMap = new Map();
+        activeData.forEach(row => {
+            if (!cMap.has(row.ma_kh)) {
+                cMap.set(row.ma_kh, { ...row, days: new Set() });
+            }
+            cMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        // Đánh dấu "x" vào đúng cột Tần suất mới (Cột 18 -> 21)
-        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        // 2. Tạo Header với cấu trúc như trong hình (22 cột từ A -> V)
+        let excelRows = [];
+        let headerRow = [
+            "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", // A - E (Index 0-4)
+            "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", // F - K (Index 5-10)
+            "T2", "T3", "T4", "T5", "T6", "T7", "CN", // L - R (Index 11-17)
+            "W1", "W2", "W3", "W4" // S - V (Index 18-21)
+        ];
+        excelRows.push(headerRow);
 
-        // Tọa độ & Khu vực (Cột 22 -> 24)
-        row[22] = cust.lat || 0;
-        row[23] = cust.lng || 0;
-        row[24] = cust.area || "Khác";
+        // 3. Mapping data (Tìm và lấp đầy dữ liệu từ file Gốc + Bản chỉnh sửa Web)
+        let sttCounter = 1;
         
-        // Doanh số (Cột 25 -> 28)
-        let dsKH = AppState.salesData[cust.ma_kh] || {};
-        row[25] = dsKH['M5'] || 0;
-        row[26] = dsKH['M6'] || 0;
-        row[27] = dsKH['M7'] || 0;
-        row[28] = dsKH['M8'] || 0;
+        cMap.forEach((cust, ma_kh) => {
+            // Tạo 1 mảng rỗng gồm 22 ô
+            let row = new Array(22).fill(""); 
 
-        excelRows.push(row);
-    });
+            // TÌM KIẾM (VLOOKUP) trong dữ liệu file gốc
+            // Chú ý: Cột Mã KH ở file gốc nằm ở Index 5
+            let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
 
-    // 4. Ghi file Excel
-    let wb = XLSX.utils.book_new(); 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "MasterRoute");
-    XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
-    showToast("Tải Excel thành công", 'success');
-}
+            if (originalRow) {
+                // Điền các cột tra cứu được từ file Tuyến Gốc (A - E)
+                row[0] = cust._ai_order !== 999 ? cust._ai_order : (originalRow[0] || "");
+                row[1] = originalRow[1] || "";
+                row[2] = originalRow[2] || "";
+                row[3] = originalRow[3] || "";
+                row[4] = originalRow[4] || "";
+                
+                // (G - K)
+                row[6] = originalRow[6] || cust.ten_kh || "";
+                row[7] = originalRow[7] || cust.dia_chi || "";
+                row[8] = originalRow[8] || "";
+                row[9] = originalRow[9] || "";
+                row[10] = originalRow[10] || "";
+            } else {
+                // Fallback nếu có lỗi không khớp
+                row[0] = cust._ai_order !== 999 ? cust._ai_order : sttCounter++;
+                row[4] = cust.nv || "";
+                row[6] = cust.ten_kh || "";
+                row[7] = cust.dia_chi || "";
+            }
+
+            // Điền Cột F (Index 5)
+            row[5] = ma_kh;
+
+            // Đánh dấu "x" vào đúng cột Thứ đã chỉnh sửa trên Web (Cột L -> R / Index 11 -> 17)
+            CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
+                row[11 + idx] = cust.days.has(day) ? "x" : "";
+            });
+
+            // Đánh dấu "x" vào đúng cột Tần suất chỉnh sửa trên Web (Cột S -> V / Index 18 -> 21)
+            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+            excelRows.push(row);
+        });
+
+        // 4. Ghi file Excel
+        let wb = XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "MasterRoute");
+        XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
+        showToast("Tải Excel thành công", 'success');
+    }
 
     async function checkServerStatus() {
         const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
