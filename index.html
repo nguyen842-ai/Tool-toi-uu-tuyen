@@ -1015,147 +1015,157 @@
         } catch (error) { showToast(error.message, 'error'); } 
         finally { document.getElementById('ai-loading-overlay').classList.add('hidden'); }
     }
-
     window.exportDetailToExcel = function() {
-        let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
-        if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
+    let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
+    if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-        let cMap = new Map();
-        activeData.forEach(row => {
-            if (!cMap.has(row.ma_kh)) {
-                cMap.set(row.ma_kh, { ...row, days: new Set() });
-            }
-            cMap.get(row.ma_kh).days.add(row.thu);
-        });
+    let cMap = new Map();
+    activeData.forEach(row => {
+        if (!cMap.has(row.ma_kh)) {
+            cMap.set(row.ma_kh, { ...row, days: new Set() });
+        }
+        cMap.get(row.ma_kh).days.add(row.thu);
+    });
 
-        let excelRows = [];
-        
-        let headerRow1 = [
-            "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", 
-            "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", 
-            "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
-            "LỘ TRÌNH", "", "", "", "", "", "", 
-            "TẦN SUẤT", "", "", ""              
-        ];
-        
-        let headerRow2 = [
-            "", "", "", "", "", "", "", "", "", "", "", 
-            "T2", "T3", "T4", "T5", "T6", "T7", "CN", 
-            "W1", "W2", "W3", "W4"
-        ];
-        
-        excelRows.push(headerRow1);
-        excelRows.push(headerRow2);
+    let excelRows = [];
+    
+    // Thêm cột Lat (22) và Lng (23) vào tiêu đề
+    let headerRow1 = [
+        "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", 
+        "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", 
+        "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
+        "LỘ TRÌNH", "", "", "", "", "", "", 
+        "TẦN SUẤT", "", "", "",
+        "Vĩ độ (Lat)", "Kinh độ (Lng)"
+    ];
+    
+    let headerRow2 = [
+        "", "", "", "", "", "", "", "", "", "", "", 
+        "T2", "T3", "T4", "T5", "T6", "T7", "CN", 
+        "W1", "W2", "W3", "W4",
+        "", ""
+    ];
+    
+    excelRows.push(headerRow1);
+    excelRows.push(headerRow2);
 
-        let exportList = Array.from(cMap.values()).sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
+    let exportList = Array.from(cMap.values()).sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
 
-        let sttCounter = 1;
-        exportList.forEach((cust) => {
-            let ma_kh = cust.ma_kh;
-            let row = new Array(22).fill(""); 
-            let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
+    let sttCounter = 1;
+    exportList.forEach((cust) => {
+        let ma_kh = cust.ma_kh;
+        let row = new Array(24).fill(""); 
+        let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
 
-            if (originalRow) {
-                row[1] = originalRow[1] || "";
-                row[2] = originalRow[2] || "";
-                row[3] = originalRow[3] || "";
-                row[4] = originalRow[4] || "";
-                row[6] = originalRow[6] || cust.ten_kh || "";
-                row[7] = originalRow[7] || cust.dia_chi || "";
-                row[8] = originalRow[8] || "";
-                row[9] = originalRow[9] || "";
-                row[10] = originalRow[10] || "";
-            } else {
-                row[4] = cust.nv || "";
-                row[6] = cust.ten_kh || "";
-                row[7] = cust.dia_chi || "";
-            }
-
-            row[0] = cust.sttRaw || sttCounter++; 
-            row[5] = ma_kh;
-
-            CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
-                row[11 + idx] = cust.days.has(day) ? "x" : "";
-            });
-
-            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-
-            excelRows.push(row);
-        });
-
-        let ws = XLSX.utils.aoa_to_sheet(excelRows);
-
-        ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   
-            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   
-            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
-            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
-            { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
-            { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },
-            { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },
-            { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },
-            { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },
-            { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },
-            { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, 
-            { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } }, 
-            { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } }  
-        ];
-
-        const headerStyle = {
-            font: { bold: true, name: "Arial", sz: 10 },
-            alignment: { horizontal: "center", vertical: "center", wrapText: true },
-            fill: { fgColor: { rgb: "E2EFDA" } }, 
-            border: {
-                top: { style: "thin", color: { auto: 1 } }, bottom: { style: "thin", color: { auto: 1 } },
-                left: { style: "thin", color: { auto: 1 } }, right: { style: "thin", color: { auto: 1 } }
-            }
-        };
-
-        const dataStyle = {
-            font: { name: "Arial", sz: 10 },
-            border: {
-                top: { style: "thin", color: { rgb: "CCCCCC" } }, bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-                left: { style: "thin", color: { rgb: "CCCCCC" } }, right: { style: "thin", color: { rgb: "CCCCCC" } }
-            }
-        };
-
-        for (let R = 0; R < excelRows.length; R++) {
-            for (let C = 0; C <= 21; C++) {
-                let cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-                if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' }; 
-                
-                if (R === 0 || R === 1) {
-                    let isRedText = (C === 1 || C === 3 || C === 5 || C === 9 || C === 10);
-                    ws[cellRef].s = { 
-                        ...headerStyle, 
-                        font: { ...headerStyle.font, color: { rgb: isRedText ? "FF0000" : "000000" } } 
-                    };
-                } else {
-                    let isCenter = (C === 0 || C >= 11);
-                    ws[cellRef].s = {
-                        ...dataStyle,
-                        alignment: isCenter ? { horizontal: "center", vertical: "center" } : undefined
-                    };
-                }
-            }
+        if (originalRow) {
+            row[1] = originalRow[1] || "";
+            row[2] = originalRow[2] || "";
+            row[3] = originalRow[3] || "";
+            row[4] = originalRow[4] || "";
+            row[6] = originalRow[6] || cust.ten_kh || "";
+            row[7] = originalRow[7] || cust.dia_chi || "";
+            row[8] = originalRow[8] || "";
+            row[9] = originalRow[9] || "";
+            row[10] = originalRow[10] || "";
+            // Trích xuất chính xác Lat (cột 22) và Lng (cột 23)
+            row[22] = originalRow[22] !== undefined ? originalRow[22] : (cust.lat || "");
+            row[23] = originalRow[23] !== undefined ? originalRow[23] : (cust.lng || "");
+        } else {
+            row[4] = cust.nv || "";
+            row[6] = cust.ten_kh || "";
+            row[7] = cust.dia_chi || "";
+            row[22] = cust.lat || "";
+            row[23] = cust.lng || "";
         }
 
-        ws['!cols'] = [
-            { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 22 }, 
-            { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, 
-            { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, 
-            { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }
-        ];
+        row[0] = cust.sttRaw || sttCounter++; 
+        row[5] = ma_kh;
 
-        let wb = XLSX.utils.book_new(); 
-        XLSX.utils.book_append_sheet(wb, ws, "MasterRoute");
-        XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
-        showToast("Tải Excel thành công", 'success');
+        CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
+            row[11 + idx] = cust.days.has(day) ? "x" : "";
+        });
+
+        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+        excelRows.push(row);
+    });
+
+    let ws = XLSX.utils.aoa_to_sheet(excelRows);
+
+    // Merge ô tiêu đề cho 2 cột tọa độ mới
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
+        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
+        { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },
+        { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },
+        { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },
+        { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },
+        { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },
+        { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, 
+        { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } }, 
+        { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } },
+        { s: { r: 0, c: 22 }, e: { r: 1, c: 22 } }, 
+        { s: { r: 0, c: 23 }, e: { r: 1, c: 23 } }  
+    ];
+
+    const headerStyle = {
+        font: { bold: true, name: "Arial", sz: 10 },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        fill: { fgColor: { rgb: "E2EFDA" } }, 
+        border: {
+            top: { style: "thin", color: { auto: 1 } }, bottom: { style: "thin", color: { auto: 1 } },
+            left: { style: "thin", color: { auto: 1 } }, right: { style: "thin", color: { auto: 1 } }
+        }
+    };
+
+    const dataStyle = {
+        font: { name: "Arial", sz: 10 },
+        border: {
+            top: { style: "thin", color: { rgb: "CCCCCC" } }, bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+            left: { style: "thin", color: { rgb: "CCCCCC" } }, right: { style: "thin", color: { rgb: "CCCCCC" } }
+        }
+    };
+
+    for (let R = 0; R < excelRows.length; R++) {
+        for (let C = 0; C <= 23; C++) {
+            let cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' }; 
+            
+            if (R === 0 || R === 1) {
+                let isRedText = (C === 1 || C === 3 || C === 5 || C === 9 || C === 10);
+                ws[cellRef].s = { 
+                    ...headerStyle, 
+                    font: { ...headerStyle.font, color: { rgb: isRedText ? "FF0000" : "000000" } } 
+                };
+            } else {
+                let isCenter = (C === 0 || C >= 11);
+                ws[cellRef].s = {
+                    ...dataStyle,
+                    alignment: isCenter ? { horizontal: "center", vertical: "center" } : undefined
+                };
+            }
+        }
     }
 
+    ws['!cols'] = [
+        { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 22 }, 
+        { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, 
+        { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, 
+        { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 },
+        { wch: 14 }, { wch: 14 }
+    ];
+
+    let wb = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(wb, ws, "MasterRoute");
+    XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
+    showToast("Tải Excel thành công", 'success');
+}
     async function checkServerStatus() {
         const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
         try { if ((await fetch(document.getElementById('sel-api-line').value + '/api/optimizeRoute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ping: true}) })).ok) { b.innerHTML = "🟢 OK"; b.className = "cursor-pointer text-emerald-700 bg-emerald-100 border border-emerald-300 px-1 rounded text-xs"; } else throw new Error(); } catch(e) { b.innerHTML = "🔴 Lỗi"; b.className = "cursor-pointer text-red-700 bg-red-100 border border-red-300 px-1 rounded text-xs"; }
