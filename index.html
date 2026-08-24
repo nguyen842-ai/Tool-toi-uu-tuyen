@@ -237,7 +237,7 @@
        1. STATE MANAGEMENT (CORE ARCHITECTURE)
        ========================================= */
     const AppState = {
-        rawExcelData: [], // THÊM MỚI: Biến lưu trữ dữ liệu thô từ file Excel gốc
+        rawExcelData: [], 
         sourceData: [],    
         warningData: [],
         workingData: [],   
@@ -574,26 +574,16 @@
     }
 
     document.getElementById('sel-area').addEventListener('change', (e) => {
-    clearWorkspace(true); 
-    if (!e.target.value) { 
-        document.getElementById('sel-npp').disabled = true; 
-        renderNVCheckboxes([]); 
-        return; 
-    }
-    document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
-    document.getElementById('sel-npp').disabled = false; 
-    renderNVCheckboxes([]);
-});
-
-document.getElementById('sel-npp').addEventListener('change', (e) => {
-    clearWorkspace(true); 
-    if (!e.target.value) { 
-        renderNVCheckboxes([]); 
-        return; 
-    }
-    let nvs = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort();
-    renderNVCheckboxes(nvs);
-});
+        clearWorkspace(true); 
+        if (!e.target.value) { 
+            document.getElementById('sel-npp').disabled = true; 
+            renderNVCheckboxes([]); 
+            return; 
+        }
+        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
+        document.getElementById('sel-npp').disabled = false; 
+        renderNVCheckboxes([]);
+    });
 
     document.getElementById('sel-npp').addEventListener('change', (e) => {
         clearWorkspace(true); 
@@ -670,18 +660,52 @@ document.getElementById('sel-npp').addEventListener('change', (e) => {
         AppState.isOptimizedView = document.querySelector('input[name="routeType"]:checked').value === 'optimized';
         AppState.isFirstMapRender = true; processDataAndRender();
     };
-    window.updateOrder = function(id, v) { executeMutation(() => { let t = AppState.workingData.find(r => r.ma_kh === id); if(t) t._ai_order = parseInt(v)||999; }); };
-    window.toggleRouteDay = function(id, d) { executeMutation(() => { let t = AppState.workingData.find(r => r.ma_kh === id); if(t) t.thu = d; }); };
-    window.toggleFreq = function(id, w) { 
-        executeMutation(() => {
-            let t = AppState.workingData.find(r => r.ma_kh === id); if(!t) return;
-            let w13 = ['F4', 'F2-1'].includes(t.freq), w24 = ['F4', 'F2-2'].includes(t.freq);
-            if(w === 'W1' || w === 'W3') w13 = !w13; else w24 = !w24;
-            if(!w13 && !w24) { if(w === 'W1' || w === 'W3') w24 = true; else w13 = true; }
-            t.freq = (w13 && w24) ? 'F4' : (w13 ? 'F2-1' : 'F2-2');
+
+    window.updateOrder = function(id, day, v) { 
+        executeMutation(() => { 
+            let t = AppState.workingData.find(r => r.ma_kh === id && r.thu === day); 
+            if(t) t._ai_order = parseInt(v) || 999; 
         }); 
     };
-    window.removeCustomer = function(id) { executeMutation(() => { AppState.workingData = AppState.workingData.filter(r => r.ma_kh !== id); }); };
+
+    window.toggleRouteDay = function(id, day) { 
+        executeMutation(() => { 
+            let existingIndex = AppState.workingData.findIndex(r => r.ma_kh === id && r.thu === day);
+            if (existingIndex > -1) {
+                // Xóa ngày
+                AppState.workingData.splice(existingIndex, 1);
+            } else {
+                // Thêm ngày mới (sử dụng template)
+                let template = AppState.workingData.find(r => r.ma_kh === id) || AppState.sourceData.find(r => r.ma_kh === id);
+                if (template) {
+                    AppState.workingData.push({...template, thu: day, _ai_order: 999});
+                }
+            }
+        }); 
+    };
+
+    window.toggleFreq = function(id, w) { 
+        executeMutation(() => {
+            let template = AppState.workingData.find(r => r.ma_kh === id); 
+            if(!template) return;
+
+            let w13 = ['F4', 'F2-1'].includes(template.freq), w24 = ['F4', 'F2-2'].includes(template.freq);
+            if(w === 'W1' || w === 'W3') w13 = !w13; else w24 = !w24;
+            if(!w13 && !w24) { if(w === 'W1' || w === 'W3') w24 = true; else w13 = true; }
+            let newFreq = (w13 && w24) ? 'F4' : (w13 ? 'F2-1' : 'F2-2');
+
+            // Cập nhật lại tần suất cho TẤT CẢ các ngày của khách hàng đó
+            AppState.workingData.forEach(r => {
+                if (r.ma_kh === id) r.freq = newFreq;
+            });
+        }); 
+    };
+
+    window.removeCustomer = function(id) { 
+        executeMutation(() => { 
+            AppState.workingData = AppState.workingData.filter(r => r.ma_kh !== id); 
+        }); 
+    };
 
     /* =========================================
        6. RENDER LOGIC
@@ -821,91 +845,97 @@ document.getElementById('sel-npp').addEventListener('change', (e) => {
 
     window.fitMapBounds = function() { AppState.isFirstMapRender = true; processDataAndRender(); };
     window.toggleRouteToolbarVisibility = function() { AppState.isToolbarExpanded = !AppState.isToolbarExpanded; document.getElementById('route-toggle-toolbar').style.display = AppState.isToolbarExpanded ? 'flex' : 'none'; };
-
+    
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
-        
-        // 1. Dựng lại khung Tiêu đề (giữ nguyên để không vỡ layout)
-        thead.innerHTML = `<tr>
-            <th class="sticky-header" rowspan="2">STT</th><th class="sticky-header" rowspan="2" style="width:30px;" title="Loại khách">🗑️</th>
-            <th class="sticky-header" rowspan="2">Nhân viên</th><th class="sticky-header" rowspan="2">Mã KH</th><th class="sticky-header" rowspan="2">Tên KH</th>
-            <th class="sticky-header" colspan="7">Lộ trình</th><th class="sticky-header" colspan="4">Tần Suất</th>
-            <th class="sticky-header ds-col" colspan="4">Doanh Số</th>
-            <th class="sticky-header coord-col" colspan="2">Tọa Độ</th>
+
+        thead.innerHTML = `
+        <tr>
+            <th class="sticky-header" rowspan="2" style="z-index: 3;">STT</th>
+            <th class="sticky-header" rowspan="2" style="width:30px; z-index: 3;" title="Loại khách">🗑️</th>
+            <th class="sticky-header" rowspan="2" style="z-index: 3;">Ngày Tuyến</th>
+            <th class="sticky-header" rowspan="2" style="z-index: 3;">Nhân viên</th>
+            <th class="sticky-header" rowspan="2" style="z-index: 3;">Mã KH</th>
+            <th class="sticky-header" rowspan="2" style="z-index: 3;">Tên KH</th>
+            <th class="sticky-header" colspan="7" style="z-index: 3;">Lộ trình (Click để Sửa/Xóa)</th>
+            <th class="sticky-header" colspan="4" style="z-index: 3;">Tần Suất</th>
+            <th class="sticky-header ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
+            <th class="sticky-header coord-col" colspan="2" style="z-index: 3;">Tọa Độ</th>
         </tr>
         <tr>
-            ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
-            ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px;">${w}</th>`).join('')}
-            ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px;">${m}</th>`).join('')}
-            <th class="sticky-header coord-col" style="top:29px; width:60px;">Lat</th>
-            <th class="sticky-header coord-col" style="top:29px; width:60px;">Lng</th>
+            ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px; z-index: 2;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
+            ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px; z-index: 2;">${w}</th>`).join('')}
+            ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">${m}</th>`).join('')}
+            <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lat</th>
+            <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lng</th>
         </tr>`;
-
-        // 2. Sắp xếp dữ liệu đa cấp: Nhân viên -> Thứ (T2->CN) -> STT (Order)
-        const dayOrder = { 'Thứ 2': 2, 'Thứ 3': 3, 'Thứ 4': 4, 'Thứ 5': 5, 'Thứ 6': 6, 'Thứ 7': 7, 'Chủ nhật': 8 };
+        
+        const dayOrderRules = {"Thứ 2":2,"Thứ 3":3,"Thứ 4":4,"Thứ 5":5,"Thứ 6":6,"Thứ 7":7,"Chủ nhật":8};
         
         let sortedData = [...data].sort((a, b) => {
-            if (a.nv !== b.nv) return a.nv.localeCompare(b.nv); // Theo tên Nhân viên
-            if (a.thu !== b.thu) return dayOrder[a.thu] - dayOrder[b.thu]; // Theo Thứ tự ngày trong tuần
-            return (a._ai_order || 999) - (b._ai_order || 999); // Theo STT AI tối ưu
+            let dayDiff = (dayOrderRules[a.thu] || 99) - (dayOrderRules[b.thu] || 99);
+            if (dayDiff !== 0) return dayDiff;
+            return (a._ai_order || 999) - (b._ai_order || 999);
         });
 
         let htmlRows = [];
-        let currentGroup = "";
-        let sttCounter = 1;
+        let currentDayGroup = "";
+        let baseData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
 
-        // 3. Render từng dòng theo nhóm, có dải phân cách
-        sortedData.forEach((cust) => {
-            let groupKey = `${cust.nv} - ${cust.thu}`;
-            
-            // Nếu phát hiện chuyển sang dải tuyến mới (đổi NV hoặc đổi Thứ)
-            if (groupKey !== currentGroup) {
-                currentGroup = groupKey;
-                sttCounter = 1; // Reset lại STT từ số 1 cho dải tuyến mới
-                
-                // Chèn một dòng tiêu đề nhóm nổi bật cắt ngang bảng
-                htmlRows.push(`<tr>
-                    <td colspan="22" style="background-color: #cbd5e1; color: #0f172a; font-weight: 800; text-align: left; padding: 10px 12px; font-size: 13px; border-top: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; text-transform: uppercase;">
-                        📍 Dải tuyến: <span style="color: #1d4ed8;">${cust.nv}</span> &nbsp;|&nbsp; 🗓️ Lịch đi: <span style="color: #b91c1c;">${cust.thu}</span>
-                    </td>
-                </tr>`);
+        sortedData.forEach(row => {
+            if (row.thu !== currentDayGroup) {
+                currentDayGroup = row.thu;
+                htmlRows.push(`
+                    <tr>
+                        <td colspan="23" style="background-color: #cbd5e1; color: #0f172a; font-weight: 800; padding: 8px 12px; font-size: 14px; text-transform: uppercase;">
+                            📍 DẢI TUYẾN: <span style="color: #b91c1c;">${currentDayGroup}</span>
+                        </td>
+                    </tr>
+                `);
             }
 
-            // Quét lại toàn bộ lịch của Mã KH này (để tick x vào đủ các ngày KH có đi chứ không chỉ hiện 1 ngày)
-            let allDaysOfCust = AppState.workingData.filter(r => r.ma_kh === cust.ma_kh).map(r => r.thu);
-            const gx = d => allDaysOfCust.includes(d) ? `<span style="color:var(--danger); font-weight:900; font-size: 14px;">x</span>` : ``;
-            const gw = h => h ? `<span style="color:#1e40af; font-weight:900; font-size: 14px;">x</span>` : ``;
-            
-            const isF4 = cust.freq === 'F4', isF21 = cust.freq === 'F2-1', isF22 = cust.freq === 'F2-2';
-            let ds = AppState.salesData[cust.ma_kh] || {}; 
-            
-            // Xác định STT: Ưu tiên lấy từ kết quả AI trả về, nếu chưa chạy AI thì dùng bộ đếm sttCounter tự động
-            let stt = cust._ai_order !== 999 ? cust._ai_order : sttCounter++;
+            let allCustRecords = baseData.filter(r => r.ma_kh === row.ma_kh);
+            let custDays = new Set(allCustRecords.map(r => r.thu));
 
-            // Thêm dòng khách hàng
-            htmlRows.push(`<tr class="hover-row" onmouseenter="highlightMarker('${cust.ma_kh}')" onmouseleave="resetHighlightMarker('${cust.ma_kh}')">
-                <td class="text-center"><input type="number" class="stt-input" value="${stt}" onchange="updateOrder('${cust.ma_kh}', this.value)"></td>
-                <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${cust.ma_kh}')">×</button></td>
-                <td style="font-weight: 600; color: #475569;">${escapeHTML(cust.nv)}</td>
-                <td style="color: #1e40af; font-weight: 600;">${escapeHTML(cust.ma_kh)}</td>
-                <td style="font-weight: 500;">${escapeHTML(cust.ten_kh)}</td>
-                ${CONSTANTS.DAYS_TEXT.map(d => `<td class="edit-cell" onclick="toggleRouteDay('${cust.ma_kh}','${d}')">${gx(d)}</td>`).join('')}
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W1')">${gw(isF4||isF21)}</td>
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W2')">${gw(isF4||isF22)}</td>
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W3')">${gw(isF4||isF21)}</td>
-                <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W4')">${gw(isF4||isF22)}</td>
-                <td class="text-right" style="background:#fffbeb; font-size: 11px;">${formatNum(ds['M5'])}</td>
-                <td class="text-right" style="background:#fef3c7; font-size: 11px;">${formatNum(ds['M6'])}</td>
-                <td class="text-right" style="background:#fffbeb; font-size: 11px;">${formatNum(ds['M7'])}</td>
-                <td class="text-right" style="background:#fef3c7; font-size: 11px;">${formatNum(ds['M8'])}</td>
-                <td class="text-center bg-slate-100 font-bold" style="font-size: 11px;">${cust.lat || '-'}</td>
-                <td class="text-center bg-slate-100 font-bold" style="font-size: 11px;">${cust.lng || '-'}</td>
+            const getX = (day) => custDays.has(day) ? `<span style="color:var(--danger); font-weight:900; font-size:14px;">x</span>` : ``;
+            const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+            
+            const isF4 = row.freq === 'F4'; const isF21 = row.freq === 'F2-1'; const isF22 = row.freq === 'F2-2';
+
+            let dsKH = AppState.salesData[row.ma_kh] || {};
+            let dsM5 = formatNum(dsKH['M5'] || 0); let dsM6 = formatNum(dsKH['M6'] || 0);
+            let dsM7 = formatNum(dsKH['M7'] || 0); let dsM8 = formatNum(dsKH['M8'] || 0);
+            let stt = row._ai_order !== 999 ? row._ai_order : "";
+
+            htmlRows.push(`<tr class="hover-row" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
+                <td style="text-align:center;">
+                    <input type="number" class="stt-input" value="${stt}" onchange="updateOrder('${row.ma_kh}', '${row.thu}', this.value)">
+                </td>
+                <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${row.ma_kh}')">×</button></td>
+                <td style="font-weight:bold; color:#b91c1c; text-align:center; background:#fef2f2;">${row.thu.replace('Thứ ','T').replace('Chủ nhật','CN')}</td>
+                <td>${escapeHTML(row.nv)}</td>
+                <td style="font-weight:600; color:#1e40af;">${escapeHTML(row.ma_kh)}</td>
+                <td style="white-space: normal;">${escapeHTML(row.ten_kh)}</td>
+                
+                ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" style="text-align:center; background:${d === 'Thứ 3' || d === 'Thứ 5' || d === 'Thứ 7' ? '#fff' : (d === 'Chủ nhật' ? '#fef2f2' : '#f8fafc')};" onclick="toggleRouteDay('${row.ma_kh}', '${d}')">${getX(d)}</td>`).join('')}
+                
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
+                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
+                
+                <td class="text-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+                <td class="text-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+                <td class="text-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
+                <td class="text-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
+                <td class="text-center bg-slate-100 font-bold">${row.lat || '-'}</td>
+                <td class="text-center bg-slate-100 font-bold">${row.lng || '-'}</td>
             </tr>`);
         });
 
         tbody.innerHTML = htmlRows.join('');
-    }
+    }    
 
     /* =========================================
        7. AI INTEGRATION & EXPORT (ĐÃ LÀM LẠI CHỨC NĂNG XUẤT)
@@ -927,14 +957,12 @@ document.getElementById('sel-npp').addEventListener('change', (e) => {
             const aiResults = (await response.json()).optimized_data;
             document.getElementById('ai-progress-fill').style.width = '100%';
 
-            // TẠO BẢN SAO ĐỂ RÚT DẦN KẾT QUẢ, TRÁNH LỖI ĐÈ KHÁCH F2/F4
             let resultsCopy = [...aiResults];
 
             AppState.workingData.forEach(row => {
-                // Chỉ xét cập nhật những khách thuộc các Thứ đang được chọn để AI chạy
                 if (AppState.selectedDays.includes(row.thu)) {
-                    // Tìm vị trí kết quả của mã KH này
-                    let matchIdx = resultsCopy.findIndex(i => i.id === row.ma_kh);
+                    // Match đúng Mã KH và Ngày tương ứng từ AI
+                    let matchIdx = resultsCopy.findIndex(i => i.id === row.ma_kh && i.day === row.thu);
                     
                     if (matchIdx !== -1) {
                         let match = resultsCopy[matchIdx];
@@ -942,8 +970,6 @@ document.getElementById('sel-npp').addEventListener('change', (e) => {
                         row._ai_order = match.order;
                         if(match.freq) row.freq = match.freq;
                         
-                        // CỰC KỲ QUAN TRỌNG: Xóa kết quả vừa dùng khỏi mảng copy 
-                        // để dòng lặp tiếp theo của cùng khách hàng này sẽ lấy kết quả khác
                         resultsCopy.splice(matchIdx, 1);
                     }
                 }
@@ -969,58 +995,66 @@ document.getElementById('sel-npp').addEventListener('change', (e) => {
             cMap.get(row.ma_kh).days.add(row.thu);
         });
 
-        // 2. Tạo Header với cấu trúc như trong hình (22 cột từ A -> V)
+        // 2. Tạo Cấu trúc 2 Dòng Header y hệt bản gốc
         let excelRows = [];
-        let headerRow = [
-            "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", // A - E (Index 0-4)
-            "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", // F - K (Index 5-10)
-            "T2", "T3", "T4", "T5", "T6", "T7", "CN", // L - R (Index 11-17)
-            "W1", "W2", "W3", "W4" // S - V (Index 18-21)
-        ];
-        excelRows.push(headerRow);
-
-        // 3. Mapping data (Tìm và lấp đầy dữ liệu từ file Gốc + Bản chỉnh sửa Web)
-        let sttCounter = 1;
         
-        cMap.forEach((cust, ma_kh) => {
-            // Tạo 1 mảng rỗng gồm 22 ô
-            let row = new Array(22).fill(""); 
+        let headerRow1 = [
+            "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", 
+            "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", 
+            "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
+            "LỘ TRÌNH", "", "", "", "", "", "", // Từ L đến R
+            "TẦN SUẤT", "", "", ""              // Từ S đến V
+        ];
+        
+        let headerRow2 = [
+            "", "", "", "", "", "", "", "", "", "", "", 
+            "T2", "T3", "T4", "T5", "T6", "T7", "CN", 
+            "W1", "W2", "W3", "W4"
+        ];
+        
+        excelRows.push(headerRow1);
+        excelRows.push(headerRow2);
 
-            // TÌM KIẾM (VLOOKUP) trong dữ liệu file gốc
-            // Chú ý: Cột Mã KH ở file gốc nằm ở Index 5
+        // Sắp xếp dữ liệu ưu tiên theo thứ tự AI đã tối ưu
+        let exportList = Array.from(cMap.values()).sort((a, b) => {
+            if (a._ai_order !== 999 && b._ai_order !== 999) return a._ai_order - b._ai_order;
+            if (a.nv !== b.nv) return (a.nv || "").localeCompare(b.nv || "");
+            return (a.ma_kh || "").localeCompare(b.ma_kh || "");
+        });
+
+        // 3. Mapping data từ file Excel gốc & Đánh số STT mới (1, 2, 3...)
+        let sttCounter = 1;
+        exportList.forEach((cust) => {
+            let ma_kh = cust.ma_kh;
+            let row = new Array(22).fill(""); 
             let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
 
+            // Điền thông tin cố định (VLOOKUP từ file gốc)
             if (originalRow) {
-                // Điền các cột tra cứu được từ file Tuyến Gốc (A - E)
-                row[0] = cust._ai_order !== 999 ? cust._ai_order : (originalRow[0] || "");
                 row[1] = originalRow[1] || "";
                 row[2] = originalRow[2] || "";
                 row[3] = originalRow[3] || "";
                 row[4] = originalRow[4] || "";
-                
-                // (G - K)
                 row[6] = originalRow[6] || cust.ten_kh || "";
                 row[7] = originalRow[7] || cust.dia_chi || "";
                 row[8] = originalRow[8] || "";
                 row[9] = originalRow[9] || "";
                 row[10] = originalRow[10] || "";
             } else {
-                // Fallback nếu có lỗi không khớp
-                row[0] = cust._ai_order !== 999 ? cust._ai_order : sttCounter++;
                 row[4] = cust.nv || "";
                 row[6] = cust.ten_kh || "";
                 row[7] = cust.dia_chi || "";
             }
 
-            // Điền Cột F (Index 5)
+            row[0] = sttCounter++; // Đánh lại STT sạch, không dùng data rác
             row[5] = ma_kh;
 
-            // Đánh dấu "x" vào đúng cột Thứ đã chỉnh sửa trên Web (Cột L -> R / Index 11 -> 17)
+            // Đánh dấu "x" vào đúng cột Thứ
             CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
                 row[11 + idx] = cust.days.has(day) ? "x" : "";
             });
 
-            // Đánh dấu "x" vào đúng cột Tần suất chỉnh sửa trên Web (Cột S -> V / Index 18 -> 21)
+            // Đánh dấu "x" vào Tần suất
             row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
             row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
             row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
@@ -1029,9 +1063,79 @@ document.getElementById('sel-npp').addEventListener('change', (e) => {
             excelRows.push(row);
         });
 
-        // 4. Ghi file Excel
+        // 4. Tạo Workbook & Bơm Style (Màu sắc, Merge Cells, Viền)
+        let ws = XLSX.utils.aoa_to_sheet(excelRows);
+
+        // Gộp ô (Merge Cells) cho Tiêu đề
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   // STT
+            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   // Mã đơn vị
+            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
+            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+            { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
+            { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },
+            { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },
+            { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },
+            { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },
+            { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },
+            { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, // Đến ngày tham gia
+            { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } }, // LỘ TRÌNH (L1:R1)
+            { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } }  // TẦN SUẤT (S1:V1)
+        ];
+
+        // Định nghĩa Style chuẩn
+        const headerStyle = {
+            font: { bold: true, name: "Arial", sz: 10 },
+            alignment: { horizontal: "center", vertical: "center", wrapText: true },
+            fill: { fgColor: { rgb: "E2EFDA" } }, // Màu nền xanh nhạt
+            border: {
+                top: { style: "thin", color: { auto: 1 } }, bottom: { style: "thin", color: { auto: 1 } },
+                left: { style: "thin", color: { auto: 1 } }, right: { style: "thin", color: { auto: 1 } }
+            }
+        };
+
+        const dataStyle = {
+            font: { name: "Arial", sz: 10 },
+            border: {
+                top: { style: "thin", color: { rgb: "CCCCCC" } }, bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                left: { style: "thin", color: { rgb: "CCCCCC" } }, right: { style: "thin", color: { rgb: "CCCCCC" } }
+            }
+        };
+
+        // Áp dụng Style cho toàn bộ bảng
+        for (let R = 0; R < excelRows.length; R++) {
+            for (let C = 0; C <= 21; C++) {
+                let cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' }; // Fallback ô trống khi merge
+                
+                if (R === 0 || R === 1) {
+                    // Header: Tô chữ đỏ cho các cột Mã và Ngày tham gia
+                    let isRedText = (C === 1 || C === 3 || C === 5 || C === 9 || C === 10);
+                    ws[cellRef].s = { 
+                        ...headerStyle, 
+                        font: { ...headerStyle.font, color: { rgb: isRedText ? "FF0000" : "000000" } } 
+                    };
+                } else {
+                    // Body: Căn giữa STT và các dấu "x"
+                    let isCenter = (C === 0 || C >= 11);
+                    ws[cellRef].s = {
+                        ...dataStyle,
+                        alignment: isCenter ? { horizontal: "center", vertical: "center" } : undefined
+                    };
+                }
+            }
+        }
+
+        // 5. Căn chỉnh độ rộng cột cho đẹp mắt
+        ws['!cols'] = [
+            { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 22 }, 
+            { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, 
+            { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, 
+            { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }
+        ];
+
         let wb = XLSX.utils.book_new(); 
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "MasterRoute");
+        XLSX.utils.book_append_sheet(wb, ws, "MasterRoute");
         XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
         showToast("Tải Excel thành công", 'success');
     }
