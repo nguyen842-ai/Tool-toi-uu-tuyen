@@ -53,8 +53,12 @@
 
         .filter-section { background: #f8fafc; padding: 12px; border-radius: var(--radius-md); border: 1px solid #e2e8f0; margin-bottom: 12px; }
         .form-control { padding: 6px; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; width: 100%; background: #fff; font-weight: 500; box-sizing: border-box; }
-        .form-control[multiple] { min-height: 80px; padding: 4px; }
         .form-control option { text-align: center; } 
+        
+        /* Giao diện Checkbox Nhân Viên mới */
+        .nv-checkbox-container { border: 1px solid #cbd5e1; border-radius: var(--radius-sm); background: #fff; padding: 6px; max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .nv-checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; user-select: none; }
+        .nv-checkbox-item input { cursor: pointer; }
         
         .day-chips-wrapper { border: 1px solid #cbd5e1; border-radius: var(--radius-sm); background: #fff; padding: 8px; }
         .day-chip { height: fit-content; padding: 4px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; user-select: none; }
@@ -70,6 +74,7 @@
         th.sticky-header { background-color: #1e40af !important; color: white !important; font-weight: bold; text-align: center; vertical-align: middle; position: sticky; top: 0; z-index: 2; }
         th.danger-th { background-color: #dc2626 !important; color: white !important; }
         .ds-col { background-color: #fef3c7 !important; color: #065f46 !important; font-weight: bold; }
+        .coord-col { background-color: #f1f5f9 !important; color: #334155 !important; font-weight: bold; }
         .hover-row:hover td { background-color: #bfdbfe !important; }
         .edit-cell { cursor: pointer; user-select: none; text-align: center; } .edit-cell:hover { background-color: #93c5fd !important; }
         .stt-input { width: 40px; text-align: center; font-weight: bold; padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); font-size: 12px; }
@@ -149,7 +154,12 @@
                 
                 <div class="flex-col" style="flex: 1.5;">
                     <label class="mb-1 font-bold text-xs text-center">Chọn tối đa 2 nhân viên</label>
-                    <select id="sel-nv" class="form-control text-center" multiple disabled style="height: 100%;"><option value="">-- Chọn Nhân viên --</option></select>
+                    <div id="nv-checkbox-list" class="nv-checkbox-container">
+                        <span class="text-muted text-xs text-center">-- Chưa có dữ liệu --</span>
+                    </div>
+                    <div id="nv-limit-warning" class="hidden text-red-600 font-bold text-xs text-center mt-1">
+                        ⚠️ Đã chọn tối đa 2 NV! Vui lòng bỏ chọn 1 NV cũ trước.
+                    </div>
                 </div>
                 
                 <div class="flex-col" style="flex: 2;">
@@ -198,7 +208,6 @@
         </div>
 
         <div id="dashboard-section" class="hidden">
-            
             <div class="table-container mb-3">
                 <table id="comparison-table">
                     <thead id="comp-head"></thead>
@@ -263,7 +272,6 @@
     function escapeHTML(str) { return !str ? '' : String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
     function formatNum(num) { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(num || 0); }
     
-    // TÍNH KHOẢNG CÁCH (V2.1 Logic)
     function getHaversine14(lat1, lon1, lat2, lon2) {
         if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
         const dLat = (lat2 - lat1) * (Math.PI / 180); 
@@ -402,7 +410,7 @@
             
             let w1 = (row[18]||'').toString().toLowerCase().trim()==='x', w2 = (row[19]||'').toString().toLowerCase().trim()==='x';
             let w3 = (row[20]||'').toString().toLowerCase().trim()==='x', w4 = (row[21]||'').toString().toLowerCase().trim()==='x';
-            let freqType = (w1&&w2&&w3&&w4) ? "F4" : (w1&&!w2&&w3&&!w4) ? "F2-1" : (!w1&&w2&&!w3&&w4) ? "F2-2" : "Lỗi Tần Suất";
+            let freqType = (w1&&w2&&w3&&w4) ? "F4" : (w1&&!w2&&w3&&!w4) ? "F2-1" : (!w1&&w2&&!w3&&w4) ? "F2-2" : "Sai Tần suất. Chỉ chấp nhận F2-1, F2-2, F4.";
 
             let addedToWarn = false;
 
@@ -410,9 +418,10 @@
                 let dayName = CONSTANTS.DAYS_TEXT[i];
                 if ((row[col]||'').toString().toLowerCase().trim() === 'x') {
                     let warnings = [];
-                    if (!isValidCoord) warnings.push("Không tọa độ");
+                    // YÊU CẦU: Chuẩn hóa nhãn cảnh báo
+                    if (!isValidCoord) warnings.push("Không có tọa độ");
                     if (dayName === 'Chủ nhật') warnings.push("Tuyến CN");
-                    if (freqType === "Lỗi Tần Suất") warnings.push("Sai T.Suất");
+                    if (freqType.includes("Sai Tần suất")) warnings.push("Sai Tần suất. Chỉ chấp nhận F2-1, F2-2, F4.");
                     
                     if (warnings.length > 0 && !addedToWarn) {
                         rawWarn.push({ area, npp, nv, ma_kh, ten_kh, errors: warnings });
@@ -480,39 +489,39 @@
     }
 
     /* =========================================
-       4. UI FILTERS & LEGEND
+       4. UI FILTERS & CHECKBOX NV & LEGEND
        ========================================= */
-    function setupFilters(isLocal) {
-        const selArea = document.getElementById('sel-area'); const selNPP = document.getElementById('sel-npp'); const selNV = document.getElementById('sel-nv');
-        if (isLocal) {
-            selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`; selArea.disabled = true;
-            selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`; selNPP.disabled = true;
-            selNV.innerHTML = [...new Set(AppState.sourceData.map(r=>r.nv))].map(nv => `<option value="${escapeHTML(nv)}">${escapeHTML(nv)}</option>`).join('');
-            selNV.disabled = false;
-        } else {
-            selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>` + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => `<option value="${escapeHTML(a)}">${escapeHTML(a)}</option>`).join('');
-            selArea.disabled = false;
+    function renderNVCheckboxes(nvList) {
+        const container = document.getElementById('nv-checkbox-list');
+        if (!nvList || nvList.length === 0) {
+            container.innerHTML = `<span class="text-muted text-xs text-center">-- Chưa có dữ liệu --</span>`;
+            return;
         }
-        clearWorkspace(true);
+        container.innerHTML = nvList.map(nv => `
+            <label class="nv-checkbox-item">
+                <input type="checkbox" value="${escapeHTML(nv)}" onchange="handleNVCheckboxChange(this)">
+                <span>${escapeHTML(nv)}</span>
+            </label>
+        `).join('');
     }
 
-    document.getElementById('sel-area').addEventListener('change', (e) => {
-        clearWorkspace(true); if (!e.target.value) { document.getElementById('sel-npp').disabled = true; document.getElementById('sel-nv').disabled = true; return; }
-        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
-        document.getElementById('sel-npp').disabled = false; document.getElementById('sel-nv').disabled = true;
-    });
+    window.handleNVCheckboxChange = function(checkboxEl) {
+        const checkedBoxes = Array.from(document.querySelectorAll('#nv-checkbox-list input[type="checkbox"]:checked'));
+        const warnEl = document.getElementById('nv-limit-warning');
+        
+        // YÊU CẦU: Nhảy đỏ cảnh báo buộc tắt bớt nếu > 2 NV
+        if (checkedBoxes.length > 2) {
+            checkboxEl.checked = false; // Tự động hủy tick vừa chọn
+            warnEl.classList.remove('hidden');
+            showToast("Chỉ chọn tối đa 2 nhân viên cùng lúc!", 'warning');
+            return;
+        } else {
+            warnEl.classList.add('hidden');
+        }
 
-    document.getElementById('sel-npp').addEventListener('change', (e) => {
-        clearWorkspace(true); if (!e.target.value) { document.getElementById('sel-nv').disabled = true; return; }
-        document.getElementById('sel-nv').innerHTML = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort().map(nv => `<option value="${escapeHTML(nv)}">${escapeHTML(nv)}</option>`).join('');
-        document.getElementById('sel-nv').disabled = false;
-    });
-
-    document.getElementById('sel-nv').addEventListener('change', (e) => {
-        let opts = Array.from(e.target.selectedOptions);
-        if (opts.length > 2) { showToast("Chọn tối đa 2 nhân viên!", 'warning'); opts[opts.length - 1].selected = false; opts = Array.from(e.target.selectedOptions); }
-        AppState.selectedEmployees = opts.map(o => o.value);
+        AppState.selectedEmployees = checkedBoxes.map(cb => cb.value);
         clearWorkspace(true);
+        
         if (AppState.selectedEmployees.length === 0) {
             document.getElementById('warning-section').classList.add('hidden');
             return;
@@ -543,6 +552,43 @@
         document.getElementById('btn-ai-optimize').disabled = false;
         
         processDataAndRender();
+    };
+
+    function setupFilters(isLocal) {
+        const selArea = document.getElementById('sel-area'); const selNPP = document.getElementById('sel-npp');
+        if (isLocal) {
+            selArea.innerHTML = `<option>-- Dữ liệu Local --</option>`; selArea.disabled = true;
+            selNPP.innerHTML = `<option>-- Dữ liệu Local --</option>`; selNPP.disabled = true;
+            let nvs = [...new Set(AppState.sourceData.map(r=>r.nv))].sort();
+            renderNVCheckboxes(nvs);
+        } else {
+            selArea.innerHTML = `<option value="">-- Chọn Khu vực --</option>` + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => `<option value="${escapeHTML(a)}">${escapeHTML(a)}</option>`).join('');
+            selArea.disabled = false;
+            renderNVCheckboxes([]);
+        }
+        clearWorkspace(true);
+    }
+
+    document.getElementById('sel-area').addEventListener('change', (e) => {
+        clearWorkspace(true); 
+        if (!e.target.value) { 
+            document.getElementById('sel-npp').disabled = true; 
+            renderNVCheckboxes([]); 
+            return; 
+        }
+        document.getElementById('sel-npp').innerHTML = `<option value="">-- Chọn NPP --</option>` + [...new Set(AppState.sourceData.filter(r => r.area === e.target.value).map(r => r.npp))].sort().map(n => `<option value="${escapeHTML(n)}">${escapeHTML(n)}</option>`).join('');
+        document.getElementById('sel-npp').disabled = false; 
+        renderNVCheckboxes([]);
+    });
+
+    document.getElementById('sel-npp').addEventListener('change', (e) => {
+        clearWorkspace(true); 
+        if (!e.target.value) { 
+            renderNVCheckboxes([]); 
+            return; 
+        }
+        let nvs = [...new Set(AppState.sourceData.filter(r => r.area === document.getElementById('sel-area').value && r.npp === e.target.value).map(r => r.nv))].sort();
+        renderNVCheckboxes(nvs);
     });
 
     function updateLegendUI(count) {
@@ -641,7 +687,6 @@
         const tbody = document.getElementById('comp-body'); 
         const tfoot = document.getElementById('comp-foot');
         
-        // Phục hồi nguyên bản thead user mong muốn
         thead.innerHTML = `<tr>
             <th class="sticky-header">Thứ</th>
             <th class="sticky-header">Nhóm Tuyến</th>
@@ -763,15 +808,21 @@
 
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); const tbody = document.getElementById('table-body');
+        
+        // YÊU CẦU: Thêm 2 cột Latitude và Longitude phía sau Doanh số
         thead.innerHTML = `<tr>
             <th class="sticky-header" rowspan="2">STT</th><th class="sticky-header" rowspan="2" style="width:30px;" title="Loại khách">🗑️</th>
             <th class="sticky-header" rowspan="2">Nhân viên</th><th class="sticky-header" rowspan="2">Mã KH</th><th class="sticky-header" rowspan="2">Tên KH</th>
-            <th class="sticky-header" colspan="7">Lộ trình</th><th class="sticky-header" colspan="4">Tần Suất</th><th class="sticky-header ds-col" colspan="4">Doanh Số</th>
+            <th class="sticky-header" colspan="7">Lộ trình</th><th class="sticky-header" colspan="4">Tần Suất</th>
+            <th class="sticky-header ds-col" colspan="4">Doanh Số</th>
+            <th class="sticky-header coord-col" colspan="2">Tọa Độ</th>
         </tr>
         <tr>
             ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
             ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px;">${w}</th>`).join('')}
             ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px;">${m}</th>`).join('')}
+            <th class="sticky-header coord-col" style="top:29px; width:60px;">Lat</th>
+            <th class="sticky-header coord-col" style="top:29px; width:60px;">Lng</th>
         </tr>`;
 
         let cMap = new Map(); data.forEach(r => { if(!cMap.has(r.ma_kh)) cMap.set(r.ma_kh, { ...r, days: new Set() }); cMap.get(r.ma_kh).days.add(r.thu); });
@@ -793,6 +844,8 @@
                 <td class="edit-cell bg-slate-50" onclick="toggleFreq('${cust.ma_kh}','W4')">${gw(isF4||isF22)}</td>
                 <td class="text-right" style="background:#fffbeb;">${formatNum(ds['M5'])}</td><td class="text-right" style="background:#fef3c7;">${formatNum(ds['M6'])}</td>
                 <td class="text-right" style="background:#fffbeb;">${formatNum(ds['M7'])}</td><td class="text-right" style="background:#fef3c7;">${formatNum(ds['M8'])}</td>
+                <td class="text-center bg-slate-100 font-bold">${cust.lat || '-'}</td>
+                <td class="text-center bg-slate-100 font-bold">${cust.lng || '-'}</td>
             </tr>`;
         }).join('');
     }
@@ -833,15 +886,16 @@
         let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
         if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-        let excelRows = [ ["--- BẢN CHỈNH SỬA PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "Lat", "Lng", "M5", "M6", "M7", "M8"] ];
+        let excelRows = [ ["--- BẢN CHỈNH SỬA PHƯƠNG ÁN TUYẾN - CHỜ PHÊ DUYỆT ---"], [], ["STT", "NPP", "Nhân viên", "Mã KH", "Tên Khách Hàng", "Địa chỉ", ...CONSTANTS.DAYS_TEXT, "W1", "W2", "W3", "W4", "M5", "M6", "M7", "M8", "Lat", "Lng"] ];
         let cMap = new Map(); activeData.forEach(row => { if (!cMap.has(row.ma_kh)) cMap.set(row.ma_kh, { ...row, days: new Set() }); cMap.get(row.ma_kh).days.add(row.thu); });
         
         let sttCounter = 1;
         cMap.forEach((cust) => {
             excelRows.push([
                 cust._ai_order !== 999 ? cust._ai_order : sttCounter++, cust.npp, cust.nv, cust.ma_kh, cust.ten_kh, cust.dia_chi,
-                ...CONSTANTS.DAYS_TEXT.map(d => cust.days.has(d) ? "x" : ""), ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", cust.lat, cust.lng,
-                AppState.salesData[cust.ma_kh]?.['M5'] || 0, AppState.salesData[cust.ma_kh]?.['M6'] || 0, AppState.salesData[cust.ma_kh]?.['M7'] || 0, AppState.salesData[cust.ma_kh]?.['M8'] || 0
+                ...CONSTANTS.DAYS_TEXT.map(d => cust.days.has(d) ? "x" : ""), ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "", ['F4', 'F2-1'].includes(cust.freq) ? "x" : "", ['F4', 'F2-2'].includes(cust.freq) ? "x" : "",
+                AppState.salesData[cust.ma_kh]?.['M5'] || 0, AppState.salesData[cust.ma_kh]?.['M6'] || 0, AppState.salesData[cust.ma_kh]?.['M7'] || 0, AppState.salesData[cust.ma_kh]?.['M8'] || 0,
+                cust.lat, cust.lng
             ]);
         });
         let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), "ProposalRoute");
