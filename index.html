@@ -869,12 +869,29 @@
             if (!response.ok) throw new Error("Lỗi Server AI");
             
             const aiResults = (await response.json()).optimized_data;
-            document.getElementById('ai-progress-fill').style.width = '100%';
+document.getElementById('ai-progress-fill').style.width = '100%';
+
+// TẠO BẢN SAO ĐỂ RÚT DẦN KẾT QUẢ, TRÁNH LỖI ĐÈ KHÁCH F2/F4
+let resultsCopy = [...aiResults];
+
+AppState.workingData.forEach(row => {
+    // Chỉ xét cập nhật những khách thuộc các Thứ đang được chọn để AI chạy
+    if (AppState.selectedDays.includes(row.thu)) {
+        // Tìm vị trí kết quả của mã KH này
+        let matchIdx = resultsCopy.findIndex(i => i.id === row.ma_kh);
+        
+        if (matchIdx !== -1) {
+            let match = resultsCopy[matchIdx];
+            row.thu = match.day;
+            row._ai_order = match.order;
+            if(match.freq) row.freq = match.freq;
             
-            AppState.workingData.forEach(row => {
-                let match = aiResults.find(i => i.id === row.ma_kh);
-                if (match) { row.thu = match.day; row._ai_order = match.order; if(match.freq) row.freq = match.freq; }
-            });
+            // CỰC KỲ QUAN TRỌNG: Xóa kết quả vừa dùng khỏi mảng copy 
+            // để dòng lặp tiếp theo của cùng khách hàng này sẽ lấy kết quả khác
+            resultsCopy.splice(matchIdx, 1);
+        }
+    }
+});
             AppState.workingData.sort((a,b) => a._ai_order - b._ai_order);
             
             showToast(`✨ Đã áp dụng đề xuất AI cho ${payload.length} khách!`);
