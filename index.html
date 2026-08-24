@@ -189,7 +189,7 @@
             <div style="margin-top:0; margin-bottom: 12px; font-size:12px; color:#475569; line-height: 1.5;">
                 <strong>Lưu ý:</strong><br>
                 - Khách bị <strong>lỗi tọa độ</strong> sẽ tạm ẩn khỏi bản đồ.<br>
-                - Kiểm tra các cảnh báo <strong>Trùng lịch đi trong tuần</strong>, <strong>Chủ nhật</strong> hoặc <strong>Trùng tọa độ</strong> dưới đây.
+                - Danh sách dưới đây tổng hợp các khách bị <strong>Lỗi Chủ nhật</strong>, <strong>Lỗi Tần suất/Trùng ngày</strong> hoặc <strong>Trùng tọa độ</strong>.
             </div>
             <div class="table-container" style="margin-bottom: 0; max-height: 200px;">
                 <table id="warning-table">
@@ -332,7 +332,7 @@
     }
 
     /* =========================================
-       3. DATA LOADING & BẢNG CẢNH BÁO MỚI
+       3. DATA LOADING & QUÉT LỖI NÂNG CẤP
        ========================================= */
     async function loadSalesData() {
         renderStatus('statusSales', '⌛ Đang tải...', '#ea580c');
@@ -400,7 +400,9 @@
     function processRawExcelData(jsonRouteList) {
         let rawValid = []; 
         let warnMap = new Map(); 
-        let coordMap = new Map();
+
+        // Bước 1: Trích xuất danh sách khách hàng và chuẩn hóa dữ liệu thô
+        let uniqueCustomersMap = new Map(); // Key: ma_kh, Value: { ten_kh, area, npp, nv, lat, lng, days: Set, freq }
 
         jsonRouteList.forEach((row, idx) => {
             if (idx === 0 || !row[0] || row[0] === 'STT') return;
@@ -416,14 +418,20 @@
             let w3 = (row[20]||'').toString().toLowerCase().trim()==='x', w4 = (row[21]||'').toString().toLowerCase().trim()==='x';
             let freqType = (w1&&w2&&w3&&w4) ? "F4" : (w1&&!w2&&w3&&!w4) ? "F2-1" : (!w1&&w2&&!w3&&w4) ? "F2-2" : "Sai Tần suất. Chỉ chấp nhận F2-1, F2-2, F4.";
 
-            let daysCount = 0;
-            let hasSunday = false;
+            if (!warnMap.has(ma_kh)) {
+                warnMap.set(ma_kh, { area, npp, nv, ma_kh, ten_kh, errors: new Set() });
+            }
+            let itemWarn = warnMap.get(ma_kh);
 
+            if (!isValidCoord) itemWarn.errors.add("Không có tọa độ");
+            if (freqType.includes("Sai Tần suất")) itemWarn.errors.add("Sai Tần suất. Chỉ chấp nhận F2-1, F2-2, F4.");
+
+            let daysCount = 0;
             CONSTANTS.DAY_COLS.forEach((col, i) => {
                 let dayName = CONSTANTS.DAYS_TEXT[i];
                 if ((row[col]||'').toString().toLowerCase().trim() === 'x') {
                     daysCount++;
-                    if (dayName === 'Chủ nhật') hasSunday = true;
+                    if (dayName === 'Chủ nhật') itemWarn.errors.add("Tuyến rơi vào Chủ nhật");
 
                     if (isValidCoord) {
                         rawValid.push({ rawIndex: idx, sttRaw: sttRaw, area, npp, nv, ma_kh, ten_kh, dia_chi, thu: dayName, lat, lng, freq: freqType, _ai_order: 999 });
@@ -431,38 +439,33 @@
                 }
             });
 
-            // 1. Ghi nhận cảnh báo cơ bản cho KH
-            if (!warnMap.has(ma_kh)) {
-                warnMap.set(ma_kh, { area, npp, nv, ma_kh, ten_kh, errors: new Set() });
+            if (daysCount >= 2) {
+                itemWarn.errors.add(`Trùng ${daysCount} ngày trong 1 tuần`);
             }
-            let itemWarn = warnMap.get(ma_kh);
 
-            if (!isValidCoord) itemWarn.errors.add("Không có tọa độ");
-            if (hasSunday) itemWarn.errors.add("Tuyến rơi vào Chủ nhật");
-            if (freqType.includes("Sai Tần suất")) itemWarn.errors.add("Sai Tần suất. Chỉ chấp nhận F2-1, F2-2, F4.");
-            if (daysCount >= 2) itemWarn.errors.add(`Trùng ${daysCount} ngày/tuần`);
-
-            // 2. Gom cụm tọa độ để quét Trùng Tọa Độ
-            if (isValidCoord) {
-                let coordKey = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
-                if (!coordMap.has(coordKey)) coordMap.set(coordKey, []);
-                coordMap.get(coordKey).push({ ma_kh, ten_kh });
+            // Lưu thông tin duy nhất của KH để quét trùng tọa độ
+            if (isValidCoord && !uniqueCustomersMap.has(ma_kh)) {
+                uniqueCustomersMap.set(ma_kh, { ma_kh, ten_kh, lat, lng });
             }
         });
 
-        // 3. Đánh dấu lỗi Trùng Tọa Độ
-        coordMap.forEach((custArray) => {
-            if (custArray.length > 1) {
-                let otherCusts = custArray.map(c => c.ma_kh).join(', ');
-                custArray.forEach(c => {
-                    if (warnMap.has(c.ma_kh)) {
-                        warnMap.get(c.ma_kh).errors.add(`Trùng vị trí tọa độ với (${otherCusts})`);
-                    }
-                });
+        // Bước 2: Quét trùng tọa độ chính xác giữa các KH KHÁC NHAU (Khoảng cách < 5 mét)
+        let custArray = Array.from(uniqueCustomersMap.values());
+        for (let i = 0; i < custArray.length; i++) {
+            for (let j = i + 1; j < custArray.length; j++) {
+                let c1 = custArray[i];
+                let c2 = custArray[j];
+                
+                // Tính khoảng cách bằng mét
+                let distanceKm = getHaversine14(c1.lat, c1.lng, c2.lat, c2.lng); 
+                if (distanceKm <= 0.005) { // Dưới 5 mét coi như trùng tọa độ
+                    if (warnMap.has(c1.ma_kh)) warnMap.get(c1.ma_kh).errors.add(`Trùng vị trí tọa độ với (${c2.ma_kh} - ${c2.ten_kh})`);
+                    if (warnMap.has(c2.ma_kh)) warnMap.get(c2.ma_kh).errors.add(`Trùng vị trí tọa độ với (${c1.ma_kh} - ${c1.ten_kh})`);
+                }
             }
-        });
+        }
 
-        // Chuyển Set error thành Array
+        // Chuyển Set error thành Array để hiển thị bảng cảnh báo
         let rawWarn = [];
         warnMap.forEach(v => {
             if (v.errors.size > 0) {
@@ -581,7 +584,7 @@
         AppState.workingData = structuredClone(AppState.sourceData.filter(r => AppState.selectedEmployees.includes(r.nv)));
         AppState.historyStack = []; updateUndoButton();
         
-        // CƯỠNG CHẾ SẮP XẾP CÁC CHIP THỨ TỪ THỨ 2 ĐẾN CHỦ NHẬT
+        // CƯỠNG CHẾ SẮP XẾP CHIP THỨ TỪ THỨ 2 -> CHỦ NHẬT
         let rawThus = [...new Set(AppState.workingData.map(r => r.thu))];
         let orderedThus = CONSTANTS.DAYS_TEXT.filter(d => rawThus.includes(d));
 
@@ -881,6 +884,7 @@
     window.fitMapBounds = function() { AppState.isFirstMapRender = true; processDataAndRender(); };
     window.toggleRouteToolbarVisibility = function() { AppState.isToolbarExpanded = !AppState.isToolbarExpanded; document.getElementById('route-toggle-toolbar').style.display = AppState.isToolbarExpanded ? 'flex' : 'none'; };
     
+    // HÀM RENDER GIỮ NGUYÊN THỨ TỰ THÔ RAW DATA - KHÔNG TỰ SẮP XẾP NHÓM
     function renderDetailTable(data) {
         const thead = document.getElementById('table-head'); 
         const tbody = document.getElementById('table-body');
