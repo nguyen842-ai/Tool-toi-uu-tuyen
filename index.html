@@ -1022,9 +1022,7 @@
     let cMap = new Map();
     activeData.forEach(row => {
         if (!cMap.has(row.ma_kh)) {
-            // LẤY STT ĐÃ CHỈNH SỬA / TỐI ƯU (Giống hệt logic render trên giao diện)
             let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
-            
             cMap.set(row.ma_kh, { ...row, days: new Set(), finalSTT: displaySTT });
         }
         cMap.get(row.ma_kh).days.add(row.thu);
@@ -1032,27 +1030,26 @@
 
     let excelRows = [];
     
-    // Thêm cột Lat (22) và Lng (23) vào tiêu đề
+    // Thêm cột Khu vực (24) và 3 cột Doanh số (25, 26, 27) vào cuối cùng
     let headerRow1 = [
         "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", 
         "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", 
         "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
         "LỘ TRÌNH", "", "", "", "", "", "", 
         "TẦN SUẤT", "", "", "",
-        "Vĩ độ (Lat)", "Kinh độ (Lng)"
+        "Vĩ độ (Lat)", "Kinh độ (Lng)", "Khu vực", "Doanh số M6", "Doanh số M7", "Doanh số M8"
     ];
     
     let headerRow2 = [
         "", "", "", "", "", "", "", "", "", "", "", 
         "T2", "T3", "T4", "T5", "T6", "T7", "CN", 
         "W1", "W2", "W3", "W4",
-        "", ""
+        "", "", "", "", "", ""
     ];
     
     excelRows.push(headerRow1);
     excelRows.push(headerRow2);
 
-    // SẮP XẾP LẠI DANH SÁCH EXCEL THEO ĐÚNG THỨ TỰ STT MỚI
     let exportList = Array.from(cMap.values()).sort((a, b) => {
         let sttA = parseInt(a.finalSTT) || 9999;
         let sttB = parseInt(b.finalSTT) || 9999;
@@ -1062,7 +1059,8 @@
     let sttCounter = 1;
     exportList.forEach((cust) => {
         let ma_kh = cust.ma_kh;
-        let row = new Array(24).fill(""); 
+        // Tăng độ dài mảng lên 28 cột
+        let row = new Array(28).fill(""); 
         let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
 
         if (originalRow) {
@@ -1077,15 +1075,16 @@
             row[10] = originalRow[10] || "";
             row[22] = originalRow[22] !== undefined ? originalRow[22] : (cust.lat || "");
             row[23] = originalRow[23] !== undefined ? originalRow[23] : (cust.lng || "");
+            row[24] = originalRow[24] !== undefined ? originalRow[24] : (cust.area || "Khác"); // Giữ nguyên khu vực để ko lỗi
         } else {
             row[4] = cust.nv || "";
             row[6] = cust.ten_kh || "";
             row[7] = cust.dia_chi || "";
             row[22] = cust.lat || "";
             row[23] = cust.lng || "";
+            row[24] = cust.area || "Khác";
         }
 
-        // GHI ĐÈ CỘT ĐẦU TIÊN (STT) BẰNG STT MỚI
         row[0] = cust.finalSTT !== "" ? cust.finalSTT : sttCounter++; 
         row[5] = ma_kh;
 
@@ -1098,12 +1097,18 @@
         row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
         row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
 
+        // THÊM DOANH SỐ VÀO CÁC CỘT 25, 26, 27
+        let dsKH = AppState.salesData[ma_kh] || {};
+        row[25] = dsKH['M6'] || 0;
+        row[26] = dsKH['M7'] || 0;
+        row[27] = dsKH['M8'] || 0;
+
         excelRows.push(row);
     });
 
     let ws = XLSX.utils.aoa_to_sheet(excelRows);
 
-    // Merge ô tiêu đề
+    // Merge các ô tiêu đề mới
     ws['!merges'] = [
         { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   
         { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   
@@ -1119,7 +1124,11 @@
         { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } }, 
         { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } },
         { s: { r: 0, c: 22 }, e: { r: 1, c: 22 } }, 
-        { s: { r: 0, c: 23 }, e: { r: 1, c: 23 } }  
+        { s: { r: 0, c: 23 }, e: { r: 1, c: 23 } },
+        { s: { r: 0, c: 24 }, e: { r: 1, c: 24 } }, 
+        { s: { r: 0, c: 25 }, e: { r: 1, c: 25 } }, 
+        { s: { r: 0, c: 26 }, e: { r: 1, c: 26 } }, 
+        { s: { r: 0, c: 27 }, e: { r: 1, c: 27 } }  
     ];
 
     const headerStyle = {
@@ -1140,8 +1149,9 @@
         }
     };
 
+    // Vòng lặp apply style cho 28 cột (chạy từ 0 đến 27)
     for (let R = 0; R < excelRows.length; R++) {
-        for (let C = 0; C <= 23; C++) {
+        for (let C = 0; C <= 27; C++) {
             let cellRef = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' }; 
             
@@ -1152,7 +1162,7 @@
                     font: { ...headerStyle.font, color: { rgb: isRedText ? "FF0000" : "000000" } } 
                 };
             } else {
-                let isCenter = (C === 0 || C >= 11);
+                let isCenter = (C === 0 || C >= 11 && C <= 21);
                 ws[cellRef].s = {
                     ...dataStyle,
                     alignment: isCenter ? { horizontal: "center", vertical: "center" } : undefined
@@ -1166,7 +1176,8 @@
         { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, 
         { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, 
         { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 },
-        { wch: 14 }, { wch: 14 }
+        { wch: 14 }, { wch: 14 }, 
+        { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 } // Thêm width cho Khu vực và Doanh số
     ];
 
     let wb = XLSX.utils.book_new(); 
