@@ -1022,7 +1022,10 @@
     let cMap = new Map();
     activeData.forEach(row => {
         if (!cMap.has(row.ma_kh)) {
-            cMap.set(row.ma_kh, { ...row, days: new Set() });
+            // LẤY STT ĐÃ CHỈNH SỬA / TỐI ƯU (Giống hệt logic render trên giao diện)
+            let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
+            
+            cMap.set(row.ma_kh, { ...row, days: new Set(), finalSTT: displaySTT });
         }
         cMap.get(row.ma_kh).days.add(row.thu);
     });
@@ -1049,7 +1052,12 @@
     excelRows.push(headerRow1);
     excelRows.push(headerRow2);
 
-    let exportList = Array.from(cMap.values()).sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
+    // SẮP XẾP LẠI DANH SÁCH EXCEL THEO ĐÚNG THỨ TỰ STT MỚI
+    let exportList = Array.from(cMap.values()).sort((a, b) => {
+        let sttA = parseInt(a.finalSTT) || 9999;
+        let sttB = parseInt(b.finalSTT) || 9999;
+        return sttA - sttB;
+    });
 
     let sttCounter = 1;
     exportList.forEach((cust) => {
@@ -1067,7 +1075,6 @@
             row[8] = originalRow[8] || "";
             row[9] = originalRow[9] || "";
             row[10] = originalRow[10] || "";
-            // Trích xuất chính xác Lat (cột 22) và Lng (cột 23)
             row[22] = originalRow[22] !== undefined ? originalRow[22] : (cust.lat || "");
             row[23] = originalRow[23] !== undefined ? originalRow[23] : (cust.lng || "");
         } else {
@@ -1078,7 +1085,8 @@
             row[23] = cust.lng || "";
         }
 
-        row[0] = cust.sttRaw || sttCounter++; 
+        // GHI ĐÈ CỘT ĐẦU TIÊN (STT) BẰNG STT MỚI
+        row[0] = cust.finalSTT !== "" ? cust.finalSTT : sttCounter++; 
         row[5] = ma_kh;
 
         CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
@@ -1095,7 +1103,7 @@
 
     let ws = XLSX.utils.aoa_to_sheet(excelRows);
 
-    // Merge ô tiêu đề cho 2 cột tọa độ mới
+    // Merge ô tiêu đề
     ws['!merges'] = [
         { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   
         { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   
