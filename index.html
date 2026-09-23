@@ -92,10 +92,6 @@
         .toast { background: #334155; color: white; padding: 12px 20px; border-radius: var(--radius-md); box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { border-left: 4px solid var(--success); } .toast.error { border-left: 4px solid var(--danger); } .toast.warning { border-left: 4px solid var(--warning); }
-        
-        /* [THAY ĐỔI] Thêm class highlight nền vàng cho dòng trùng toạ độ */
-        .dup-coord-row td { background-color: #fef08a !important; }
-        .dup-coord-row:hover td { background-color: #fde047 !important; }
     </style>
 </head>
 <body>
@@ -404,7 +400,7 @@
     function processRawExcelData(jsonRouteList) {
         let rawValid = []; 
         let warnMap = new Map(); 
-        let coordMap = new Map();
+        let coordMap = new Map(); // Key: "lat_lng", Value: Set các ma_kh KHÁC NHAU
 
         jsonRouteList.forEach((row, idx) => {
             if (idx === 0 || !row[0] || row[0] === 'STT') return;
@@ -445,46 +441,28 @@
                 itemWarn.errors.add(`Trùng ${daysCount} ngày trong 1 tuần`);
             }
 
-            // [THAY ĐỔI] Gom nhóm tọa độ bằng Set() để tự động loại bỏ trùng lặp cùng 1 ma_kh
+            // Gom nhóm tọa độ bằng Set() để tự động loại bỏ trùng lặp cùng 1 ma_kh
             if (isValidCoord) {
-                let coordKey = lat.toFixed(5) + "_" + lng.toFixed(5);
+                let coordKey = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
                 if (!coordMap.has(coordKey)) {
                     coordMap.set(coordKey, new Map());
                 }
-                // Lưu Mã KH cùng Object chứa Tên KH và Mã NV
-                coordMap.get(coordKey).set(ma_kh, { ten_kh: ten_kh, nv: nv });
+                // Lưu Mã KH và Tên KH vào Map của điểm tọa độ đó
+                coordMap.get(coordKey).set(ma_kh, ten_kh);
             }
         });
 
-        // [THAY ĐỔI] Quét nhanh O(N) các tọa độ có >= 2 MÃ KH KHÁC NHAU
+        // Quét nhanh O(N) các tọa độ có >= 2 MÃ KH KHÁC NHAU
         coordMap.forEach((custMap) => {
             if (custMap.size > 1) { // Chỉ xử lý khi có từ 2 MÃ KH khác nhau trở lên
-                let allCustList = Array.from(custMap.entries()); // Lấy danh sách [ma_kh, {ten_kh, nv}]
+                let allCustList = Array.from(custMap.keys());
                 
-                custMap.forEach((info, ma_kh) => {
-                    let otherCusts = allCustList
-                        .filter(item => item[0] !== ma_kh)
-                        .map(item => {
-                            let otherMaKh = item[0];
-                            let otherNv = item[1].nv;
-                            // Nếu khác NV thì gán thêm tên NV đằng sau Mã KH
-                            return info.nv !== otherNv ? otherMaKh + " (NV: " + otherNv + ")" : otherMaKh;
-                        })
-                        .join(', ');
-                    
+                custMap.forEach((ten_kh, ma_kh) => {
+                    let otherCusts = allCustList.filter(id => id !== ma_kh).join(', ');
                     if (warnMap.has(ma_kh)) {
-                        // Thêm nối chuỗi thông thường (không dùng dấu ngoặc kép mẫu) để an toàn
-                        warnMap.get(ma_kh).errors.add("Trùng tọa độ với: " + otherCusts);
-                        warnMap.get(ma_kh).isDuplicateCoord = true; // Đánh dấu khách hàng bị trùng
+                        warnMap.get(ma_kh).errors.add(`Trùng tọa độ với Mã KH khác: (${otherCusts})`);
                     }
                 });
-            }
-        });
-
-        // [THAY ĐỔI] Gán cờ báo lỗi trùng tọa độ cho data hợp lệ để render bảng
-        rawValid.forEach(r => {
-            if (warnMap.has(r.ma_kh) && warnMap.get(r.ma_kh).isDuplicateCoord) {
-                r.isDuplicateCoord = true;
             }
         });
 
@@ -499,7 +477,6 @@
         AppState.sourceData = rawValid;
         AppState.warningData = rawWarn;
     }
-    
     async function handleLocalFileUpload(event) {
         const files = event.target.files;
         if (!files || files.length === 0) return;
@@ -892,7 +869,7 @@
     }
 
     m.setIcon(L.divIcon({ className: 'custom-div-icon', html: iconHtml, iconSize: [26,26] }));
-    m.bindPopup(`<b>${escapeHTML(row.ten_kh)}</b><br>STT Lộ Trình: <b>${stt}</b><br>Mã KH: ${escapeHTML(row.ma_kh)}<br>NV:${escapeHTML(row.nv)}<br>Tần suất: ${row.freq}`);
+    m.bindPopup(`<b>${escapeHTML(row.ten_kh)}</b><br>STT Lộ Trình: <b>${stt}</b><br>Mã KH: ${escapeHTML(row.ma_kh)}<br>NV: ${escapeHTML(row.nv)}<br>Tần suất: ${row.freq}`);
 
     // 2. Tự động cuộn Bảng & Tô vàng dòng tương ứng khi CLICK vào điểm trên Bản Đồ
     m.off('click').on('click', () => {
@@ -920,87 +897,82 @@
 
     window.fitMapBounds = function() { AppState.isFirstMapRender = true; processDataAndRender(); };
     window.toggleRouteToolbarVisibility = function() { AppState.isToolbarExpanded = !AppState.isToolbarExpanded; document.getElementById('route-toggle-toolbar').style.display = AppState.isToolbarExpanded ? 'flex' : 'none'; };
-    
     function renderDetailTable(data) {
-        const thead = document.getElementById('table-head'); 
-        const tbody = document.getElementById('table-body');
+    const thead = document.getElementById('table-head'); 
+    const tbody = document.getElementById('table-body');
 
-        thead.innerHTML = `
-        <tr>
-            <th class="sticky-header" rowspan="2" style="z-index: 3;">STT</th>
-            <th class="sticky-header" rowspan="2" style="width:30px; z-index: 3;" title="Loại khách">🗑️</th>
-            <th class="sticky-header" rowspan="2" style="z-index: 3;">Mã KH</th>
-            <th class="sticky-header" rowspan="2" style="z-index: 3;">Tên KH</th>
-            <th class="sticky-header" colspan="7" style="z-index: 3;">Lộ trình</th>
-            <th class="sticky-header" colspan="4" style="z-index: 3;">Tần Suất</th>
-            <th class="sticky-header ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
-            <th class="sticky-header coord-col" colspan="2" style="z-index: 3;">Tọa Độ</th>
-        </tr>
-        <tr>
-            ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px; z-index: 2;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
-            ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px; z-index: 2;">${w}</th>`).join('')}
-            ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">${m}</th>`).join('')}
-            <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lat</th>
-            <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lng</th>
-        </tr>`;
-        
-        let htmlRows = [];
-        let baseData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
+    thead.innerHTML = `
+    <tr>
+        <th class="sticky-header" rowspan="2" style="z-index: 3;">STT</th>
+        <th class="sticky-header" rowspan="2" style="width:30px; z-index: 3;" title="Loại khách">🗑️</th>
+        <th class="sticky-header" rowspan="2" style="z-index: 3;">Mã KH</th>
+        <th class="sticky-header" rowspan="2" style="z-index: 3;">Tên KH</th>
+        <th class="sticky-header" colspan="7" style="z-index: 3;">Lộ trình</th>
+        <th class="sticky-header" colspan="4" style="z-index: 3;">Tần Suất</th>
+        <th class="sticky-header ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
+        <th class="sticky-header coord-col" colspan="2" style="z-index: 3;">Tọa Độ</th>
+    </tr>
+    <tr>
+        ${CONSTANTS.DAYS_TEXT.map(d=>`<th class="sticky-header" style="top:29px; width:35px; z-index: 2;">${d.replace('Thứ ','T').replace('Chủ nhật','CN')}</th>`).join('')}
+        ${['W1','W2','W3','W4'].map(w=>`<th class="sticky-header" style="top:29px; width:30px; z-index: 2;">${w}</th>`).join('')}
+        ${['M5','M6','M7','M8'].map(m=>`<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">${m}</th>`).join('')}
+        <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lat</th>
+        <th class="sticky-header coord-col" style="top:29px; width:60px; z-index: 2;">Lng</th>
+    </tr>`;
+    
+    let htmlRows = [];
+    let baseData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
 
-        // Sắp xếp lại bảng theo STT trên bản đồ nếu chọn 1 Thứ cụ thể
-        let sortedTableData = [...data];
-        if (AppState.selectedDays.length === 1) {
-            sortedTableData.sort((a, b) => (a._map_stt || 999) - (b._map_stt || 999));
-        } else {
-            sortedTableData.sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
-        }
-
-        sortedTableData.forEach(row => {
-            let allCustRecords = baseData.filter(r => r.ma_kh === row.ma_kh);
-            let custDays = new Set(allCustRecords.map(r => r.thu));
-
-            const getX = (day) => custDays.has(day) ? `<span style="color:var(--danger); font-weight:900; font-size:14px;">x</span>` : ``;
-            const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
-            
-            const isF4 = row.freq === 'F4'; const isF21 = row.freq === 'F2-1'; const isF22 = row.freq === 'F2-2';
-
-            let dsKH = AppState.salesData[row.ma_kh] || {};
-            let dsM5 = formatNum(dsKH['M5'] || 0); let dsM6 = formatNum(dsKH['M6'] || 0);
-            let dsM7 = formatNum(dsKH['M7'] || 0); let dsM8 = formatNum(dsKH['M8'] || 0);
-            
-            // ƯU TIÊN KHỚP SỐ STT TRÊN BẢN ĐỒ
-            let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
-
-            // [THAY ĐỔI] Check nếu bị trùng toạ độ -> Đổi class
-            let trClass = row.isDuplicateCoord ? "hover-row dup-coord-row" : "hover-row";
-
-            htmlRows.push(`<tr id="row-${row.ma_kh}" class="${trClass}" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
-                <td style="text-align:center;">
-                    <input type="number" class="stt-input" value="${displaySTT}" onchange="updateOrder('${row.ma_kh}', '${row.thu}', this.value)">
-                </td>
-                <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${row.ma_kh}')">×</button></td>
-                <td style="font-weight:600; color:#1e40af;">${escapeHTML(row.ma_kh)}</td>
-                <td style="white-space: normal;">${escapeHTML(row.ten_kh)}</td>
-                
-                ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" style="text-align:center; background:${d === 'Thứ 3' \vert{}\vert{} d === 'Thứ 5' \vert{}\vert{} d === 'Thứ 7' ? '#fff' : (d === 'Chủ nhật' ? '#fef2f2' : '#f8fafc')};" onclick="toggleRouteDay('${row.ma_kh}', '${d}')">${getX(d)}</td>`).join('')}
-                
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
-                <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
-                
-                <td class="text-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-                <td class="text-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
-                <td class="text-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
-                <td class="text-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
-                <td class="text-center bg-slate-100 font-bold">${row.lat || '-'}</td>
-                <td class="text-center bg-slate-100 font-bold">${row.lng || '-'}</td>
-            </tr>`);
-        });
-
-        tbody.innerHTML = htmlRows.join('');
+    // Sắp xếp lại bảng theo STT trên bản đồ nếu chọn 1 Thứ cụ thể
+    let sortedTableData = [...data];
+    if (AppState.selectedDays.length === 1) {
+        sortedTableData.sort((a, b) => (a._map_stt || 999) - (b._map_stt || 999));
+    } else {
+        sortedTableData.sort((a, b) => (a.rawIndex || 0) - (b.rawIndex || 0));
     }
 
+    sortedTableData.forEach(row => {
+        let allCustRecords = baseData.filter(r => r.ma_kh === row.ma_kh);
+        let custDays = new Set(allCustRecords.map(r => r.thu));
+
+        const getX = (day) => custDays.has(day) ? `<span style="color:var(--danger); font-weight:900; font-size:14px;">x</span>` : ``;
+        const getW = (hasW) => hasW ? `<span style="color:#1e40af; font-weight:900; font-size:14px;">x</span>` : ``;
+        
+        const isF4 = row.freq === 'F4'; const isF21 = row.freq === 'F2-1'; const isF22 = row.freq === 'F2-2';
+
+        let dsKH = AppState.salesData[row.ma_kh] || {};
+        let dsM5 = formatNum(dsKH['M5'] || 0); let dsM6 = formatNum(dsKH['M6'] || 0);
+        let dsM7 = formatNum(dsKH['M7'] || 0); let dsM8 = formatNum(dsKH['M8'] || 0);
+        
+        // ƯU TIÊN KHỚP SỐ STT TRÊN BẢN ĐỒ
+        let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
+
+        htmlRows.push(`<tr id="row-${row.ma_kh}" class="hover-row" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
+            <td style="text-align:center;">
+                <input type="number" class="stt-input" value="${displaySTT}" onchange="updateOrder('${row.ma_kh}', '${row.thu}', this.value)">
+            </td>
+            <td class="text-center"><button class="btn-remove" onclick="removeCustomer('${row.ma_kh}')">×</button></td>
+            <td style="font-weight:600; color:#1e40af;">${escapeHTML(row.ma_kh)}</td>
+            <td style="white-space: normal;">${escapeHTML(row.ten_kh)}</td>
+            
+            ${CONSTANTS.DAYS_TEXT.map(d=>`<td class="edit-cell" style="text-align:center; background:${d === 'Thứ 3' || d === 'Thứ 5' || d === 'Thứ 7' ? '#fff' : (d === 'Chủ nhật' ? '#fef2f2' : '#f8fafc')};" onclick="toggleRouteDay('${row.ma_kh}', '${d}')">${getX(d)}</td>`).join('')}
+            
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W1')">${getW(isF4 || isF21)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W2')">${getW(isF4 || isF22)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W3')">${getW(isF4 || isF21)}</td>
+            <td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq('${row.ma_kh}', 'W4')">${getW(isF4 || isF22)}</td>
+            
+            <td class="text-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
+            <td class="text-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
+            <td class="text-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
+            <td class="text-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
+            <td class="text-center bg-slate-100 font-bold">${row.lat || '-'}</td>
+            <td class="text-center bg-slate-100 font-bold">${row.lng || '-'}</td>
+        </tr>`);
+    });
+
+    tbody.innerHTML = htmlRows.join('');
+}
     /* =========================================
        7. AI INTEGRATION & EXPORT
        ========================================= */
@@ -1043,178 +1015,176 @@
         } catch (error) { showToast(error.message, 'error'); } 
         finally { document.getElementById('ai-loading-overlay').classList.add('hidden'); }
     }
-    
     window.exportDetailToExcel = function() {
-        let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
-        if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
+    let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
+    if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
 
-        let cMap = new Map();
-        activeData.forEach(row => {
-            if (!cMap.has(row.ma_kh)) {
-                let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
-                cMap.set(row.ma_kh, { ...row, days: new Set(), finalSTT: displaySTT });
-            }
-            cMap.get(row.ma_kh).days.add(row.thu);
-        });
+    let cMap = new Map();
+    activeData.forEach(row => {
+        if (!cMap.has(row.ma_kh)) {
+            let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
+            cMap.set(row.ma_kh, { ...row, days: new Set(), finalSTT: displaySTT });
+        }
+        cMap.get(row.ma_kh).days.add(row.thu);
+    });
 
-        let excelRows = [];
-        
-        // Thêm cột Khu vực (24) và 3 cột Doanh số (25, 26, 27) vào cuối cùng
-        let headerRow1 = [
-            "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", 
-            "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", 
-            "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
-            "LỘ TRÌNH", "", "", "", "", "", "", 
-            "TẦN SUẤT", "", "", "",
-            "Vĩ độ (Lat)", "Kinh độ (Lng)", "Khu vực", "Doanh số M6", "Doanh số M7", "Doanh số M8"
-        ];
-        
-        let headerRow2 = [
-            "", "", "", "", "", "", "", "", "", "", "", 
-            "T2", "T3", "T4", "T5", "T6", "T7", "CN", 
-            "W1", "W2", "W3", "W4",
-            "", "", "", "", "", ""
-        ];
-        
-        excelRows.push(headerRow1);
-        excelRows.push(headerRow2);
+    let excelRows = [];
+    
+    // Thêm cột Khu vực (24) và 3 cột Doanh số (25, 26, 27) vào cuối cùng
+    let headerRow1 = [
+        "STT", "Mã đơn vị", "Tên đơn vị", "Mã tuyến", "Tên nhân viên", 
+        "Mã khách hàng", "Tên khách hàng", "Địa chỉ", "Trạng thái tham gia", 
+        "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
+        "LỘ TRÌNH", "", "", "", "", "", "", 
+        "TẦN SUẤT", "", "", "",
+        "Vĩ độ (Lat)", "Kinh độ (Lng)", "Khu vực", "Doanh số M6", "Doanh số M7", "Doanh số M8"
+    ];
+    
+    let headerRow2 = [
+        "", "", "", "", "", "", "", "", "", "", "", 
+        "T2", "T3", "T4", "T5", "T6", "T7", "CN", 
+        "W1", "W2", "W3", "W4",
+        "", "", "", "", "", ""
+    ];
+    
+    excelRows.push(headerRow1);
+    excelRows.push(headerRow2);
 
-        let exportList = Array.from(cMap.values()).sort((a, b) => {
-            let sttA = parseInt(a.finalSTT) || 9999;
-            let sttB = parseInt(b.finalSTT) || 9999;
-            return sttA - sttB;
-        });
+    let exportList = Array.from(cMap.values()).sort((a, b) => {
+        let sttA = parseInt(a.finalSTT) || 9999;
+        let sttB = parseInt(b.finalSTT) || 9999;
+        return sttA - sttB;
+    });
 
-        let sttCounter = 1;
-        exportList.forEach((cust) => {
-            let ma_kh = cust.ma_kh;
-            // Tăng độ dài mảng lên 28 cột
-            let row = new Array(28).fill(""); 
-            let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
+    let sttCounter = 1;
+    exportList.forEach((cust) => {
+        let ma_kh = cust.ma_kh;
+        // Tăng độ dài mảng lên 28 cột
+        let row = new Array(28).fill(""); 
+        let originalRow = AppState.rawExcelData.find(r => r && String(r[5]).trim() === String(ma_kh).trim());
 
-            if (originalRow) {
-                row[1] = originalRow[1] || "";
-                row[2] = originalRow[2] || "";
-                row[3] = originalRow[3] || "";
-                row[4] = originalRow[4] || "";
-                row[6] = originalRow[6] || cust.ten_kh || "";
-                row[7] = originalRow[7] || cust.dia_chi || "";
-                row[8] = originalRow[8] || "";
-                row[9] = originalRow[9] || "";
-                row[10] = originalRow[10] || "";
-                row[22] = originalRow[22] !== undefined ? originalRow[22] : (cust.lat || "");
-                row[23] = originalRow[23] !== undefined ? originalRow[23] : (cust.lng || "");
-                row[24] = originalRow[24] !== undefined ? originalRow[24] : (cust.area || "Khác"); // Giữ nguyên khu vực để ko lỗi
-            } else {
-                row[4] = cust.nv || "";
-                row[6] = cust.ten_kh || "";
-                row[7] = cust.dia_chi || "";
-                row[22] = cust.lat || "";
-                row[23] = cust.lng || "";
-                row[24] = cust.area || "Khác";
-            }
-
-            row[0] = cust.finalSTT !== "" ? cust.finalSTT : sttCounter++; 
-            row[5] = ma_kh;
-
-            CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
-                row[11 + idx] = cust.days.has(day) ? "x" : "";
-            });
-
-            row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-            row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
-            row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
-
-            // THÊM DOANH SỐ VÀO CÁC CỘT 25, 26, 27
-            let dsKH = AppState.salesData[ma_kh] || {};
-            row[25] = dsKH['M6'] || 0;
-            row[26] = dsKH['M7'] || 0;
-            row[27] = dsKH['M8'] || 0;
-
-            excelRows.push(row);
-        });
-
-        let ws = XLSX.utils.aoa_to_sheet(excelRows);
-
-        // Merge các ô tiêu đề mới
-        ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   
-            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   
-            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
-            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
-            { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
-            { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },
-            { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },
-            { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },
-            { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },
-            { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },
-            { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, 
-            { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } }, 
-            { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } },
-            { s: { r: 0, c: 22 }, e: { r: 1, c: 22 } }, 
-            { s: { r: 0, c: 23 }, e: { r: 1, c: 23 } },
-            { s: { r: 0, c: 24 }, e: { r: 1, c: 24 } }, 
-            { s: { r: 0, c: 25 }, e: { r: 1, c: 25 } }, 
-            { s: { r: 0, c: 26 }, e: { r: 1, c: 26 } }, 
-            { s: { r: 0, c: 27 }, e: { r: 1, c: 27 } }  
-        ];
-
-        const headerStyle = {
-            font: { bold: true, name: "Arial", sz: 10 },
-            alignment: { horizontal: "center", vertical: "center", wrapText: true },
-            fill: { fgColor: { rgb: "E2EFDA" } }, 
-            border: {
-                top: { style: "thin", color: { auto: 1 } }, bottom: { style: "thin", color: { auto: 1 } },
-                left: { style: "thin", color: { auto: 1 } }, right: { style: "thin", color: { auto: 1 } }
-            }
-        };
-
-        const dataStyle = {
-            font: { name: "Arial", sz: 10 },
-            border: {
-                top: { style: "thin", color: { rgb: "CCCCCC" } }, bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-                left: { style: "thin", color: { rgb: "CCCCCC" } }, right: { style: "thin", color: { rgb: "CCCCCC" } }
-            }
-        };
-
-        // Vòng lặp apply style cho 28 cột (chạy từ 0 đến 27)
-        for (let R = 0; R < excelRows.length; R++) {
-            for (let C = 0; C <= 27; C++) {
-                let cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-                if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' }; 
-                
-                if (R === 0 || R === 1) {
-                    let isRedText = (C === 1 || C === 3 || C === 5 || C === 9 || C === 10);
-                    ws[cellRef].s = { 
-                        ...headerStyle, 
-                        font: { ...headerStyle.font, color: { rgb: isRedText ? "FF0000" : "000000" } } 
-                    };
-                } else {
-                    let isCenter = (C === 0 || C >= 11 && C <= 21);
-                    ws[cellRef].s = {
-                        ...dataStyle,
-                        alignment: isCenter ? { horizontal: "center", vertical: "center" } : undefined
-                    };
-                }
-            }
+        if (originalRow) {
+            row[1] = originalRow[1] || "";
+            row[2] = originalRow[2] || "";
+            row[3] = originalRow[3] || "";
+            row[4] = originalRow[4] || "";
+            row[6] = originalRow[6] || cust.ten_kh || "";
+            row[7] = originalRow[7] || cust.dia_chi || "";
+            row[8] = originalRow[8] || "";
+            row[9] = originalRow[9] || "";
+            row[10] = originalRow[10] || "";
+            row[22] = originalRow[22] !== undefined ? originalRow[22] : (cust.lat || "");
+            row[23] = originalRow[23] !== undefined ? originalRow[23] : (cust.lng || "");
+            row[24] = originalRow[24] !== undefined ? originalRow[24] : (cust.area || "Khác"); // Giữ nguyên khu vực để ko lỗi
+        } else {
+            row[4] = cust.nv || "";
+            row[6] = cust.ten_kh || "";
+            row[7] = cust.dia_chi || "";
+            row[22] = cust.lat || "";
+            row[23] = cust.lng || "";
+            row[24] = cust.area || "Khác";
         }
 
-        ws['!cols'] = [
-            { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 22 }, 
-            { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, 
-            { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, 
-            { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 },
-            { wch: 14 }, { wch: 14 }, 
-            { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 } // Thêm width cho Khu vực và Doanh số
-        ];
+        row[0] = cust.finalSTT !== "" ? cust.finalSTT : sttCounter++; 
+        row[5] = ma_kh;
 
-        let wb = XLSX.utils.book_new(); 
-        XLSX.utils.book_append_sheet(wb, ws, "MasterRoute");
-        XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
-        showToast("Tải Excel thành công", 'success');
+        CONSTANTS.DAYS_TEXT.forEach((day, idx) => {
+            row[11 + idx] = cust.days.has(day) ? "x" : "";
+        });
+
+        row[18] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[19] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+        row[20] = ['F4', 'F2-1'].includes(cust.freq) ? "x" : "";
+        row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
+
+        // THÊM DOANH SỐ VÀO CÁC CỘT 25, 26, 27
+        let dsKH = AppState.salesData[ma_kh] || {};
+        row[25] = dsKH['M6'] || 0;
+        row[26] = dsKH['M7'] || 0;
+        row[27] = dsKH['M8'] || 0;
+
+        excelRows.push(row);
+    });
+
+    let ws = XLSX.utils.aoa_to_sheet(excelRows);
+
+    // Merge các ô tiêu đề mới
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
+        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
+        { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },
+        { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },
+        { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },
+        { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },
+        { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },
+        { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, 
+        { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } }, 
+        { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } },
+        { s: { r: 0, c: 22 }, e: { r: 1, c: 22 } }, 
+        { s: { r: 0, c: 23 }, e: { r: 1, c: 23 } },
+        { s: { r: 0, c: 24 }, e: { r: 1, c: 24 } }, 
+        { s: { r: 0, c: 25 }, e: { r: 1, c: 25 } }, 
+        { s: { r: 0, c: 26 }, e: { r: 1, c: 26 } }, 
+        { s: { r: 0, c: 27 }, e: { r: 1, c: 27 } }  
+    ];
+
+    const headerStyle = {
+        font: { bold: true, name: "Arial", sz: 10 },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        fill: { fgColor: { rgb: "E2EFDA" } }, 
+        border: {
+            top: { style: "thin", color: { auto: 1 } }, bottom: { style: "thin", color: { auto: 1 } },
+            left: { style: "thin", color: { auto: 1 } }, right: { style: "thin", color: { auto: 1 } }
+        }
+    };
+
+    const dataStyle = {
+        font: { name: "Arial", sz: 10 },
+        border: {
+            top: { style: "thin", color: { rgb: "CCCCCC" } }, bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+            left: { style: "thin", color: { rgb: "CCCCCC" } }, right: { style: "thin", color: { rgb: "CCCCCC" } }
+        }
+    };
+
+    // Vòng lặp apply style cho 28 cột (chạy từ 0 đến 27)
+    for (let R = 0; R < excelRows.length; R++) {
+        for (let C = 0; C <= 27; C++) {
+            let cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' }; 
+            
+            if (R === 0 || R === 1) {
+                let isRedText = (C === 1 || C === 3 || C === 5 || C === 9 || C === 10);
+                ws[cellRef].s = { 
+                    ...headerStyle, 
+                    font: { ...headerStyle.font, color: { rgb: isRedText ? "FF0000" : "000000" } } 
+                };
+            } else {
+                let isCenter = (C === 0 || C >= 11 && C <= 21);
+                ws[cellRef].s = {
+                    ...dataStyle,
+                    alignment: isCenter ? { horizontal: "center", vertical: "center" } : undefined
+                };
+            }
+        }
     }
 
+    ws['!cols'] = [
+        { wch: 5 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 22 }, 
+        { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, 
+        { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, 
+        { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 },
+        { wch: 14 }, { wch: 14 }, 
+        { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 } // Thêm width cho Khu vực và Doanh số
+    ];
+
+    let wb = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(wb, ws, "MasterRoute");
+    XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
+    showToast("Tải Excel thành công", 'success');
+}
     async function checkServerStatus() {
         const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
         try { if ((await fetch(document.getElementById('sel-api-line').value + '/api/optimizeRoute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ping: true}) })).ok) { b.innerHTML = "🟢 OK"; b.className = "cursor-pointer text-emerald-700 bg-emerald-100 border border-emerald-300 px-1 rounded text-xs"; } else throw new Error(); } catch(e) { b.innerHTML = "🔴 Lỗi"; b.className = "cursor-pointer text-red-700 bg-red-100 border border-red-300 px-1 rounded text-xs"; }
