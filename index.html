@@ -93,7 +93,7 @@
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { border-left: 4px solid var(--success); } .toast.error { border-left: 4px solid var(--danger); } .toast.warning { border-left: 4px solid var(--warning); }
         
-        /* CSS bôi vàng dòng trùng tọa độ */
+        /* [THAY ĐỔI] Thêm class highlight nền vàng cho dòng trùng toạ độ */
         .dup-coord-row td { background-color: #fef08a !important; }
         .dup-coord-row:hover td { background-color: #fde047 !important; }
     </style>
@@ -404,7 +404,7 @@
     function processRawExcelData(jsonRouteList) {
         let rawValid = []; 
         let warnMap = new Map(); 
-        let coordMap = new Map(); // Key: "lat_lng", Value: Set các ma_kh KHÁC NHAU
+        let coordMap = new Map();
 
         jsonRouteList.forEach((row, idx) => {
             if (idx === 0 || !row[0] || row[0] === 'STT') return;
@@ -445,9 +445,9 @@
                 itemWarn.errors.add(`Trùng ${daysCount} ngày trong 1 tuần`);
             }
 
-            // Gom nhóm tọa độ bằng Set() để tự động loại bỏ trùng lặp cùng 1 ma_kh
+            // [THAY ĐỔI] Gom nhóm tọa độ bằng Set() để tự động loại bỏ trùng lặp cùng 1 ma_kh
             if (isValidCoord) {
-                let coordKey = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+                let coordKey = lat.toFixed(5) + "_" + lng.toFixed(5);
                 if (!coordMap.has(coordKey)) {
                     coordMap.set(coordKey, new Map());
                 }
@@ -456,7 +456,7 @@
             }
         });
 
-        // Quét nhanh O(N) các tọa độ có >= 2 MÃ KH KHÁC NHAU
+        // [THAY ĐỔI] Quét nhanh O(N) các tọa độ có >= 2 MÃ KH KHÁC NHAU
         coordMap.forEach((custMap) => {
             if (custMap.size > 1) { // Chỉ xử lý khi có từ 2 MÃ KH khác nhau trở lên
                 let allCustList = Array.from(custMap.entries()); // Lấy danh sách [ma_kh, {ten_kh, nv}]
@@ -468,19 +468,20 @@
                             let otherMaKh = item[0];
                             let otherNv = item[1].nv;
                             // Nếu khác NV thì gán thêm tên NV đằng sau Mã KH
-                            return info.nv !== otherNv ? `${otherMaKh} (NV:${otherNv})` : otherMaKh;
+                            return info.nv !== otherNv ? otherMaKh + " (NV: " + otherNv + ")" : otherMaKh;
                         })
                         .join(', ');
                     
                     if (warnMap.has(ma_kh)) {
-                        warnMap.get(ma_kh).errors.add(`Trùng tọa độ với Mã KH khác: (${otherCusts})`);
+                        // Thêm nối chuỗi thông thường (không dùng dấu ngoặc kép mẫu) để an toàn
+                        warnMap.get(ma_kh).errors.add("Trùng tọa độ với: " + otherCusts);
                         warnMap.get(ma_kh).isDuplicateCoord = true; // Đánh dấu khách hàng bị trùng
                     }
                 });
             }
         });
 
-        // Gán cờ báo lỗi trùng tọa độ cho data hợp lệ để render bảng
+        // [THAY ĐỔI] Gán cờ báo lỗi trùng tọa độ cho data hợp lệ để render bảng
         rawValid.forEach(r => {
             if (warnMap.has(r.ma_kh) && warnMap.get(r.ma_kh).isDuplicateCoord) {
                 r.isDuplicateCoord = true;
@@ -498,6 +499,7 @@
         AppState.sourceData = rawValid;
         AppState.warningData = rawWarn;
     }
+    
     async function handleLocalFileUpload(event) {
         const files = event.target.files;
         if (!files || files.length === 0) return;
@@ -969,6 +971,7 @@
             // ƯU TIÊN KHỚP SỐ STT TRÊN BẢN ĐỒ
             let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
 
+            // [THAY ĐỔI] Check nếu bị trùng toạ độ -> Đổi class
             let trClass = row.isDuplicateCoord ? "hover-row dup-coord-row" : "hover-row";
 
             htmlRows.push(`<tr id="row-${row.ma_kh}" class="${trClass}" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
@@ -1040,6 +1043,7 @@
         } catch (error) { showToast(error.message, 'error'); } 
         finally { document.getElementById('ai-loading-overlay').classList.add('hidden'); }
     }
+    
     window.exportDetailToExcel = function() {
         let activeData = AppState.workingData.filter(r => AppState.selectedDays.includes(r.thu));
         if (activeData.length === 0) return showToast("Không có dữ liệu!", 'warning');
@@ -1210,6 +1214,7 @@
         XLSX.writeFile(wb, `BAN_CHINH_SUA_TUYEN_${AppState.selectedEmployees.join('_')}.xlsx`); 
         showToast("Tải Excel thành công", 'success');
     }
+
     async function checkServerStatus() {
         const b = document.getElementById('server-status-badge'); b.innerHTML = "⏳ Ping..."; b.className = "cursor-pointer text-yellow-700 bg-yellow-100 border border-yellow-300 px-1 rounded text-xs";
         try { if ((await fetch(document.getElementById('sel-api-line').value + '/api/optimizeRoute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ping: true}) })).ok) { b.innerHTML = "🟢 OK"; b.className = "cursor-pointer text-emerald-700 bg-emerald-100 border border-emerald-300 px-1 rounded text-xs"; } else throw new Error(); } catch(e) { b.innerHTML = "🔴 Lỗi"; b.className = "cursor-pointer text-red-700 bg-red-100 border border-red-300 px-1 rounded text-xs"; }
