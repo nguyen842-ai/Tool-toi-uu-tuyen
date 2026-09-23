@@ -473,7 +473,7 @@
                         .join(', ');
                     
                     if (warnMap.has(ma_kh)) {
-                        warnMap.get(ma_kh).errors.add(`Trùng tọa độ với: ${otherCusts}`);
+                        warnMap.get(ma_kh).errors.add(`Trùng tọa độ với Mã KH khác: (${otherCusts})`);
                         warnMap.get(ma_kh).isDuplicateCoord = true; // Đánh dấu khách hàng bị trùng
                     }
                 });
@@ -968,8 +968,7 @@
             
             // ƯU TIÊN KHỚP SỐ STT TRÊN BẢN ĐỒ
             let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
-            
-            // Kiểm tra cờ isDuplicateCoord để chèn thêm CSS class bôi vàng
+
             let trClass = row.isDuplicateCoord ? "hover-row dup-coord-row" : "hover-row";
 
             htmlRows.push(`<tr id="row-${row.ma_kh}" class="${trClass}" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
