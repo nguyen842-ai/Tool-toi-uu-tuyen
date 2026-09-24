@@ -96,6 +96,9 @@
         /* BỔ SUNG: CSS highlight dòng trùng tọa độ */
         .dup-coord-row td { background-color: #fef08a !important; }
         .dup-coord-row:hover td { background-color: #fde047 !important; }
+        /* BỔ SUNG: CSS highlight dòng lỗi tọa độ */
+        .coord-error-row td { background-color: #fee2e2 !important; color: #991b1b !important; }
+        .coord-error-row:hover td { background-color: #fecaca !important; }
     </style>
 </head>
 <body>
@@ -435,8 +438,13 @@
                     daysCount++;
                     if (dayName === 'Chủ nhật') itemWarn.errors.add("Tuyến rơi vào Chủ nhật");
 
-                    if (isValidCoord) {
-                        rawValid.push({ rawIndex: idx, sttRaw: sttRaw, area, npp, nv, ma_kh, ten_kh, dia_chi, thu: dayName, lat, lng, freq: freqType, _ai_order: 999 });
+                    // Đẩy cả khách có tọa độ và lỗi tọa độ vào data
+                    rawValid.push({ 
+                        rawIndex: idx, sttRaw: sttRaw, area, npp, nv, ma_kh, ten_kh, dia_chi, 
+                        thu: dayName, lat: isValidCoord ? lat : '', lng: isValidCoord ? lng : '', 
+                        freq: freqType, _ai_order: 999, isCoordError: !isValidCoord 
+                    });
+                    }
                     }
                 }
             });
@@ -787,11 +795,13 @@
     function getRouteStatsForGroup(groupData) {
         let dist = 0;
         if (!groupData || groupData.length === 0) return { count: 0, dist: 0 };
-        let sorted = [...groupData].sort((a,b) => a._ai_order - b._ai_order);
+        // Bỏ qua khách lỗi tọa độ khi tính KM
+        let validGroup = groupData.filter(r => !r.isCoordError);
+        let sorted = [...validGroup].sort((a,b) => a._ai_order - b._ai_order);
         for(let i = 0; i < sorted.length - 1; i++) {
             dist += getHaversine14(sorted[i].lat, sorted[i].lng, sorted[i+1].lat, sorted[i+1].lng);
         }
-        return { count: sorted.length, dist: dist };
+        return { count: groupData.length, dist: dist }; // Vẫn giữ nguyên đếm tổng số khách
     }
 
     function renderComparisonTable() {
@@ -900,13 +910,16 @@
                     if(group.length === 0) return;
                     group.sort((a, b) => (a._ai_order || 999) - (b._ai_order || 999));
                     let coords = [];
-                    group.forEach((row, i) => {
-                        coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
-                        
+                        group.forEach((row, i) => {
                         let stt = row._ai_order !== 999 ? row._ai_order : i + 1;
                         row._map_stt = stt; 
 
-                        let iconHtml = shape === 'marker-triangle' 
+                        // NẾU KHÁCH LỖI TỌA ĐỘ -> BỎ QUA KHÔNG VẼ LÊN BẢN ĐỒ
+                        if (row.isCoordError) return;
+
+                        coords.push([row.lat, row.lng]); allLatLngs.push([row.lat, row.lng]);
+                        
+                        let iconHtml = shape === 'marker-triangle'
                             ? `<div aria-label="Tuyến ${day}" style="position:relative; width: 26px; height: 26px; display:flex; align-items:center; justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" style="position:absolute; top:0; left:0; z-index: 1;"><path fill="${bg}" stroke="white" stroke-width="1.5" d="M12 2 L22 21 L2 21 Z"/></svg><span style="position:relative; z-index: 2; color:${txt}; font-size:11px; font-weight:bold; margin-top: 4px;">${stt}</span></div>`
                             : `<div aria-label="Tuyến ${day}" class="route-marker ${shape}" style="background-color: ${bg}; color: ${txt};">${stt}</div>`;
                         
@@ -1003,8 +1016,15 @@
             
             let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
             
-            // [TÍNH NĂNG BỔ SUNG] Check class để bôi vàng
-            let trClass = row.isDuplicateCoord ? "hover-row dup-coord-row" : "hover-row";
+            /// Kiểm tra lỗi để gán class bôi màu & tooltip địa chỉ
+            let trClass = "hover-row";
+            let trTitle = "";
+            if (row.isCoordError) {
+                trClass += " coord-error-row";
+                trTitle = "LỖI TỌA ĐỘ - Địa chỉ: " + escapeHTML(row.dia_chi);
+            } else if (row.isDuplicateCoord) {
+                trClass += " dup-coord-row";
+            }
 
             let daysHtml = CONSTANTS.DAYS_TEXT.map(d => {
                 let bgCol = (d === 'Thứ 3' || d === 'Thứ 5' || d === 'Thứ 7') ? '#fff' : (d === 'Chủ nhật' ? '#fef2f2' : '#f8fafc');
@@ -1017,7 +1037,7 @@
             let freq4Html = '<td class="edit-cell" style="text-align:center; background:#f0fdfa;" onclick="toggleFreq(\'' + row.ma_kh + '\', \'W4\')">' + getW(isF4 || isF22) + '</td>';
 
             htmlRows.push(`
-                <tr id="row-${row.ma_kh}" class="${trClass}" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
+                <tr id="row-${row.ma_kh}" class="${trClass}" title="${trTitle}" onmouseenter="highlightMarker('${row.ma_kh}')" onmouseleave="resetHighlightMarker('${row.ma_kh}')">
                     <td style="text-align:center;">
                         <input type="number" class="stt-input" value="${displaySTT}" onchange="updateOrder('${row.ma_kh}', '${row.thu}', this.value)">
                     </td>
@@ -1056,7 +1076,7 @@
         
         try {
             const baseUrl = document.getElementById('sel-api-line').value;
-            const payload = dataToOptimize.map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, currentDay: r.thu, currentFreq: r.freq }));
+            const payload = dataToOptimize.filter(r => !r.isCoordError).map(r => ({ id: r.ma_kh, lat: r.lat, lng: r.lng, currentDay: r.thu, currentFreq: r.freq }));
             const response = await fetch(`${baseUrl}/api/optimizeRoute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locations: payload, availableDays: AppState.selectedDays }) });
             if (!response.ok) throw new Error("Lỗi Server AI");
             
