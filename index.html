@@ -591,10 +591,17 @@
             return;
         }
 
-        let activeWarnings = AppState.warningData.filter(r => AppState.selectedEmployees.includes(r.nv));
+        // Lấy giá trị Khu vực và NPP hiện tại đang chọn
+        const selArea = document.getElementById('sel-area').value;
+        const selNPP = document.getElementById('sel-npp').value;
+
+        // Ép điều kiện lọc phải Khớp Tên NV + Khớp Khu vực + Khớp NPP
+        let activeWarnings = AppState.warningData.filter(r => 
+            AppState.selectedEmployees.includes(r.nv) && r.area === selArea && r.npp === selNPP
+        );
+        
         let tbody = document.getElementById('warning-body');
         if (activeWarnings.length > 0) {
-            // Gỡ backtick lồng để chống lỗi Syntax Error
             tbody.innerHTML = activeWarnings.map(row => 
                 '<tr class="hover-row"><td class="font-bold text-red-600 text-center">' + escapeHTML(row.ma_kh) + '</td>' + 
                 '<td>' + escapeHTML(row.nv) + '</td>' + 
@@ -606,7 +613,11 @@
             document.getElementById('warning-section').classList.add('hidden');
         }
 
-        AppState.workingData = structuredClone(AppState.sourceData.filter(r => AppState.selectedEmployees.includes(r.nv)));
+        // Ép điều kiện lọc vào dữ liệu Working Data
+        AppState.workingData = structuredClone(AppState.sourceData.filter(r => 
+            AppState.selectedEmployees.includes(r.nv) && r.area === selArea && r.npp === selNPP
+        ));
+        
         AppState.historyStack = []; updateUndoButton();
         
         let rawThus = [...new Set(AppState.workingData.map(r => r.thu))];
@@ -625,17 +636,17 @@
     };
 
     function setupFilters(isLocal) {
-        const selArea = document.getElementById('sel-area'); const selNPP = document.getElementById('sel-npp');
-        if (isLocal) {
-            selArea.innerHTML = '<option>-- Dữ liệu Local --</option>'; selArea.disabled = true;
-            selNPP.innerHTML = '<option>-- Dữ liệu Local --</option>'; selNPP.disabled = true;
-            let nvs = [...new Set(AppState.sourceData.map(r=>r.nv))].sort();
-            renderNVCheckboxes(nvs);
-        } else {
-            selArea.innerHTML = '<option value="">-- Chọn Khu vực --</option>' + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => '<option value="' + escapeHTML(a) + '">' + escapeHTML(a) + '</option>').join('');
-            selArea.disabled = false;
-            renderNVCheckboxes([]);
-        }
+        const selArea = document.getElementById('sel-area'); 
+        const selNPP = document.getElementById('sel-npp');
+        
+        // Cho phép cả DB và Local file đều chạy qua bộ lọc Area -> NPP -> NV
+        selArea.innerHTML = '<option value="">-- Chọn Khu vực --</option>' + [...new Set(AppState.sourceData.map(r => r.area))].sort().map(a => '<option value="' + escapeHTML(a) + '">' + escapeHTML(a) + '</option>').join('');
+        selArea.disabled = false;
+        
+        selNPP.innerHTML = '<option value="">-- Chọn NPP --</option>';
+        selNPP.disabled = true;
+        
+        renderNVCheckboxes([]);
         clearWorkspace(true);
     }
 
@@ -799,8 +810,15 @@
         let tOldCount=0, tNewCount=0, tNewDist=0;
         let htmlRows = [];
 
+        // Lấy Khu vực và NPP để lọc
+        const selArea = document.getElementById('sel-area').value;
+        const selNPP = document.getElementById('sel-npp').value;
+
         AppState.selectedDays.forEach(day => {
-            let origDayData = AppState.sourceData.filter(r => r.thu === day && AppState.selectedEmployees.includes(r.nv));
+            // Lọc dữ liệu gốc khắt khe hơn theo cả Area và NPP
+            let origDayData = AppState.sourceData.filter(r => 
+                r.thu === day && AppState.selectedEmployees.includes(r.nv) && r.area === selArea && r.npp === selNPP
+            );
             let optDayData = AppState.workingData.filter(r => r.thu === day);
 
             let hasF21 = origDayData.some(r => r.freq === 'F2-1') || optDayData.some(r => r.freq === 'F2-1');
@@ -846,9 +864,19 @@
         </tr>`;
     }
 
-    function processDataAndRender() {
+   function processDataAndRender() {
+        const selArea = document.getElementById('sel-area').value;
+        const selNPP = document.getElementById('sel-npp').value;
+        
         let activeData = AppState.isOptimizedView ? AppState.workingData : AppState.sourceData;
-        activeData = activeData.filter(r => AppState.selectedEmployees.includes(r.nv) && AppState.selectedDays.includes(r.thu));
+        
+        // Khóa chặt việc render đúng 3 biến: Tên NV + Khu vực + NPP
+        activeData = activeData.filter(r => 
+            AppState.selectedEmployees.includes(r.nv) && 
+            AppState.selectedDays.includes(r.thu) && 
+            r.area === selArea && 
+            r.npp === selNPP
+        );
 
         renderMapOptimized(activeData); 
         renderComparisonTable();
