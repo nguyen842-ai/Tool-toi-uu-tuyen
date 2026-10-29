@@ -351,8 +351,8 @@
                 return; 
             }
 
-            let { data: urls } = await supabaseClient.storage.from('data').createSignedUrls(['dataM5.js','dataM6.js','dataM7.js','dataM8.js','dataM9.js'], 60);
-            if (!urls || urls[0].error) urls = (await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls(['data/dataM5.js','data/dataM6.js','data/dataM7.js','data/dataM8.js','data/dataM9.js'], 60)).data;
+            let { data: urls } = await supabaseClient.storage.from('data').createSignedUrls(['dataM7.js','dataM8.js','dataM9.js','dataM10.js'], 60);
+            if (!urls || urls[0].error) urls = (await supabaseClient.storage.from(CONSTANTS.BUCKET).createSignedUrls(['data/dataM7.js','data/dataM8.js','data/dataM9.js','data/dataM10.js'], 60)).data;
             
             if (urls && urls.length > 0) {
                 for (let item of urls) {
@@ -362,7 +362,7 @@
                             if (res.ok) {
                                 let text = await res.text();
                                 let mMatch = item.path.match(/M\d+/);
-                                let mName = mMatch ? mMatch[0] : 'M5'; 
+                                let mName = mMatch ? mMatch[0] : 'M7'; 
                                 let arr = [];
                                 
                                 try {
@@ -967,7 +967,7 @@
         // Khử toàn bộ backtick lồng (nested template literal) để chống lỗi Syntax
         const thDays = CONSTANTS.DAYS_TEXT.map(d => '<th class="sticky-header" style="top:29px; width:35px; z-index: 2;">' + d.replace('Thứ ','T').replace('Chủ nhật','CN') + '</th>').join('');
         const thW = ['W1','W2','W3','W4'].map(w => '<th class="sticky-header" style="top:29px; width:30px; z-index: 2;">' + w + '</th>').join('');
-        const thM = ['M5','M6','M7','M8','M9'].map(m => '<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">' + m + '</th>').join('');
+        const thM = ['M7','M8','M9','M10'].map(m => '<th class="sticky-header ds-col" style="top:29px; width:50px; z-index: 2;">' + m + '</th>').join('');
 
         thead.innerHTML = `
         <tr>
@@ -977,7 +977,7 @@
             <th class="sticky-header" rowspan="2" style="z-index: 3;">Tên KH</th>
             <th class="sticky-header" colspan="7" style="z-index: 3;">Lộ trình</th>
             <th class="sticky-header" colspan="4" style="z-index: 3;">Tần Suất</th>
-            <th class="sticky-header ds-col" colspan="5" style="z-index: 3;">Doanh Số (đ)</th>
+            <th class="sticky-header ds-col" colspan="4" style="z-index: 3;">Doanh Số (đ)</th>
             <th class="sticky-header coord-col" colspan="2" style="z-index: 3;">Tọa Độ</th>
         </tr>
         <tr>
@@ -1008,9 +1008,8 @@
             const isF4 = row.freq === 'F4'; const isF21 = row.freq === 'F2-1'; const isF22 = row.freq === 'F2-2';
 
             let dsKH = AppState.salesData[row.ma_kh] || {};
-            let dsM5 = formatNum(dsKH['M5'] || 0); let dsM6 = formatNum(dsKH['M6'] || 0);
             let dsM7 = formatNum(dsKH['M7'] || 0); let dsM8 = formatNum(dsKH['M8'] || 0);
-            let dsM9 = formatNum(dsKH['M9'] || 0);
+            let dsM9 = formatNum(dsKH['M9'] || 0); let dsM10 = formatNum(dsKH['M10'] || 0);
             
             let displaySTT = row._map_stt || (row._ai_order !== 999 ? row._ai_order : (row.sttRaw || row.rawIndex || ""));
             
@@ -1047,11 +1046,10 @@
                     ${freq2Html}
                     ${freq3Html}
                     ${freq4Html}
-                    <td class="text-right" style="background:#fffbeb;">${dsM5 !== '0' ? dsM5 : '-'}</td>
-                    <td class="text-right" style="background:#fef3c7;">${dsM6 !== '0' ? dsM6 : '-'}</td>
                     <td class="text-right" style="background:#fffbeb;">${dsM7 !== '0' ? dsM7 : '-'}</td>
                     <td class="text-right" style="background:#fef3c7;">${dsM8 !== '0' ? dsM8 : '-'}</td>
-                    <td class="text-right" style="background:#fef3c7;">${dsM9 !== '0' ? dsM9 : '-'}</td>
+                    <td class="text-right" style="background:#fffbeb;">${dsM9 !== '0' ? dsM9 : '-'}</td>
+                    <td class="text-right" style="background:#fef3c7;">${dsM10 !== '0' ? dsM10 : '-'}</td>
                     <td class="text-center bg-slate-100 font-bold">${row.lat || '-'}</td>
                     <td class="text-center bg-slate-100 font-bold">${row.lng || '-'}</td>
                 </tr>
@@ -1125,7 +1123,7 @@
             "Từ ngày tham gia\n(dd/mm/yyyy)", "Đến ngày tham gia\n(dd/mm/yyyy)", 
             "LỘ TRÌNH", "", "", "", "", "", "", 
             "TẦN SUẤT", "", "", "",
-            "Vĩ độ (Lat)", "Kinh độ (Lng)", "Khu vực", "Doanh số M6", "Doanh số M7", "Doanh số M8", "Doanh số M9"
+            "Vĩ độ (Lat)", "Kinh độ (Lng)", "Khu vực", "Doanh số M7", "Doanh số M8", "Doanh số M9", "Doanh số M10"
         ];
         
         let headerRow2 = [
@@ -1185,10 +1183,10 @@
             row[21] = ['F4', 'F2-2'].includes(cust.freq) ? "x" : "";
 
             let dsKH = AppState.salesData[ma_kh] || {};
-            row[25] = dsKH['M6'] || 0;
-            row[26] = dsKH['M7'] || 0;
-            row[27] = dsKH['M8'] || 0;
-            row[28] = dsKH['M9'] || 0;
+            row[25] = dsKH['M7'] || 0;
+            row[26] = dsKH['M8'] || 0;
+            row[27] = dsKH['M9'] || 0;
+            row[28] = dsKH['M10'] || 0;
 
             excelRows.push(row);
         });
